@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import {
-  validateConfig,
-  assembleSystemPrompt,
-  type RouterConfig,
-} from "../../src/index";
+import { validateConfig } from "../../src/router/config";
+import { assembleSystemPrompt } from "../../src/router/protocol";
+import type { RouterConfig } from "../../src/index";
 
 describe("assembled-prompt golden", () => {
   const raw = JSON.parse(

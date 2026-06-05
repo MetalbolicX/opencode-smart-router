@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import {
-  validateConfig,
-  buildDelegationProtocol,
-  type RouterConfig,
-} from "../../src/index";
+import { validateConfig } from "../../src/router/config";
+import { buildDelegationProtocol } from "../../src/router/protocol";
+import type { RouterConfig } from "../../src/index";
 
 describe("protocol golden", () => {
   const raw = JSON.parse(

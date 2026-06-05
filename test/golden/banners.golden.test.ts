@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
-import {
-  fingerprintToolCall,
-  buildCapBanner,
-  type Cap,
-} from "../../src/index";
+import { fingerprintToolCall } from "../../src/guard/fingerprint";
+import { buildCapBanner } from "../../src/router/sessions";
+import type { Cap } from "../../src/index";
 
 describe("fingerprintToolCall golden", () => {
   it("read with file_path", () => {

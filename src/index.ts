@@ -35,47 +35,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
-// Re-exports — keep all public names importable from src/index for backwards
-// compatibility (tests, external consumers, plugin consumers).
+// Re-exports — type-only re-exports for IDE/test consumers.
+// NOTE: value re-exports are intentionally absent. opencode's plugin loader
+// calls every function export as a factory (Ck iterates Object.values(mod));
+// adding named function exports would cause spurious factory calls.
+// Tests import from their specific source files instead of this entry point.
 // ---------------------------------------------------------------------------
 
-export { validateConfig } from "./router/config";
-export { loadConfig, resolvePresetName, writeState, invalidateConfigCache };
 export type { RouterConfig, TierConfig, Preset, ModeConfig, FallbackConfig, EnforcementConfig } from "./router/config";
-export { fingerprintToolCall, detectNarration };
-export {
-  buildDelegationProtocol,
-  isClaudeModel,
-  CLAUDE_ORCHESTRATOR_PREFIX,
-  CLAUDE_ANTI_NARRATION,
-  CLAUDE_TIER_PREFIX,
-  assembleSystemPrompt,
-};
-export { parseCapDirective, buildCapBanner, DEFAULT_TIER_CAPS, READ_ONLY_TOOLS };
 export type { Cap, SubagentState };
-export {
-  createTrajectory,
-  recordToolEvent,
-  setStopReason,
-  trajectoryMetrics,
-  dumpTrajectory,
-  createTrajectoryStore,
-} from "./telemetry/trajectory";
 export type { TrajectoryState, TrajectoryToolEvent } from "./telemetry/trajectory";
-export { resolveEnforcementMode, DEFAULT_ENV_GATE } from "./router/enforcement";
 export type { EnforcementMode } from "./router/enforcement";
-export { createGuardStore } from "./guard/store";
-export { guardBeforeCall, guardAfterCall, buildGuardPolicy, DEFAULT_GUARD_BUDGET } from "./guard/enforce";
-export { scrubText } from "./guard/scrub";
-export {
-  evaluateGuards,
-  updateState,
-  newGuardState,
-  forcingMessage,
-  observationOk,
-  classify,
-  isSelfScript,
-} from "./guard/guards";
 export type { GuardPolicy, GuardState, GuardCall, GuardDecision } from "./guard/guards";
 
 function saveActivePreset(presetName: string): void {

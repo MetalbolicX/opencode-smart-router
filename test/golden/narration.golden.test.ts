@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectNarration } from "../../src/index";
+import { detectNarration } from "../../src/guard/narration";
 
 describe("detectNarration golden", () => {
   it("short string under 20 chars", () => {
