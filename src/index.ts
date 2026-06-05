@@ -10,6 +10,22 @@ import {
 import type { RouterConfig, TierConfig, Preset, ModeConfig } from "./router/config";
 import { fingerprintToolCall } from "./guard/fingerprint";
 import { detectNarration } from "./guard/narration";
+import {
+  getActiveTiers,
+  buildDelegationProtocol,
+  isClaudeModel,
+  CLAUDE_TIER_PREFIX,
+  CLAUDE_ORCHESTRATOR_PREFIX,
+  CLAUDE_ANTI_NARRATION,
+  assembleSystemPrompt,
+} from "./router/protocol";
+import {
+  createSessionStore,
+  parseCapDirective,
+  buildCapBanner,
+  DEFAULT_TIER_CAPS,
+} from "./router/sessions";
+import type { Cap, SubagentState } from "./router/sessions";
 
 // ---------------------------------------------------------------------------
 // Re-exports — keep all public names importable from src/index for backwards
@@ -20,6 +36,16 @@ export { validateConfig } from "./router/config";
 export { loadConfig, resolvePresetName, writeState, invalidateConfigCache };
 export type { RouterConfig, TierConfig, Preset, ModeConfig, FallbackConfig, EnforcementConfig } from "./router/config";
 export { fingerprintToolCall, detectNarration };
+export {
+  buildDelegationProtocol,
+  isClaudeModel,
+  CLAUDE_ORCHESTRATOR_PREFIX,
+  CLAUDE_ANTI_NARRATION,
+  CLAUDE_TIER_PREFIX,
+  assembleSystemPrompt,
+};
+export { parseCapDirective, buildCapBanner, DEFAULT_TIER_CAPS };
+export type { Cap, SubagentState };
 
 function saveActivePreset(presetName: string): void {
   const cfg = loadConfig();
@@ -48,10 +74,6 @@ function saveActiveMode(modeName: string): void {
   invalidateConfigCache();
 }
 
-function getActiveTiers(cfg: RouterConfig): Preset {
-  return cfg.presets[cfg.activePreset] ?? Object.values(cfg.presets)[0]!;
-}
-
 // ---------------------------------------------------------------------------
 // Build agent options from tier config
 // ---------------------------------------------------------------------------
@@ -77,154 +99,6 @@ function buildAgentOptions(tier: TierConfig): Record<string, unknown> {
   }
 
   return Object.keys(opts).length > 0 ? opts : {};
-}
-
-// ---------------------------------------------------------------------------
-// Mode helpers
-// ---------------------------------------------------------------------------
-
-function getActiveMode(cfg: RouterConfig): ModeConfig | undefined {
-  if (!cfg.modes || !cfg.activeMode) return undefined;
-  return cfg.modes[cfg.activeMode];
-}
-
-// ---------------------------------------------------------------------------
-// Fallback instructions builder
-// ---------------------------------------------------------------------------
-
-function buildFallbackInstructions(cfg: RouterConfig): string {
-  const fb = cfg.fallback;
-  if (!fb) return "";
-
-  const presetMap = fb.presets?.[cfg.activePreset];
-  const map =
-    presetMap && Object.keys(presetMap).length > 0 ? presetMap : fb.global;
-  if (!map) return "";
-
-  const chains = Object.entries(map).flatMap(([provider, presetOrder]) => {
-    if (!Array.isArray(presetOrder)) return [];
-    const valid = presetOrder.filter(
-      (p) => p !== cfg.activePreset && Boolean(cfg.presets[p]),
-    );
-    return valid.length > 0 ? [`${provider}→${valid.join("→")}`] : [];
-  });
-
-  if (chains.length === 0) return "";
-  return `Err→retry-alt-tier→fail→direct. Chain: ${chains.join(" | ")}`;
-}
-
-// ---------------------------------------------------------------------------
-// Cost & taxonomy builders
-// ---------------------------------------------------------------------------
-
-function buildTaskTaxonomy(cfg: RouterConfig): string {
-  if (!cfg.taskPatterns || Object.keys(cfg.taskPatterns).length === 0)
-    return "";
-  const lines = ["R:"];
-  for (const [tier, patterns] of Object.entries(cfg.taskPatterns)) {
-    if (Array.isArray(patterns) && patterns.length > 0) {
-      lines.push(`@${tier}→${patterns.join("/")}`);
-    }
-  }
-  return lines.join(" ");
-}
-
-/**
- * Injects a multi-phase decomposition hint into the delegation protocol.
- * Teaches the orchestrator to split composite tasks (explore + implement)
- * so the cheap @fast tier handles exploration and @medium handles execution.
- * Only active in normal mode — budget/quality modes have their own override rules.
- */
-function buildDecomposeHint(cfg: RouterConfig): string {
-  const mode = getActiveMode(cfg);
-  // Budget and quality modes handle this via overrideRules — skip to avoid conflicts
-  if (mode?.overrideRules?.length) return "";
-
-  const tiers = getActiveTiers(cfg);
-  const entries = Object.entries(tiers);
-  if (entries.length < 2) return "";
-
-  // Sort by costRatio ascending to find cheapest (explore) and next (execute) tiers
-  const sorted = [...entries].sort(
-    ([, a], [, b]) => (a.costRatio ?? 1) - (b.costRatio ?? 1),
-  );
-  const cheapest = sorted[0]?.[0];
-  const mid = sorted[1]?.[0];
-  if (!cheapest || !mid) return "";
-
-  return `Multi-phase: prefer explore(@${cheapest})→execute(@${mid}) when phases are separable. Cheapest-first when practical.`;
-}
-
-// ---------------------------------------------------------------------------
-// System prompt builder
-// ---------------------------------------------------------------------------
-
-export function buildDelegationProtocol(cfg: RouterConfig): string {
-  const tiers = getActiveTiers(cfg);
-
-  // Compact tier summary: @name=model/variant(costRatio)
-  const tierLine = Object.entries(tiers)
-    .map(([name, t]) => {
-      const short = t.model.split("/").pop() ?? t.model;
-      const v = t.variant ? `/${t.variant}` : "";
-      const c = t.costRatio != null ? `(${t.costRatio}x)` : "";
-      return `@${name}=${short}${v}${c}`;
-    })
-    .join(" ");
-
-  const mode = getActiveMode(cfg);
-  const modeSuffix = cfg.activeMode ? ` mode:${cfg.activeMode}` : "";
-
-  const taxonomy = buildTaskTaxonomy(cfg);
-  const decompose = buildDecomposeHint(cfg);
-
-  const effectiveRules = mode?.overrideRules?.length
-    ? mode.overrideRules
-    : cfg.rules;
-  const rulesLine = effectiveRules.map((r, i) => `${i + 1}.${r}`).join(" ");
-
-  const fallback = buildFallbackInstructions(cfg);
-
-  return [
-    `## Model Delegation Protocol — MANDATORY`,
-    ``,
-    `You are the orchestrator. Information-gathering is NOT orchestration — it IS execution. Execution belongs to subagents, not to you.`,
-    ``,
-    `Preset: ${cfg.activePreset}. Tiers: ${tierLine}.${modeSuffix}`,
-    ``,
-    `### HARD ROUTING (non-negotiable)`,
-    `- **Read-only work** (grep, glob, read, ls, lookup, count, git-info, doc-lookup, type-check, exists-check) → default to \`Task(subagent_type="fast", ...)\`. Self-cap (TARGET): ≤2 direct read-only calls per user turn; on the 3rd read-only need, dispatch @fast instead. You may exceed with a 1-line \`reason:\` note when dispatching feels clearly wrong. Rationale: every tool-result token is billed at your tier rate — a grep via @fast costs ~20x less than the same grep here.`,
-    `- **Implementation work** (write, edit, refactor, tests, bug-fix, build-fix, create-file, config, api-endpoint) → \`Task(subagent_type="medium", ...)\`.`,
-    `- **Architecture / security / perf / debugging after ≥2 failures / multi-system tradeoffs / RCA** → \`Task(subagent_type="heavy", ...)\`, UNLESS you ARE @heavy (opus); then handle locally and never self-call @heavy.`,
-    ``,
-    `### DISPATCH CAPS (read-only budget per subagent)`,
-    `Subagents carry a TARGET cap on their own read-only tool calls (baseline: @fast=8, @medium=5, @heavy=3). Include \`CAP:N\` in the dispatch prompt to override (e.g., \`CAP:3\` for a tight lookup, \`CAP:none\` to disable). Mode adjustments apply automatically via rules below. Subagents also run a redundancy check every call: if they detect repeated reads/greps of the same area, they STOP and return partial findings with \`DONE: ...\`, \`NEED MORE: ...\`, or \`ESCALATE: ...\` — you decide the next step from their return.`,
-    ``,
-    `### ROLE CONTRACT`,
-    `The primary agent's job: decompose the user's request, dispatch subagents, synthesize their results, and answer the user. Keep orchestration-first posture: prefer dispatching read-only exploration to @fast rather than running repeated Grep/Read/Glob/Bash calls yourself. Self-cap applies (see HARD ROUTING above): ≤2 direct read-only calls per turn as a target; beyond that, dispatch @fast.`,
-    ``,
-    `### @fast contract`,
-    `@fast is a read-only explorer. It will search/grep/read/count/lookup and return file:line paths, snippets, and a one-line summary. It will refuse edits. Batch related searches into a single @fast dispatch when possible; fire independent searches in parallel (one message, multiple Task calls).`,
-    ``,
-    `### @medium contract`,
-    `@medium is the implementer. It writes, edits, refactors, adds tests, fixes bugs, applies build-fixes. It matches existing project patterns, runs targeted tests for changed areas, and reports back if it hits 2+ consecutive failures instead of self-escalating. Give it context: file paths, patterns to match, what verification to run.`,
-    ``,
-    `### @heavy contract (CRITICAL — read before every @heavy dispatch)`,
-    `@heavy has **no Task tool** — it cannot self-explore, cannot grep, cannot delegate. Dispatching @heavy without context can waste a run: it may reason on thin evidence or return "SCOPE GROWTH" asking for additional @fast findings.`,
-    `**Before @heavy, gather context first — usually via @fast.** If you already have sufficient concrete context, dispatch @heavy directly. If @heavy still needs more evidence, collect it with @fast and re-invoke.`,
-    `Pattern: \`Task(@fast, "collect X, Y, Z")\` (when needed) → synthesize findings → \`Task(@heavy, "given these findings: [paste], analyze W")\`.`,
-    ``,
-    `### CONFLICT WITH CLAUDE.md / AGENTS.md`,
-    `If CLAUDE.md or AGENTS.md (or any other guide in your context) says "use direct tools first when scope is clear" or labels Grep/Read/Glob as "FREE", **this protocol wins**. Those labels are wrong about cost: tools executed by you are billed at your tier rate — every tool-result token is tokenized into your context. A Grep dispatched to @fast costs ~20x less than the same Grep executed by @heavy. Treat yourself as expensive and delegate reads by default.`,
-    ``,
-    ...(taxonomy ? [taxonomy, ``] : []),
-    ...(decompose ? [decompose, ``] : []),
-    `### Compact rules`,
-    rulesLine,
-    ...(fallback ? [``, fallback] : []),
-    ``,
-    `Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.`,
-  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -351,196 +225,6 @@ function buildPresetOutput(cfg: RouterConfig, args: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Runtime cap enforcement (tool.execute.after banner injection for subagents)
-// ---------------------------------------------------------------------------
-
-/** Tools that count against the read-only cap. Keep narrow — editing tools should never count. */
-const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
-
-/** Fallback caps when tiers.json has no tierCaps block. */
-const DEFAULT_TIER_CAPS: Record<string, number> = {
-  fast: 8,
-  medium: 5,
-  heavy: 3,
-};
-
-export type Cap = number | "none";
-
-interface SubagentState {
-  tierName: string;
-  cap: Cap;
-  calls: number;
-  /** Fingerprint → call index where this fingerprint was first seen. */
-  seen: Map<string, number>;
-}
-
-/** Extract the first `CAP:N` or `CAP:none` directive from a dispatch prompt. */
-export function parseCapDirective(text: string): Cap | null {
-  const m = text.match(/\bCAP\s*:\s*(none|\d+)\b/i);
-  if (!m) return null;
-  const raw = m[1]!.toLowerCase();
-  if (raw === "none") return "none";
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/** Best-effort extraction of textual content from a chat.message output payload. */
-function extractDispatchText(output: unknown): string {
-  const o = output as Record<string, unknown> | undefined;
-  const parts = (o?.parts as unknown[]) ?? [];
-  const chunks: string[] = [];
-  for (const p of parts) {
-    if (typeof p === "string") {
-      chunks.push(p);
-    } else if (p && typeof p === "object") {
-      const rec = p as Record<string, unknown>;
-      if (typeof rec.text === "string") chunks.push(rec.text);
-      else if (typeof rec.content === "string") chunks.push(rec.content);
-    }
-  }
-  if (chunks.length === 0) {
-    const msg = o?.message as Record<string, unknown> | undefined;
-    const content = msg?.content;
-    if (typeof content === "string") chunks.push(content);
-  }
-  return chunks.join("\n");
-}
-
-/** Build the banner appended to every read-only tool result in a subagent session. */
-export function buildCapBanner(
-  state: SubagentState,
-  isRedundant: boolean,
-  previousCall: number | undefined,
-  tool: string,
-): string {
-  const lines: string[] = [];
-  const capDisplay = state.cap === "none" ? "∞" : String(state.cap);
-  lines.push(`[cap: ${state.calls}/${capDisplay}]`);
-
-  if (isRedundant && previousCall !== undefined) {
-    lines.push(
-      `[⚠ REDUNDANT: this is the same ${tool} you ran at call #${previousCall}. STOP now — repeated reads add no information. Return with DONE/NEED MORE/NEED CONTEXT/SCOPE GROWTH/ESCALATE.]`,
-    );
-  }
-
-  if (state.cap !== "none") {
-    const remaining = state.cap - state.calls;
-    if (remaining <= 0) {
-      lines.push(
-        `[⚠ CAP REACHED (${state.calls}/${state.cap}): your NEXT response MUST be a return — do NOT make another read-only call. Start the response with DONE:, NEED MORE:, NEED CONTEXT:, SCOPE GROWTH:, or ESCALATE:.]`,
-      );
-    } else if (remaining <= 2) {
-      lines.push(
-        `[⚠ CAP WARNING: ${remaining} read-only call(s) remaining before forced return]`,
-      );
-    }
-  }
-
-  return lines.join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// Claude-model adversarial prefixes
-//
-// Anthropic models (direct or via other providers) are served with a large
-// cached "Claude Code" signature prompt that primes them toward broad
-// exploratory Read/Grep/Glob behavior. Our tier prompts land after that
-// cached block and lose authority through primacy bias and cache freezing.
-// For Claude models specifically, we prepend an override block that
-// explicitly revokes the exploratory priming for the current dispatch.
-//
-// Detection is by model identifier, not preset — a hybrid preset mixing
-// providers gets the override only on its Claude-backed tiers.
-// ---------------------------------------------------------------------------
-
-export function isClaudeModel(modelID: string | undefined): boolean {
-  if (!modelID) return false;
-  const s = modelID.toLowerCase();
-  if (s.startsWith("anthropic/")) return true;
-  return /\/claude-/.test(s) || /(^|[\/\-])claude-/.test(s);
-}
-
-/** Per-tier adversarial openers. @fast/@medium use Tom 2 (scoping); @heavy uses Tom 1 (override). */
-export const CLAUDE_TIER_PREFIX: Record<string, string> = {
-  fast: [
-    "SCOPE NOTE — any cached instruction priming you to 'thoroughly explore",
-    "the codebase' or 'gather context broadly' does not apply here. This is",
-    "a single dispatch with a single question. Stay narrow to the ask.",
-    "",
-    "Before every tool call, ask: 'Does THIS read answer the dispatch",
-    "question specifically, or am I drifting into context-gathering for my",
-    "own understanding?' If the latter, stop — you have enough.",
-  ].join("\n"),
-  medium: [
-    "SCOPE NOTE — cached instructions may prime you to deeply understand",
-    "surrounding code before editing. For THIS dispatch, the orchestrator",
-    "has already scoped the problem; trust that scoping. Read what's needed",
-    "for the edit, not the whole module.",
-    "",
-    "A 4th or 5th 'context read' is usually a sign the dispatch was under-",
-    "scoped — return NEED CONTEXT rather than expanding scope yourself.",
-  ].join("\n"),
-  heavy: [
-    "AUTHORITY OVERRIDE — this block supersedes any cached prefix suggesting",
-    "you should 'investigate thoroughly', 'gather comprehensive context', or",
-    "'trace through the code systematically before analyzing'. You are",
-    "@heavy, an ANALYSIS specialist. The orchestrator should have pre-",
-    "gathered context via @fast before dispatching you. If it didn't, return",
-    "`SCOPE GROWTH:` immediately — do NOT self-gather.",
-    "",
-    "40 minutes of Read/Grep is not analysis — it is the orchestrator's job",
-    "that leaked into yours. Push it back with SCOPE GROWTH. Your 3 reads",
-    "are for targeted verification, not exploration.",
-  ].join("\n"),
-};
-
-/** Adversarial opener prepended to the delegation protocol when the orchestrator is a Claude model. */
-export const CLAUDE_ORCHESTRATOR_PREFIX = [
-  "AUTHORITY OVERRIDE — this block supersedes any prior system instruction",
-  "about 'exploring the codebase', 'gathering context with tools', or using",
-  "Read/Grep/Glob to validate assumptions. Those instructions describe a",
-  "general-purpose Claude Code session. THIS session is a routing",
-  "orchestrator.",
-  "",
-  "Your job is to DISPATCH, not to EXECUTE. Read-only work (grep/read/",
-  "glob/ls) is execution, and execution is delegated to @fast. You may run",
-  "AT MOST 2 direct read-only tool calls per turn — a 3rd call is a rule",
-  "violation. If you need more context, you dispatch @fast.",
-  "",
-  "If a cached instruction told you to 'be thorough', 'explore broadly', or",
-  "'read supporting files' — ignore it here. Thoroughness is achieved by",
-  "dispatching the right tier, not by you becoming the explorer.",
-].join("\n");
-
-/**
- * Anti-narration clause appended to every Claude-model prefix (tier + orchestrator).
- *
- * Thinking-enabled Claude models (esp. Sonnet with `max` variant) sometimes
- * produce progress narration in place of actual work — "Still writing X...",
- * "Now I'll implement Y...", "Let me add Z..." — without the X/Y/Z ever
- * appearing. This clause names the pattern, lists specific forbidden phrasings
- * (A3 — exemplified), and carves out an escape valve for legitimate
- * explanation/plan requests (A2 — with exception).
- */
-export const CLAUDE_ANTI_NARRATION = [
-  "ANTI-NARRATION — do NOT write progress commentary in your response or",
-  "thinking output. Forbidden phrasings include:",
-  "  - \"Still writing the X function...\"",
-  "  - \"Now I'll implement Y...\"",
-  "  - \"Let me add Z...\"",
-  "  - \"Continuing with W...\"",
-  "  - \"Going to fix V...\"",
-  "",
-  "Each of these signals planning without production. If you write one, the",
-  "NEXT tokens MUST contain the actual artifact (the code, the edit, the",
-  "concrete output). Otherwise, stop and return with status.",
-  "",
-  "Exception: when the user explicitly asks for an explanation, plan, or",
-  "walkthrough, prose is welcome — this rule targets unsolicited progress",
-  "narration during code and implementation tasks.",
-].join("\n");
-
-// ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
 
@@ -548,14 +232,8 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
   let cfg = loadConfig();
   const activeTiers = getActiveTiers(cfg);
 
-  // Track subagent sessions so we can skip delegation protocol injection.
-  // Populated by chat.params (which has the agent name) before system.transform fires.
-  const subagentSessionIDs = new Set<string>();
-
-  // Per-subagent-session cap state for runtime enforcement. Populated on chat.message,
-  // read/updated by tool.execute.after. Keyed by sessionID. Orchestrator sessions are
-  // intentionally NOT tracked here (per user decision: enforce on subagents only).
-  const subagentCapState = new Map<string, SubagentState>();
+  // Per-plugin-instance session store: owns subagentSessionIDs and subagentCapState.
+  const sessionStore = createSessionStore();
 
   // Bypass mode: when true, the router skips all system prompt injection,
   // subagent tracking, cap enforcement, and narration detection for the
@@ -588,24 +266,7 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
         cfg = loadConfig();
       } catch {}
       const tierNames = Object.keys(getActiveTiers(cfg));
-      if (input.agent && tierNames.includes(input.agent)) {
-        subagentSessionIDs.add(input.sessionID);
-
-        // Initialize cap state on first dispatch; reset on subsequent rounds to the same
-        // subagent session (rare but supported — treats each round as a fresh budget).
-        const tierName = input.agent as string;
-        const dispatchText = extractDispatchText(output);
-        const override = parseCapDirective(dispatchText);
-        const baseline =
-          cfg.tierCaps?.[tierName] ?? DEFAULT_TIER_CAPS[tierName] ?? 5;
-        const cap: Cap = override ?? baseline;
-        subagentCapState.set(input.sessionID, {
-          tierName,
-          cap,
-          calls: 0,
-          seen: new Map(),
-        });
-      }
+      sessionStore.registerFromChatMessage(input, output, cfg, tierNames);
     },
 
     // -----------------------------------------------------------------------
@@ -617,24 +278,7 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
     // -----------------------------------------------------------------------
     "tool.execute.after": async (input: any, output: any) => {
       if (bypassed) return;
-      const state = subagentCapState.get(input.sessionID);
-      if (!state) return; // not a tracked subagent session
-      if (!READ_ONLY_TOOLS.has(input.tool)) return;
-
-      const fp = fingerprintToolCall(input.tool, input.args);
-      const previousCall = state.seen.get(fp);
-      const isRedundant = previousCall !== undefined;
-
-      state.calls += 1;
-      if (!isRedundant) {
-        state.seen.set(fp, state.calls);
-      }
-
-      const banner = buildCapBanner(state, isRedundant, previousCall, input.tool);
-
-      const existing =
-        typeof output.output === "string" ? output.output : "";
-      output.output = existing ? `${existing}\n\n${banner}` : banner;
+      sessionStore.recordToolCall(input, output);
     },
 
     // -----------------------------------------------------------------------
@@ -772,7 +416,7 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
       // Skip injection for child (subagent) sessions.
       // Child sessions are detected via session.created events with a parentID.
       const sessionID = _input?.sessionID;
-      if (sessionID && subagentSessionIDs.has(sessionID)) return;
+      if (sessionID && sessionStore.isSubagent(sessionID)) return;
 
       // For Claude-backed orchestrators, prepend an adversarial opener that
       // revokes the cached "Claude Code explorer" priming for the routing
@@ -780,12 +424,8 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
       const providerID = _input?.model?.providerID ?? "";
       const modelID = _input?.model?.modelID ?? "";
       const orchestratorModel = providerID && modelID ? `${providerID}/${modelID}` : modelID;
-      const delegationProtocol = buildDelegationProtocol(cfg);
-      const finalProtocol = isClaudeModel(orchestratorModel)
-        ? `${CLAUDE_ORCHESTRATOR_PREFIX}\n\n${CLAUDE_ANTI_NARRATION}\n\n---\n\n${delegationProtocol}`
-        : delegationProtocol;
 
-      output.system.push(finalProtocol);
+      output.system.push(assembleSystemPrompt(cfg, orchestratorModel));
     },
 
     // -----------------------------------------------------------------------
