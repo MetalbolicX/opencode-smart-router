@@ -108,7 +108,7 @@ export function buildCapBanner(
 // ---------------------------------------------------------------------------
 
 /** Tools that count against the read-only cap. Keep narrow — editing tools should never count. */
-const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
+export const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
 
 // ---------------------------------------------------------------------------
 // Session store factory

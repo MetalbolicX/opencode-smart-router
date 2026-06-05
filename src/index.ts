@@ -24,8 +24,13 @@ import {
   parseCapDirective,
   buildCapBanner,
   DEFAULT_TIER_CAPS,
+  READ_ONLY_TOOLS,
 } from "./router/sessions";
 import type { Cap, SubagentState } from "./router/sessions";
+import { createTrajectoryStore } from "./telemetry/trajectory";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Re-exports — keep all public names importable from src/index for backwards
@@ -44,8 +49,19 @@ export {
   CLAUDE_TIER_PREFIX,
   assembleSystemPrompt,
 };
-export { parseCapDirective, buildCapBanner, DEFAULT_TIER_CAPS };
+export { parseCapDirective, buildCapBanner, DEFAULT_TIER_CAPS, READ_ONLY_TOOLS };
 export type { Cap, SubagentState };
+export {
+  createTrajectory,
+  recordToolEvent,
+  setStopReason,
+  trajectoryMetrics,
+  dumpTrajectory,
+  createTrajectoryStore,
+} from "./telemetry/trajectory";
+export type { TrajectoryState, TrajectoryToolEvent } from "./telemetry/trajectory";
+export { resolveEnforcementMode, DEFAULT_ENV_GATE } from "./router/enforcement";
+export type { EnforcementMode } from "./router/enforcement";
 
 function saveActivePreset(presetName: string): void {
   const cfg = loadConfig();
@@ -235,6 +251,12 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
   // Per-plugin-instance session store: owns subagentSessionIDs and subagentCapState.
   const sessionStore = createSessionStore();
 
+  // Per-plugin-instance trajectory store (Phase 0.3 scaffolding — RECORD-ONLY).
+  // Observes subagent tool activity to build a per-session scorecard. It emits
+  // NOTHING into any model-visible output; the only externally observable effect
+  // is an opt-in debug dump gated behind MODEL_ROUTER_TRAJECTORY_DEBUG=1.
+  const trajectoryStore = createTrajectoryStore();
+
   // Bypass mode: when true, the router skips all system prompt injection,
   // subagent tracking, cap enforcement, and narration detection for the
   // current plugin lifetime (i.e., until OpenCode is restarted).
@@ -267,6 +289,12 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
       } catch {}
       const tierNames = Object.keys(getActiveTiers(cfg));
       sessionStore.registerFromChatMessage(input, output, cfg, tierNames);
+
+      // Record-only: initialise a trajectory scorecard for tracked subagents.
+      const sid = input?.sessionID;
+      if (sid && sessionStore.isSubagent(sid)) {
+        trajectoryStore.ensure(sid, input?.agent ?? null);
+      }
     },
 
     // -----------------------------------------------------------------------
@@ -279,6 +307,16 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
     "tool.execute.after": async (input: any, output: any) => {
       if (bypassed) return;
       sessionStore.recordToolCall(input, output);
+
+      // Record-only trajectory observation (mutates internal maps only; never
+      // touches output, so emitted banners/observations stay byte-identical).
+      const sid = input?.sessionID;
+      if (sid && sessionStore.isSubagent(sid) && typeof input?.tool === "string") {
+        trajectoryStore.recordToolEvent(sid, {
+          tool: input.tool,
+          readOnly: READ_ONLY_TOOLS.has(input.tool),
+        });
+      }
     },
 
     // -----------------------------------------------------------------------
@@ -302,6 +340,29 @@ const ModelRouterPlugin: Plugin = async (_ctx: PluginInput) => {
         .map((m) => `"${m.slice(0, 60)}${m.length > 60 ? "…" : ""}"`)
         .join(", ");
       output.text = `${text}\n\n[⚠ narration detected: ${quoted}]`;
+    },
+
+    // -----------------------------------------------------------------------
+    // Gated trajectory debug dump (Phase 0.3, T0.3.3) — RECORD-ONLY, OPT-IN.
+    // No-op unless MODEL_ROUTER_TRAJECTORY_DEBUG=1. On session.idle, writes the
+    // session's trajectory scorecard to a throwaway file under the OS temp dir
+    // for manual inspection. Best-effort; never throws into the session.
+    // Emits nothing model-visible, so GA-1 (no-regression) is preserved.
+    // -----------------------------------------------------------------------
+    event: async ({ event }: any) => {
+      if (process.env.MODEL_ROUTER_TRAJECTORY_DEBUG !== "1") return;
+      if (event?.type !== "session.idle") return;
+      const sid = event?.properties?.sessionID;
+      if (typeof sid !== "string") return;
+      const dump = trajectoryStore.dump(sid);
+      if (!dump) return;
+      try {
+        const dir = join(tmpdir(), "opencode-model-router-trajectory");
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, `${sid}.log`), dump + "\n", { flag: "a" });
+      } catch {
+        // best-effort: a debug dump must never crash a real session
+      }
     },
 
     // -----------------------------------------------------------------------
