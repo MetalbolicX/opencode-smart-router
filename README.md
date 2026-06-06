@@ -579,6 +579,43 @@ Defines provider fallback order when a delegated task fails:
 }
 ```
 
+## Enforced delegation (opt-in)
+
+The read-only cap banners described above are advisory: a well-behaved subagent will respect them, but nothing prevents a model from making one more read after the `[⚠ CAP REACHED]` banner. The optional **enforcement layer** turns delegation into a produce → verify → accept/escalate loop with real hard-blocks, independent acceptance, and quality escalation. It is **opt-in and off by default** — with `enforcement` absent from `tiers.json` or `"mode": "off"` set explicitly, routing behaviour is byte-for-byte unchanged: zero added prompt tokens, zero new latency.
+
+### The three enforcement layers
+
+- **Layer 1 — hard-block guard.** A `tool.execute.before` hook throws before a disallowed tool call executes, stopping budget overruns, redundant reads, and throwaway-script sidesteps in subagent sessions.
+- **Layer 2 — independent acceptance gate.** Every non-trivial delegation carries a Definition-of-Done (DoD) that is checked — deterministically or by an independent grader at ≥ the producer's tier — before the result is trusted. The producer never grades its own output.
+- **Layer 3 — quality-escalation ladder.** On a failed check: retry once, then escalate fast → medium → heavy, bounded by attempt and cost ceilings. The loop ends in an honest `status: unmet` rather than a fabricated pass.
+
+### Two operating modes
+
+- **Mode A — on-the-fly.** The orchestrator calls the plugin's `delegate` tool (or a raw `Task()` call is observed and annotated) and the full enforcement pipeline runs automatically.
+- **Mode B — plan-annotated.** `/annotate-plan` emits `[tier:X]` plus an `[acceptance]` block per task; the enforcement loop is wired up at execution time based on those annotations.
+
+### Enabling enforcement
+
+Three equivalent ways to turn it on:
+
+1. Add an `enforcement` block to `tiers.json` with `"mode": "advisory"` or `"mode": "enforced"` (see `docs/CONFIG_REFERENCE.md`).
+2. Set `MODEL_ROUTER_ENFORCE=1` in your environment to try it for a session (equivalent to `mode: "enforced"`).
+3. Run `/router enforce <off|advisory|enforced>` from the chat to toggle at runtime.
+
+**Modes:** `off` — no-op, identical to having no `enforcement` key; `advisory` — evaluates and surfaces guidance, never blocks (safe adoption step); `enforced` — hard-blocks active, full produce → verify → accept/escalate pipeline.
+
+> Enforcement applies to subagent/delegate sessions only. The orchestrator session is never hard-blocked.
+
+### Deep-dive documentation
+
+- `docs/ENFORCEMENT.md` — architecture, hook wiring, session lifecycle
+- `docs/VERIFICATION.md` — DoD schema, deterministic checks, grader dispatch
+- `docs/ESCALATION.md` — escalation ladder configuration and cost ceilings
+- `docs/CONFIG_REFERENCE.md` — full `enforcement` block schema
+- `docs/ENFORCEMENT_PRESETS.md` — ready-to-paste enforcement presets
+
+> These files are not included in the npm tarball. This section is the self-contained summary; the docs are available in the repository for contributors and advanced users.
+
 ## Commands
 
 | Command | Description |
