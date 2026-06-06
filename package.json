@@ -1,6 +1,6 @@
 {
   "name": "opencode-model-router",
-  "version": "1.1.15",
+  "version": "1.2.0",
   "description": "OpenCode plugin that routes tasks to tiered subagents (fast/medium/heavy) based on complexity",
   "type": "module",
   "main": "./src/index.ts",
@@ -8,7 +8,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "smoke": "cross-env RUN_OC_SMOKE=1 vitest run test/smoke",
+    "smoke": "cross-env RUN_OC_SMOKE=1 vitest run --config vitest.smoke.config.ts test/smoke",
     "typecheck": "tsc --noEmit"
   },
   "license": "GPL-3.0-only",
