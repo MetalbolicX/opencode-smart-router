@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,11 +9,16 @@ import {
   saveActivePreset,
   saveActiveMode,
   saveEnforcementMode,
+  globalConfigPath,
+  localConfigPath,
+  configPath as realConfigPath,
 } from "../../src/router/config";
 
 let tmpHome: string;
 let origHOME: string | undefined;
 let origUSERPROFILE: string | undefined;
+let origCwd: string;
+let tmpCwd: string;
 
 beforeEach(() => {
   origHOME = process.env["HOME"];
@@ -25,6 +30,12 @@ beforeEach(() => {
   mkdirSync(tmpHome, { recursive: true });
   process.env["HOME"] = tmpHome;
   process.env["USERPROFILE"] = tmpHome;
+
+  origCwd = process.cwd();
+  tmpCwd = join(tmpHome, "cwd");
+  mkdirSync(tmpCwd, { recursive: true });
+  process.chdir(tmpCwd);
+
   invalidateConfigCache();
 });
 
@@ -33,6 +44,7 @@ afterEach(() => {
   else process.env["HOME"] = origHOME;
   if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
   else process.env["USERPROFILE"] = origUSERPROFILE;
+  process.chdir(origCwd);
   invalidateConfigCache();
 });
 
@@ -111,5 +123,380 @@ describe("saveEnforcementMode", () => {
   it("does not affect the activePreset key on the state file", () => {
     saveEnforcementMode("enforced");
     expect(readState().activePreset).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layered manual config (bundled / global / local) + state overlay
+// ---------------------------------------------------------------------------
+
+/** Stage `content` at `<tmpHome>/.config/opencode-model-router/tiers.json`. */
+function stageGlobal(content: string | Record<string, unknown>): void {
+  const dir = join(tmpHome, ".config", "opencode-model-router");
+  mkdirSync(dir, { recursive: true });
+  const p = join(dir, "tiers.json");
+  if (typeof content === "string") {
+    writeFileSync(p, content, "utf-8");
+  } else {
+    writeFileSync(p, JSON.stringify(content), "utf-8");
+  }
+}
+
+/** Stage `content` at `<tmpCwd>/.opencode/tiers.json`. */
+function stageLocal(content: string | Record<string, unknown>): void {
+  const dir = join(tmpCwd, ".opencode");
+  mkdirSync(dir, { recursive: true });
+  const p = join(dir, "tiers.json");
+  if (typeof content === "string") {
+    writeFileSync(p, content, "utf-8");
+  } else {
+    writeFileSync(p, JSON.stringify(content), "utf-8");
+  }
+}
+
+function clearGlobal(): void {
+  rmSync(globalConfigPath(), { force: true });
+}
+
+function clearLocal(): void {
+  rmSync(localConfigPath(), { force: true });
+}
+
+describe("globalConfigPath / localConfigPath", () => {
+  it("globalConfigPath resolves under $HOME/.config/opencode-model-router/tiers.json", () => {
+    expect(globalConfigPath()).toBe(
+      join(tmpHome, ".config", "opencode-model-router", "tiers.json"),
+    );
+  });
+
+  it("localConfigPath resolves under process.cwd()/.opencode/tiers.json", () => {
+    expect(localConfigPath()).toBe(join(tmpCwd, ".opencode", "tiers.json"));
+  });
+
+  it("localConfigPath reflects current cwd on each call", () => {
+    const otherCwd = join(tmpHome, "other-cwd");
+    mkdirSync(otherCwd, { recursive: true });
+    process.chdir(otherCwd);
+    expect(localConfigPath()).toBe(join(otherCwd, ".opencode", "tiers.json"));
+  });
+});
+
+describe("Layered config — bundled-only (no overrides)", () => {
+  it("loads bundled defaults when global and local are absent", () => {
+    clearGlobal();
+    clearLocal();
+    const cfg = loadConfig();
+    // Bundled tiers.json sets activePreset to "anthropic" by default.
+    expect(cfg.activePreset).toBe("anthropic");
+    expect(cfg.presets["anthropic"]).toBeDefined();
+    expect(cfg.presets["openai"]).toBeDefined();
+  });
+});
+
+describe("Layered config — precedence table", () => {
+  it("global scalar overrides bundled scalar; unrelated bundled fields preserved", () => {
+    stageGlobal({ activePreset: "openai" });
+    clearLocal();
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("openai");
+    // Bundled's anthropic preset is unrelated and must survive.
+    expect(cfg.presets["anthropic"]).toBeDefined();
+    expect(cfg.presets["google"]).toBeDefined();
+  });
+
+  it("local scalar overrides bundled scalar when global is absent", () => {
+    clearGlobal();
+    stageLocal({ activePreset: "github-copilot" });
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("github-copilot");
+    expect(cfg.presets["anthropic"]).toBeDefined();
+  });
+
+  it("local wins over global when both present", () => {
+    stageGlobal({ activePreset: "openai" });
+    stageLocal({ activePreset: "google" });
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("google");
+  });
+
+  it("all three layers: local > global > bundled for the same field", () => {
+    // Bundled has anthropic; global pushes it to openai; local pushes it to google.
+    stageGlobal({ activePreset: "openai" });
+    stageLocal({ activePreset: "google" });
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("google");
+  });
+
+  it("array values: local array replaces bundled (no concat)", () => {
+    clearGlobal();
+    stageLocal({
+      presets: {
+        anthropic: {
+          fast: {
+            model: "anthropic/claude-haiku-4-5",
+            description: "fast tier",
+            whenToUse: ["only-this-one"],
+          },
+        },
+      },
+    });
+    const cfg = loadConfig();
+    const fast = cfg.presets["anthropic"]?.["fast"];
+    expect(fast?.whenToUse).toEqual(["only-this-one"]);
+  });
+
+  it("array values: global array replaces bundled", () => {
+    stageGlobal({
+      presets: {
+        anthropic: {
+          fast: {
+            model: "anthropic/claude-haiku-4-5",
+            description: "fast tier",
+            whenToUse: ["override-1", "override-2"],
+          },
+        },
+      },
+    });
+    clearLocal();
+    const cfg = loadConfig();
+    const fast = cfg.presets["anthropic"]?.["fast"];
+    expect(fast?.whenToUse).toEqual(["override-1", "override-2"]);
+  });
+
+  it("nested-object merge: tierPrompts keys merge across layers", () => {
+    // Bundled has tierPrompts.fast/medium/heavy; global adds a new key.
+    stageGlobal({
+      tierPrompts: { extra: "global-only prompt" },
+    });
+    clearLocal();
+    const cfg = loadConfig();
+    expect(cfg.tierPrompts?.["fast"]).toBeDefined();
+    expect(cfg.tierPrompts?.["extra"]).toBe("global-only prompt");
+  });
+
+  it("nested-object merge: scalar override on a nested key wins, siblings preserved", () => {
+    stageGlobal({
+      presets: {
+        anthropic: {
+          fast: {
+            model: "different/model",
+            description: "fast tier",
+            whenToUse: ["recon"],
+          },
+        },
+      },
+    });
+    clearLocal();
+    const cfg = loadConfig();
+    const fast = cfg.presets["anthropic"]?.["fast"];
+    expect(fast?.model).toBe("different/model");
+    // Other anthropic tiers must survive the global override.
+    expect(cfg.presets["anthropic"]?.["medium"]).toBeDefined();
+    expect(cfg.presets["anthropic"]?.["heavy"]).toBeDefined();
+  });
+
+  it("nested-object merge: object override on a nested key wins, siblings preserved", () => {
+    // Bundled has tierCaps.fast/medium/heavy; global sets tierCaps.fast = 99.
+    stageGlobal({ tierCaps: { fast: 99 } });
+    clearLocal();
+    const cfg = loadConfig();
+    expect(cfg.tierCaps?.["fast"]).toBe(99);
+    expect(cfg.tierCaps?.["medium"]).toBeDefined();
+    expect(cfg.tierCaps?.["heavy"]).toBeDefined();
+  });
+});
+
+describe("Layered config — absence cases", () => {
+  it("missing global and local falls through to bundled defaults", () => {
+    clearGlobal();
+    clearLocal();
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("anthropic");
+  });
+
+  it("missing global only falls through to bundled (local wins over bundled)", () => {
+    clearGlobal();
+    stageLocal({ activePreset: "openai" });
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("openai");
+  });
+
+  it("missing local only falls through to bundled (global wins over bundled)", () => {
+    stageGlobal({ activePreset: "openai" });
+    clearLocal();
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("openai");
+  });
+
+  it("an empty-object local override is a no-op merge", () => {
+    stageGlobal({ activePreset: "openai" });
+    stageLocal({});
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("openai");
+    // Bundled's anthropic preset remains intact.
+    expect(cfg.presets["anthropic"]).toBeDefined();
+  });
+
+  it("an empty-object global override is a no-op merge", () => {
+    clearGlobal();
+    stageLocal({ activePreset: "google" });
+    stageGlobal({});
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("google");
+  });
+});
+
+describe("Layered config — error cases", () => {
+  it("throws with global path when global contains malformed JSON", () => {
+    stageGlobal("{not valid json");
+    clearLocal();
+    expect(() => loadConfig()).toThrow(/global/);
+    expect(() => loadConfig()).toThrow(/malformed JSON/);
+  });
+
+  it("throws with local path when local contains malformed JSON", () => {
+    clearGlobal();
+    stageLocal("{not valid json");
+    expect(() => loadConfig()).toThrow(/local/);
+    expect(() => loadConfig()).toThrow(/malformed JSON/);
+  });
+
+  it("throws when a global file is empty (empty string is not valid JSON)", () => {
+    stageGlobal("");
+    clearLocal();
+    expect(() => loadConfig()).toThrow(/global/);
+  });
+
+  it("throws when a local file is empty", () => {
+    clearGlobal();
+    stageLocal("");
+    expect(() => loadConfig()).toThrow(/local/);
+  });
+
+  it("throws when bundled layer is unreadable", () => {
+    // Temporarily move the bundled tiers.json out of the way so the bundled
+    // read fails with ENOENT. The bundled file is restored in the finally
+    // block even if the assertion throws, so other tests stay green.
+    const bundledPath = realConfigPath();
+    const backupPath = bundledPath + ".bak-test";
+    renameSync(bundledPath, backupPath);
+    try {
+      expect(() => loadConfig()).toThrow(/bundled/);
+    } finally {
+      renameSync(backupPath, bundledPath);
+      invalidateConfigCache();
+    }
+  });
+});
+
+describe("Layered config — state overlay", () => {
+  it("state.activePreset wins over bundled defaults", () => {
+    clearGlobal();
+    clearLocal();
+    saveActivePreset("openai");
+    expect(loadConfig().activePreset).toBe("openai");
+  });
+
+  it("state.activePreset wins over global manual layer", () => {
+    stageGlobal({ activePreset: "google" });
+    clearLocal();
+    saveActivePreset("openai");
+    expect(loadConfig().activePreset).toBe("openai");
+  });
+
+  it("state.activeMode wins over manual activeMode when state mode exists", () => {
+    clearGlobal();
+    clearLocal();
+    // bundled tiers.json already has modes.normal/budget/quality/deep.
+    saveActiveMode("budget");
+    expect(loadConfig().activeMode).toBe("budget");
+  });
+
+  it("state.activeMode is ignored when mode does not exist in cfg.modes", () => {
+    clearGlobal();
+    clearLocal();
+    saveActiveMode("not-a-real-mode");
+    // bundled activeMode is "normal" — must be preserved.
+    expect(loadConfig().activeMode).toBe("normal");
+  });
+
+  it("state.enforcementMode wins; cfg.enforcement is created if missing", () => {
+    clearGlobal();
+    clearLocal();
+    saveEnforcementMode("enforced");
+    expect(loadConfig().enforcement?.mode).toBe("enforced");
+  });
+
+  it("state.enforcementMode wins over manual enforcement.mode in merged layers", () => {
+    stageGlobal({ enforcement: { mode: "off" } });
+    clearLocal();
+    saveEnforcementMode("enforced");
+    expect(loadConfig().enforcement?.mode).toBe("enforced");
+  });
+
+  it("manual activePreset is preserved when no state is written", () => {
+    clearGlobal();
+    clearLocal();
+    // No saveActivePreset call — bundled default must remain.
+    expect(loadConfig().activePreset).toBe("anthropic");
+  });
+
+  it("state overlay does not leak into unrelated manual fields", () => {
+    stageGlobal({
+      presets: {
+        anthropic: {
+          fast: {
+            model: "anthropic/claude-haiku-4-5",
+            description: "fast tier",
+            whenToUse: ["only-this"],
+          },
+        },
+      },
+    });
+    clearLocal();
+    saveActivePreset("openai");
+    const cfg = loadConfig();
+    expect(cfg.activePreset).toBe("openai");
+    // Manual nested override must survive the state overlay.
+    expect(cfg.presets["anthropic"]?.["fast"]?.whenToUse).toEqual(["only-this"]);
+  });
+});
+
+describe("Layered config — cwd change requires cache invalidation", () => {
+  it("without invalidateConfigCache, changing cwd returns the cached local result", () => {
+    stageLocal({ activePreset: "openai" });
+    expect(loadConfig().activePreset).toBe("openai");
+
+    // Move to a different cwd with NO local override. The cache still holds
+    // the previous local-overriding result until invalidated.
+    const otherCwd = join(tmpHome, "no-local");
+    mkdirSync(otherCwd, { recursive: true });
+    process.chdir(otherCwd);
+    expect(loadConfig().activePreset).toBe("openai");
+  });
+
+  it("after invalidateConfigCache, changing cwd re-resolves the local layer", () => {
+    stageLocal({ activePreset: "openai" });
+    expect(loadConfig().activePreset).toBe("openai");
+
+    const otherCwd = join(tmpHome, "no-local");
+    mkdirSync(otherCwd, { recursive: true });
+    process.chdir(otherCwd);
+    invalidateConfigCache();
+    // Bundled default wins back once cache is cleared and cwd no longer has a local file.
+    expect(loadConfig().activePreset).toBe("anthropic");
+  });
+
+  it("editing the local file in place does NOT reload until cache is invalidated", () => {
+    stageLocal({ activePreset: "openai" });
+    expect(loadConfig().activePreset).toBe("openai");
+
+    // Mutate the local file on disk.
+    stageLocal({ activePreset: "google" });
+    // Still the cached value.
+    expect(loadConfig().activePreset).toBe("openai");
+
+    invalidateConfigCache();
+    expect(loadConfig().activePreset).toBe("google");
   });
 });

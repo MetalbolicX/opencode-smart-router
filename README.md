@@ -235,7 +235,45 @@ In `~/.config/opencode/opencode.json`:
 
 ## Configuration
 
-All configuration lives in `tiers.json` at the plugin root.
+The plugin resolves its effective config from up to **four layers**, merged in this precedence (highest → lowest):
+
+```
+state  >  local  >  global  >  bundled
+```
+
+| Layer | Path | Required? | Purpose |
+|-------|------|-----------|---------|
+| **bundled** | `<plugin>/tiers.json` | yes | Shipped defaults. Read on every load. |
+| **global**  | `~/.config/opencode-model-router/tiers.json` | no | User-level override that applies across all projects. |
+| **local**   | `<cwd>/.opencode/tiers.json` | no | Repo-local override. Re-evaluated on every call (changes to `process.cwd()` require `invalidateConfigCache()` to take effect). |
+| **state**   | `~/.config/opencode/opencode-model-router.state.json` | no | Runtime state (`activePreset`, `activeMode`, `enforcement.mode`). Written by `/preset`, `/budget`, and `/router enforce`. |
+
+**Manual layers (bundled → global → local)** are deep-merged: plain objects merge by key union; arrays, scalars, and an explicit `null` **replace** the lower value (not delete). The merged result is validated exactly once with `validateConfig()`.
+
+**Runtime state (state)** is the highest-precedence layer but it overlays **only** the three fields it owns — `activePreset`, `activeMode`, and `enforcement.mode`. All other manual fields are preserved. Runtime state is never written back into `tiers.json`.
+
+**Errors are tagged by layer path.** A present layer with malformed JSON, an unreadable bundled file, or a merged manual result that fails schema validation produces a descriptive error that names the offending file or field. Missing optional global/local files are treated as absent, not erroneous.
+
+### Example: repo-local override
+
+Override only the fields you want to change at the repo root (`<repo>/.opencode/tiers.json`):
+
+```json
+{
+  "activePreset": "github-copilot",
+  "presets": {
+    "github-copilot": {
+      "fast": {
+        "model": "github-copilot/claude-haiku-4-5",
+        "description": "fast tier",
+        "whenToUse": ["recon", "lookup"]
+      }
+    }
+  }
+}
+```
+
+The bundled `anthropic`, `openai`, and `google` presets remain available in the merged result; only the fields you override change. A global override at `~/.config/opencode-model-router/tiers.json` works the same way and applies across all repos.
 
 ### Presets
 

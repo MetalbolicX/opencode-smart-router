@@ -4,6 +4,24 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------------------
+// Layered manual config helpers
+//
+// `loadConfig()` resolves three static manual layers — bundled, global,
+// local — merges them in precedence order (bundled → global → local),
+// validates the merged result once, and finally overlays runtime state.
+// ---------------------------------------------------------------------------
+
+type ConfigLayer = {
+  kind: "bundled" | "global" | "local";
+  path: string;
+  required: boolean;
+};
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -97,6 +115,16 @@ export function configPath(): string {
   return join(getPluginRoot(), "tiers.json");
 }
 
+/** Global user-level override path (`~/.config/opencode-model-router/tiers.json`). */
+export function globalConfigPath(): string {
+  return join(homedir(), ".config", "opencode-model-router", "tiers.json");
+}
+
+/** Repo-local override path (`<cwd>/.opencode/tiers.json`). Re-evaluated per call. */
+export function localConfigPath(): string {
+  return join(process.cwd(), ".opencode", "tiers.json");
+}
+
 export function statePath(): string {
   return join(
     homedir(),
@@ -104,6 +132,90 @@ export function statePath(): string {
     "opencode",
     "opencode-model-router.state.json",
   );
+}
+
+/**
+ * Read a single manual config layer from disk.
+ * - Returns the parsed JSON object on success.
+ * - Returns `undefined` ONLY when an optional layer is missing (ENOENT).
+ * - Throws a path-prefixed error for any other read or parse failure, or when
+ *   a required layer is missing.
+ */
+function readConfigLayer(layer: ConfigLayer): Record<string, unknown> | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(layer.path, "utf-8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      if (layer.required) {
+        throw new Error(`bundled config missing at ${layer.path}`);
+      }
+      return undefined;
+    }
+    throw new Error(
+      `${layer.kind} layer (${layer.path}) is unreadable: ${(err as Error).message}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      `${layer.kind} layer (${layer.path}) contains malformed JSON: ${(err as Error).message}`,
+    );
+  }
+
+  if (!isPlainObject(parsed)) {
+    throw new Error(
+      `${layer.kind} layer (${layer.path}) must be a JSON object, got ${parsed === null ? "null" : Array.isArray(parsed) ? "array" : typeof parsed}`,
+    );
+  }
+
+  return parsed;
+}
+
+/**
+ * Deep-merge two config-shaped values with these rules:
+ * - `undefined` in either position returns the other.
+ * - Both plain objects ⇒ recursive merge by key union.
+ * - Arrays and scalars (including `null`) ⇒ override replaces base.
+ * - `null` is NOT a plain object; it is treated as a scalar replacement.
+ */
+function deepMergeConfig(base: unknown, override: unknown): unknown {
+  if (base === undefined) return override;
+  if (override === undefined) return base;
+  if (isPlainObject(base) && isPlainObject(override)) {
+    const result: Record<string, unknown> = { ...base };
+    for (const key of Object.keys(override)) {
+      result[key] = deepMergeConfig(base[key], override[key]);
+    }
+    return result;
+  }
+  return override;
+}
+
+/**
+ * Narrow state overlay. Writes ONLY:
+ * - `state.activePreset` → `cfg.activePreset` when `resolvePresetName()` succeeds
+ * - `state.activeMode`   → `cfg.activeMode` when the mode exists in `cfg.modes`
+ * - `state.enforcementMode` → `cfg.enforcement.mode`, creating `cfg.enforcement` if missing
+ * All other manual fields are preserved unchanged.
+ */
+function applyStateOverlay(cfg: RouterConfig, state: RouterState): void {
+  if (state.activePreset) {
+    const resolved = resolvePresetName(cfg, state.activePreset);
+    if (resolved) {
+      cfg.activePreset = resolved;
+    }
+  }
+  if (state.activeMode && cfg.modes?.[state.activeMode]) {
+    cfg.activeMode = state.activeMode;
+  }
+  if (state.enforcementMode) {
+    cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
+  }
 }
 
 export function resolvePresetName(
@@ -412,30 +524,38 @@ export function loadConfig(): RouterConfig {
     return _cachedConfig;
   }
 
-  const raw = JSON.parse(readFileSync(configPath(), "utf-8"));
-  const cfg = validateConfig(raw);
+  // `loadConfig()` pipeline (highest → lowest precedence):
+  //   state  >  local  >  global  >  bundled
+  //
+  // 1. Read three MANUAL layers (bundled required; global/local optional,
+  //    absent only on ENOENT). Deep-merge in precedence order — plain
+  //    objects merge by key, arrays/scalars/explicit null REPLACE the
+  //    lower value (not delete).
+  // 2. Validate the merged manual result exactly once with `validateConfig()`.
+  // 3. RUNTIME STATE overlays only `activePreset`, `activeMode`, and
+  //    `enforcement.mode`. Runtime state never mutates `tiers.json`.
+  //
+  // `_configDirty` is the cache invalidation signal; callers that change
+  // `process.cwd()` or a layer file must call `invalidateConfigCache()`.
+  const layers: ConfigLayer[] = [
+    { kind: "bundled", path: configPath(), required: true },
+    { kind: "global", path: globalConfigPath(), required: false },
+    { kind: "local", path: localConfigPath(), required: false },
+  ];
 
-  try {
-    if (existsSync(statePath())) {
-      const state = JSON.parse(
-        readFileSync(statePath(), "utf-8"),
-      ) as RouterState;
-      if (state.activePreset) {
-        const resolved = resolvePresetName(cfg, state.activePreset);
-        if (resolved) {
-          cfg.activePreset = resolved;
-        }
-      }
-      if (state.activeMode && cfg.modes?.[state.activeMode]) {
-        cfg.activeMode = state.activeMode;
-      }
-      if (state.enforcementMode) {
-        cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
-      }
-    }
-  } catch {
-    // Ignore state read errors and keep tiers.json defaults
-  }
+  const bundled = readConfigLayer(layers[0]!);
+  const global = readConfigLayer(layers[1]!);
+  const local = readConfigLayer(layers[2]!);
+
+  const mergedManual = deepMergeConfig(
+    deepMergeConfig(bundled, global),
+    local,
+  );
+  const cfg = validateConfig(mergedManual);
+
+  // Runtime state is best-effort and overlays only its owned fields.
+  const state = readState();
+  applyStateOverlay(cfg, state);
 
   _cachedConfig = cfg;
   _configDirty = false;

@@ -215,6 +215,87 @@ describe("validateConfig — enforcement.escalate extra fields", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Layered merge regressions
+//
+// The layered config pipeline (bundled → global → local → state) feeds
+// `validateConfig()` once. These tests pin the validator's contract for
+// shapes the deep-merge is expected to produce:
+//   - 3.1: explicit `null` in a higher layer REPLACES the lower value
+//     (treated as a scalar, not a deletion) and the merged result still
+//     validates.
+//   - 3.2: a higher layer can also REPLACE a lower value with something
+//     invalid; the merged result must then fail validation with a
+//     descriptive error that names the offending field.
+// ---------------------------------------------------------------------------
+
+describe("validateConfig — layered merge: null replacement (regression)", () => {
+  it("explicit null in higher layer replaces lower scalar and merged result still validates", () => {
+    // Simulate the post-merge output of:
+    //   bundled:  enforcement.escalate.floorTier = "medium"  (ladder + maxAttempts also defined)
+    //   local:    enforcement.escalate.floorTier = null
+    //
+    // The deep-merge treats `null` as a scalar (not a deletion), so the
+    // merged result must have floorTier === null AND must still validate,
+    // because `validateConfig` explicitly accepts `null` for floorTier.
+    const merged = validRaw({
+      enforcement: {
+        escalate: {
+          floorTier: null,
+          ladder: ["fast", "medium", "heavy"],
+          maxAttemptsPerTier: 1,
+          maxTotalAttempts: 3,
+        },
+      },
+    });
+    const cfg = validateConfig(merged);
+    expect(cfg.enforcement?.escalate?.floorTier).toBeNull();
+    // Sibling fields from the lower layer must survive the null replacement.
+    expect(cfg.enforcement?.escalate?.ladder).toEqual([
+      "fast",
+      "medium",
+      "heavy",
+    ]);
+    expect(cfg.enforcement?.escalate?.maxTotalAttempts).toBe(3);
+  });
+
+  it("null in higher layer replaces optional top-level field and merged result still validates", () => {
+    // Simulate: bundled.activeMode = "normal", local.activeMode = null.
+    // `activeMode` has no validator rule that rejects null, so the merged
+    // result must validate cleanly.
+    const merged = validRaw({ activeMode: null });
+    const cfg = validateConfig(merged);
+    expect(cfg.activeMode).toBeNull();
+  });
+});
+
+describe("validateConfig — layered merge: invalid merged result (regression)", () => {
+  it("higher-layer null on activePreset replaces lower value and merged result fails with tagged error", () => {
+    // Simulate: bundled.activePreset = "anthropic", local.activePreset = null.
+    // After deep-merge, the merged config has activePreset === null.
+    // `validateConfig` MUST throw a descriptive error that names the field.
+    const merged = validRaw({ activePreset: null });
+    expect(() => validateConfig(merged)).toThrow(/activePreset/);
+  });
+
+  it("higher-layer invalid type on presets replaces lower value and merged result fails with tagged error", () => {
+    // Simulate: bundled.presets = { anthropic: {...} }, local.presets = "bogus".
+    // The override replaces the entire presets block (arrays/scalars replace,
+    // not merge) — the merged result has presets as a string and must fail
+    // validation with a descriptive error naming the `presets` field.
+    const merged = validRaw({ presets: "not-an-object" });
+    expect(() => validateConfig(merged)).toThrow(/presets/);
+  });
+
+  it("higher-layer invalid enforcement.mode replaces lower value and merged result fails with tagged error", () => {
+    // Simulate: bundled enforcement absent, global enforcement = { mode: "loud" }.
+    // The merged enforcement.mode is the invalid value; the validator must
+    // reject it with an error that names `enforcement.mode`.
+    const merged = validRaw({ enforcement: { mode: "loud" } });
+    expect(() => validateConfig(merged)).toThrow(/enforcement\.mode/);
+  });
+});
+
 describe("normalizeEnforcement", () => {
   it("missing enforcement ⇒ mode:advisory", () => {
     expect(normalizeEnforcement(undefined)).toEqual({ mode: "advisory" });
