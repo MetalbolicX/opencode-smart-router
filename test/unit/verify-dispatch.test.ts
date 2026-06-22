@@ -518,3 +518,142 @@ describe("dumpDelegateScorecard", () => {
     expect(threw).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 3.6 — narrowed-shape coverage for verify-dispatch.
+//
+// PR2 tightened `dispatchGrader` and `verifyTaskAfterHook` so the SDK
+// results and hook IO go through narrow interfaces from `src/plugin/types.ts`
+// instead of `any`. These tests assert the runtime contract on the narrowed
+// shapes: invalid or partial inputs are tolerated, valid inputs still
+// drive the gate, and the helper guards (extractSessionId / extractPromptText
+// / asTaskToolArgs) are wired through correctly.
+// ---------------------------------------------------------------------------
+
+describe("dispatchGrader — narrowed shape tolerance", () => {
+  it("tolerates a session.create response with no data field", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async () => ({}),
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "p",
+    });
+
+    expect(result).toEqual({ sessionID: "", text: "" });
+  });
+
+  it("tolerates a session.prompt response with no data.parts field", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => ({}),
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "p",
+    });
+
+    // No text parts found -> empty text. The sessionID is the default.
+    expect(result.sessionID).toBe("sess_x");
+    expect(result.text).toBe("");
+  });
+
+  it("filters non-text parts and joins text parts with newlines", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => ({
+        data: {
+          parts: [
+            { type: "tool_use", id: "t1" },
+            { type: "text", text: "line-1" },
+            { type: "step-start" },
+            { type: "text", text: "line-2" },
+          ],
+        },
+      }),
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "p",
+    });
+
+    // Only the two text parts are emitted, joined with a single newline.
+    expect(result.text).toBe("line-1\nline-2");
+  });
+
+  it("ignores parts whose text field is not a string", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => ({
+        data: {
+          parts: [
+            { type: "text", text: 42 },
+            { type: "text", text: null },
+            { type: "text", text: "ok" },
+          ],
+        },
+      }),
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "p",
+    });
+
+    expect(result.text).toBe("ok");
+  });
+});
+
+describe("verifyTaskAfterHook — narrowed shape tolerance", () => {
+  it("ignores input whose tool field is not a string", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({ directory: workDir });
+    const input = { tool: 123, sessionID: "orch", args: { prompt: "p" } };
+    const output = { output: "untouched" };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    expect(output.output).toBe("untouched");
+  });
+
+  it("tolerates args without subagent_type (treated as empty producerTier)", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({ directory: workDir });
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: { prompt: "Do something.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]" },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-no-tier" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // The gate fails (file missing), so a forcing note is appended.
+    expect(output.output).toContain("NOT ACCEPTED");
+  });
+
+  it("tolerates a missing args object entirely", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({ directory: workDir });
+    const input = { tool: "task", sessionID: "orch" };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-no-args" },
+    };
+
+    // asTaskToolArgs(undefined) returns {} — the gate runs with empty
+    // producerTier, prompt, and description.
+    await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
+  });
+});
