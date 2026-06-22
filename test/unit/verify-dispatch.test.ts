@@ -657,3 +657,146 @@ describe("verifyTaskAfterHook — narrowed shape tolerance", () => {
     await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 matrix — ambiguous verify.require values in the dispatcher.
+//
+// The dispatcher's buildGateDeps() reads `cfg.enforcement?.verify?.require`
+// and passes it through. With Phase 5, an unknown value is rejected at
+// config-load time (validateConfig) AND coerced to "always" at the gate
+// boundary. These tests pin both ends of the contract for the dispatcher:
+//   - buildGateDeps passes the raw value through (it is not the layer that
+//     normalizes — the gate is).
+//   - verifyTaskAfterHook with an unknown require still VERIFIES (not skip)
+//     because the gate fails closed.
+//   - the supported values keep their existing semantics end-to-end.
+// ---------------------------------------------------------------------------
+
+describe("buildGateDeps — Phase 5: pass-through of verify.require", () => {
+  it("passes through 'never' unchanged", () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "never" } } } as any,
+    });
+    const deps = buildGateDeps(ctx);
+    expect(deps.require).toBe("never");
+  });
+
+  it("passes through 'whenDoDPresent' unchanged", () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "whenDoDPresent" } } } as any,
+    });
+    const deps = buildGateDeps(ctx);
+    expect(deps.require).toBe("whenDoDPresent");
+  });
+
+  it("passes through 'always' unchanged", () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "always" } } } as any,
+    });
+    const deps = buildGateDeps(ctx);
+    expect(deps.require).toBe("always");
+  });
+
+  it("passes through an UNKNOWN value (coercion is the gate's job, not dispatcher's)", () => {
+    // Phase 5 contract: buildGateDeps is a pass-through. The gate is the
+    // component that calls normalizeRequire(). A test config that bypasses
+    // validateConfig can still flow here, and the gate must fail closed.
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "sometimes" } } } as any,
+    });
+    const deps = buildGateDeps(ctx);
+    expect(deps.require).toBe("sometimes");
+  });
+});
+
+describe("verifyTaskAfterHook — Phase 5: ambiguous verify.require end-to-end", () => {
+  it("require:'never' on a built-in task => no-op (gate would skip)", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "never" } } } as any,
+    });
+    // Create a missing file so the deterministic check WOULD fail, but
+    // 'never' should skip verification entirely.
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-never" },
+    };
+    const original = output.output;
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    expect(output.output).toBe(original);
+  });
+
+  it("require: 'sometimes' (unknown) => verifies (fail-closed) — the gate coerces to 'always'", async () => {
+    // Phase 5 contract: an unknown value in the config reaches the gate
+    // via buildGateDeps; the gate's normalizeRequire() coerces it to
+    // "always", so verification runs. A failing check produces a forcing
+    // note — the visible signal of the fail-closed semantic, not a silent
+    // skip.
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "sometimes" } } } as any,
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-ambiguous" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // A forcing note is appended — verification RAN, did not skip, and
+    // produced a visible failure rather than silently accepting.
+    expect(output.output).toContain("NOT ACCEPTED");
+  });
+
+  it("require: 'always' on a built-in task with a passing check => no forcing note", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    writeFileSync(join(workDir, "present.txt"), "ok");
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "always" } } } as any,
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "[acceptance]\ncheck: fileExists path=present.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-always" },
+    };
+    const original = output.output;
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    expect(output.output).toBe(original);
+  });
+});
