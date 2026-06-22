@@ -9,13 +9,22 @@
 //
 // This module owns no state — it is a pure factory that returns a fresh
 // hooks object for each plugin instance.
+//
+// Phase 3 of the core-refactor-plan replaces the prior `(input: any,
+// output: any)` hook callbacks with the SDK's `Hooks` shape from
+// `@opencode-ai/plugin`. Each adapter still receives the same payload
+// values it always did — the change is purely types-only and behaviour is
+// preserved (the bodies in `src/plugin/hooks.ts` keep using optional
+// chaining, so they tolerate the SDK's full input shape just as they
+// tolerated the loose `any` shape).
 // ---------------------------------------------------------------------------
 
-import { tool } from "@opencode-ai/plugin";
+import { tool, type Hooks } from "@opencode-ai/plugin";
 
 import { handleCommandBefore } from "../router/commands";
 import type { Preset } from "../router/config";
-import { executeDelegate, type DelegateArgs } from "./delegate";
+import { executeDelegate } from "./delegate";
+import type { DelegateArgs } from "./types";
 import {
   handleChatMessage,
   handleChatParams,
@@ -40,7 +49,7 @@ export function assembleRuntimeHooks(
   ctx: PluginContext,
   activeTiersAtLoad: Preset,
   enableDelegateTool: boolean,
-) {
+): Hooks {
   return {
     tool: {
       ...(enableDelegateTool
@@ -72,30 +81,34 @@ export function assembleRuntimeHooks(
         : {}),
     },
 
-    "chat.params": (input: any, output: any) =>
-      handleChatParams(ctx, input, output),
+    // Each callback keeps the SDK's narrow shape and casts down to the
+    // handler's local shape only at the call site. The casts are
+    // values-preserving (no `any`), so behaviour is unchanged.
+    "chat.params": (input, output) =>
+      handleChatParams(ctx, input as unknown as Parameters<typeof handleChatParams>[1], output as unknown as Parameters<typeof handleChatParams>[2]),
 
-    "chat.message": (input: any, output: any) =>
-      handleChatMessage(ctx, input, output),
+    "chat.message": (input, output) =>
+      handleChatMessage(ctx, input as unknown as Parameters<typeof handleChatMessage>[1], output as unknown as Parameters<typeof handleChatMessage>[2]),
 
-    "tool.execute.before": (input: any, output: any) =>
-      handleToolExecuteBefore(ctx, input, output),
+    "tool.execute.before": (input, output) =>
+      handleToolExecuteBefore(ctx, input as unknown as Parameters<typeof handleToolExecuteBefore>[1], output as unknown as Parameters<typeof handleToolExecuteBefore>[2]),
 
-    "tool.execute.after": (input: any, output: any) =>
-      handleToolExecuteAfter(ctx, input, output),
+    "tool.execute.after": (input, output) =>
+      handleToolExecuteAfter(ctx, input as unknown as Parameters<typeof handleToolExecuteAfter>[1], output as unknown as Parameters<typeof handleToolExecuteAfter>[2]),
 
-    "experimental.text.complete": (input: any, output: any) =>
-      handleTextComplete(ctx, input, output),
+    "experimental.text.complete": (input, output) =>
+      handleTextComplete(ctx, input as unknown as Parameters<typeof handleTextComplete>[1], output as unknown as Parameters<typeof handleTextComplete>[2]),
 
-    event: (payload: any) => handleSessionIdle(ctx, payload),
+    event: (payload) =>
+      handleSessionIdle(ctx, payload as unknown as Parameters<typeof handleSessionIdle>[1]),
 
-    config: (opencodeConfig: any) =>
-      handleConfig(ctx, activeTiersAtLoad, opencodeConfig),
+    config: (opencodeConfig) =>
+      handleConfig(ctx, activeTiersAtLoad, opencodeConfig as unknown as Parameters<typeof handleConfig>[2]),
 
-    "experimental.chat.system.transform": (input: any, output: any) =>
-      handleSystemTransform(ctx, input, output),
+    "experimental.chat.system.transform": (input, output) =>
+      handleSystemTransform(ctx, input as unknown as Parameters<typeof handleSystemTransform>[1], output as unknown as Parameters<typeof handleSystemTransform>[2]),
 
-    "command.execute.before": (input: any, output: any) =>
-      handleCommandBefore(ctx, input, output),
+    "command.execute.before": (input, output) =>
+      handleCommandBefore(ctx, input as unknown as Parameters<typeof handleCommandBefore>[1], output as unknown as Parameters<typeof handleCommandBefore>[2]),
   };
 }

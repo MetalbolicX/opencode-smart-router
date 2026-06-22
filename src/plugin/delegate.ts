@@ -31,13 +31,10 @@ import {
 } from "../escalate/ladder";
 import { getActiveTiers } from "../router/protocol";
 import type { PluginContext } from "./context";
+import type { DelegateArgs } from "./types";
 
-/** Shape of the args object passed to the delegate tool's `execute`. */
-export interface DelegateArgs {
-  task: string;
-  tier?: string;
-  acceptance?: string;
-}
+/** Re-exported for IDE/test consumers — canonical shape lives in `./types`. */
+export type { DelegateArgs } from "./types";
 
 /**
  * Delegate a task to a tier subagent. The subagent's result is independently
