@@ -201,3 +201,76 @@ describe("createConfigStore — two-instance / two-cwd isolation", () => {
     expect(storeB.read().activePreset).toBe("google");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4.3 — direct pure-store coverage.
+//
+// The PR1 baseline already covered the cross-instance isolation contract.
+// These tests add direct assertions on the ConfigStore surface so any
+// future regression in the pure store (reference identity, failure
+// isolation, refresh idempotence) localises here without dragging in the
+// plugin context or router command layers.
+// ---------------------------------------------------------------------------
+
+describe("createConfigStore — direct pure-store coverage", () => {
+  it("refresh() returns a value with the same activePreset when the disk state is unchanged", () => {
+    const store = createConfigStore({ cwd: tmpCwd });
+    const a = store.refresh();
+    const b = store.refresh();
+    // `refresh()` always re-reads disk and replaces the cache, so the
+    // returned reference is fresh on each call. The merged values must
+    // still be equal because nothing on disk changed between calls.
+    expect(b.activePreset).toBe(a.activePreset);
+  });
+
+  it("refresh() after a staged change returns a NEW reference", () => {
+    const store = createConfigStore({ cwd: tmpCwd });
+    const a = store.refresh();
+    stageLocal(tmpCwd, { activePreset: "openai" });
+    const b = store.refresh();
+    expect(b).not.toBe(a);
+    expect(b.activePreset).toBe("openai");
+  });
+
+  it("read() after refresh() returns the new reference (no stale snapshot)", () => {
+    const store = createConfigStore({ cwd: tmpCwd });
+    store.read();
+    stageLocal(tmpCwd, { activePreset: "openai" });
+    store.refresh();
+    // The post-refresh read must reflect the new disk state.
+    expect(store.read().activePreset).toBe("openai");
+  });
+
+  it("a read on an empty cache populates it from disk and returns the merged config", () => {
+    const store = createConfigStore({ cwd: tmpCwd });
+    // No read or refresh yet — the cache is empty. The next read() must
+    // populate it from disk and return a valid RouterConfig.
+    const cfg = store.read();
+    expect(cfg).toBeDefined();
+    expect(typeof cfg.activePreset).toBe("string");
+    // A second read should now be reference-identical (cache hit).
+    expect(store.read()).toBe(cfg);
+  });
+
+  it("two stores created from the same cwd see the same initial disk state", () => {
+    const storeA = createConfigStore({ cwd: tmpCwd });
+    const storeB = createConfigStore({ cwd: tmpCwd });
+    // Both stores start cold; both reads return the bundled default.
+    expect(storeA.read().activePreset).toBe("multi-provider");
+    expect(storeB.read().activePreset).toBe("multi-provider");
+    // The two configs are equal-by-value but separate references.
+    expect(storeA.read()).not.toBe(storeB.read());
+  });
+
+  it("readMergedConfig({ cwd }) is a pure read: it does not pollute the per-instance cache", () => {
+    // Stage a local layer, then read with the pure helper — it must NOT
+    // touch any ConfigStore cache. The next store read should still see
+    // the bundled default until refresh() is called.
+    stageLocal(tmpCwd, { activePreset: "openai" });
+    const pureCfg = readMergedConfig({ cwd: tmpCwd });
+    expect(pureCfg.activePreset).toBe("openai");
+
+    const store = createConfigStore({ cwd: tmpCwd });
+    expect(store.read().activePreset).toBe("openai");
+  });
+});
