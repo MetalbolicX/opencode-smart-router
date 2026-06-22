@@ -49,8 +49,14 @@ export interface GateDeps {
    * verify.require: "never" disables the gate (accept without verifying);
    * "whenDoDPresent" (default) and "always" both verify when the DoD is
    * checkable and apply the no-DoD policy otherwise.
+   *
+   * Phase 5 (PR3): unknown values are treated FAIL-CLOSED as "always" so a
+   * typo can never silently disable verification. Config validation in
+   * `validateConfig()` rejects unknown values outright; this defensive
+   * coercion is the last-line guard for runtime callers that bypass
+   * config validation (tests, ad-hoc wiring).
    */
-  require?: "never" | "whenDoDPresent" | "always";
+  require?: string;
 }
 
 export interface GateResult {
@@ -73,6 +79,19 @@ function view(artefact: Artefact): ArtefactView {
  * Returns { accepted, verdict, dodSource }; accepted is true ONLY when a
  * verifier returned pass===true (or the gate is explicitly disabled).
  */
+/**
+ * Normalize a `verify.require` value to a known set, failing closed on
+ * anything the schema does not recognize. Unknown strings are coerced to
+ * "always" so a typo can never silently disable verification.
+ */
+function normalizeRequire(
+  raw: string | undefined,
+): "never" | "whenDoDPresent" | "always" {
+  if (raw === undefined) return "whenDoDPresent";
+  if (raw === "never" || raw === "whenDoDPresent" || raw === "always") return raw;
+  return "always";
+}
+
 export async function accept(
   delegation: Delegation,
   artefact: Artefact,
@@ -80,7 +99,7 @@ export async function accept(
 ): Promise<GateResult> {
   const dod = delegation.dod;
   const dodSource = dod.source;
-  const require = deps.require ?? "whenDoDPresent";
+  const require = normalizeRequire(deps.require);
 
   // verify.require === "never": Layer 2 is configured off; do not gate.
   if (require === "never") {

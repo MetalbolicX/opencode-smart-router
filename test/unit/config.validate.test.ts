@@ -146,6 +146,35 @@ describe("validateConfig — enforcement block", () => {
     expect(() => validateConfig(withEnf({ verify: { graderPolicy: "cheapest" } }))).toThrow(/graderPolicy/);
     expect(validateConfig(withEnf({ verify: { graderPolicy: "atLeastProducerTier" } })).enforcement).toBeDefined();
   });
+
+  // Phase 5 (PR3): unknown verify.require values are rejected at config-load.
+  // The runtime gate also fails closed on unknown values (coerced to "always"),
+  // but config validation is the first line of defense.
+  it("rejects unknown verify.require values (typo, null, non-string)", () => {
+    expect(() => validateConfig(withEnf({ verify: { require: "sometimes" } }))).toThrow(
+      /verify\.require must be one of never\|whenDoDPresent\|always/,
+    );
+    expect(() => validateConfig(withEnf({ verify: { require: "NEVER" } }))).toThrow(
+      /verify\.require must be one of never\|whenDoDPresent\|always/,
+    );
+    expect(() => validateConfig(withEnf({ verify: { require: "" } }))).toThrow(
+      /verify\.require must be one of never\|whenDoDPresent\|always/,
+    );
+    expect(() => validateConfig(withEnf({ verify: { require: 42 } }))).toThrow(
+      /verify\.require must be one of never\|whenDoDPresent\|always/,
+    );
+  });
+
+  it("accepts all three supported verify.require values", () => {
+    for (const r of ["never", "whenDoDPresent", "always"]) {
+      const cfg = validateConfig(withEnf({ verify: { require: r } }));
+      expect(cfg.enforcement?.verify?.require).toBe(r);
+    }
+  });
+
+  it("accepts a missing verify.require (no value => defaults downstream)", () => {
+    expect(() => validateConfig(withEnf({ verify: { graderPolicy: "atLeastProducerTier" } }))).not.toThrow();
+  });
   it("rejects costCeiling.multiple <= 0; accepts > 0", () => {
     expect(() => validateConfig(withEnf({ escalate: { costCeiling: { multiple: 0 } } }))).toThrow(/multiple must be a number/);
     expect(() => validateConfig(withEnf({ escalate: { costCeiling: { multiple: -1 } } }))).toThrow(/multiple must be a number/);

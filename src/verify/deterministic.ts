@@ -85,8 +85,27 @@ export function shapeMismatch(
     }
     return null;
   } else if (Array.isArray(schemaVal)) {
-    if (!Array.isArray(targetVal)) return `${path || "<root>"}: expected array`;
-    return null; // presence of array suffices; elements/length not checked
+    // Phase 5 (PR3): fail closed on non-matching arrays. Previously the
+    // presence of an array was enough — a schema of [1,2,3] would silently
+    // pass a target of [99] (or any length). That permissive pass let a
+    // misconfigured schema confirm a shape that did NOT match, defeating
+    // the whole point of schemaMatch. We now require the array length to
+    // match and check each element recursively.
+    if (!Array.isArray(targetVal)) {
+      return `${path || "<root>"}: expected array`;
+    }
+    if (schemaVal.length !== targetVal.length) {
+      return `${path || "<root>"}: expected array length ${schemaVal.length}, got ${targetVal.length}`;
+    }
+    for (let i = 0; i < schemaVal.length; i++) {
+      const nested = shapeMismatch(
+        schemaVal[i],
+        targetVal[i],
+        `${path || "<root>"}[${i}].`,
+      );
+      if (nested !== null) return nested;
+    }
+    return null;
   } else {
     // primitive
     if (typeof schemaVal !== typeof targetVal) {
@@ -288,9 +307,16 @@ export async function runDeterministic(dod: DoD, deps: DeterministicDeps): Promi
         result = await runSchemaMatch(check, deps);
         break;
       default: {
-        // Defensive: TypeScript proves this is unreachable; guards runtime extensions.
-        const exhaustive: never = check.kind;
-        result = { ok: false, reason: `unknown check kind: ${exhaustive}` };
+        // Phase 5 (PR3): fail closed on unsupported check kinds. The TypeScript
+        // union `CheckKind` proves this branch is unreachable for typed input;
+        // this guard catches runtime extensions (a check object built from
+        // untyped JSON, an SDK shape drift, etc.). The stringified value is
+        // included so a typo is visible in the verdict reasons.
+        const unknown: string = String(check.kind);
+        result = {
+          ok: false,
+          reason: `unsupported check kind: "${unknown}" (supported: run, fileExists, schemaMatch, testsPass, buildPasses, lintClean)`,
+        };
         break;
       }
     }

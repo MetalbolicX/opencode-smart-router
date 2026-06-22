@@ -447,6 +447,19 @@ export function validateConfig(raw: unknown): RouterConfig {
           'tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"',
         );
       }
+      // Phase 5 (PR3): reject unknown `verify.require` values. The runtime
+      // gate (src/verify/gate.ts) fails closed on unknown values by coercing
+      // them to "always", but that coercion should never be the first line of
+      // defense — a typo in tiers.json must surface at config-load time so
+      // the operator sees it before the gate runs.
+      if (verify.require !== undefined) {
+        const requireAllowed = ["never", "whenDoDPresent", "always"];
+        if (typeof verify.require !== "string" || !requireAllowed.includes(verify.require)) {
+          throw new Error(
+            `tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always (got ${JSON.stringify(verify.require)})`,
+          );
+        }
+      }
     }
     if (
       enforcement.escalate !== undefined &&
