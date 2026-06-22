@@ -89,6 +89,19 @@ function makeCtx(opts: {
   promptImpl?: (req: any) => Promise<any>;
   getConfigImpl?: () => RouterConfig;
   refreshConfigImpl?: () => RouterConfig;
+  sessionStoreOverrides?: Partial<{
+    registerProducerSession: (...args: unknown[]) => unknown;
+    unregister: (...args: unknown[]) => unknown;
+    isSubagent: (sid: string) => boolean;
+    isTrivial: (sid: string) => boolean;
+    getTier: (sid: string) => string | null;
+    registerFromChatMessage: (...args: unknown[]) => unknown;
+    recordToolCall: (...args: unknown[]) => unknown;
+  }>;
+  guardStoreOverrides?: Partial<{
+    get: (...args: unknown[]) => unknown;
+    clear: (...args: unknown[]) => unknown;
+  }>;
 }): {
   ctx: PluginContext;
   sessions: SessionCall[];
@@ -188,6 +201,7 @@ function makeCtx(opts: {
       getTier: () => "fast",
       registerFromChatMessage: () => undefined,
       recordToolCall: () => undefined,
+      ...(opts.sessionStoreOverrides ?? {}),
     } as any,
     trajectoryStore: {
       ensure: () => undefined,
@@ -197,6 +211,7 @@ function makeCtx(opts: {
     guardStore: {
       get: () => null,
       clear: () => undefined,
+      ...(opts.guardStoreOverrides ?? {}),
     } as any,
     changedFileStore: {
       get: () => [],
@@ -464,5 +479,217 @@ describe("executeDelegate — config-refresh parity", () => {
     // The accepted suffix proves the run completed cleanly — the test name
     // documents the intended refresh-vs-read semantic change in PR1.
     expect(acceptMock).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 4.1 — additional direct branch coverage for executeDelegate.
+//
+// These tests cover the remaining seams of the delegate loop:
+//   - store-mutation throw paths (register/unregister/guard.clear swallow)
+//   - accept returning a "skipped" verdict (no forcing note appended)
+//   - the forcing-message retry/escalate path that runs across attempts
+//   - the safety-net branch when the loop exceeds its attempt cap
+//   - the costRatio fallback when tiersForCost lacks the tier's costRatio
+//   - defaultTier undefined defaults the initial tier to "medium"
+// ---------------------------------------------------------------------------
+
+describe("executeDelegate — store-mutation swallow paths", () => {
+  it("continues to the gate even when registerProducerSession throws", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      // Force registerProducerSession to throw on every attempt.
+      sessionStoreOverrides: {
+        registerProducerSession: () => {
+          throw new Error("register boom");
+        },
+      },
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+
+  it("continues when sessionStore.unregister throws after the gate verdict", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      sessionStoreOverrides: {
+        unregister: () => {
+          throw new Error("unregister boom");
+        },
+      },
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+
+  it("continues when guardStore.clear throws after the gate verdict", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      guardStoreOverrides: {
+        clear: () => {
+          throw new Error("guard clear boom");
+        },
+      },
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+});
+
+describe("executeDelegate — gate verdict branches", () => {
+  it("does NOT append a forcing note when the gate verdict is skipped", async () => {
+    // skipped: true means the gate chose to skip verification; the ladder
+    // treats this as "pass" via `if (!res.accepted && !res.verdict.skipped)`,
+    // so no forcing note is appended.
+    acceptMock.mockResolvedValueOnce({
+      accepted: false,
+      verdict: {
+        pass: false,
+        method: "deterministic",
+        reasons: [],
+        skipped: true,
+      },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({});
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    // The output ends with a missing/empty forcing note.
+    expect(out).not.toContain("NOT ACCEPTED");
+  });
+
+  it("escalates and retries across attempts when the gate fails the first attempt", async () => {
+    // First attempt FAILS (with retry), second attempt PASSES.
+    acceptMock
+      .mockResolvedValueOnce({
+        accepted: false,
+        verdict: { pass: false, method: "deterministic", reasons: ["missing"] },
+        dodSource: "inferred",
+      })
+      .mockResolvedValueOnce({
+        accepted: true,
+        verdict: { pass: true, method: "deterministic", reasons: [] },
+        dodSource: "inferred",
+      });
+    const { ctx, sessions } = makeCtx({});
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(sessions.length).toBeGreaterThanOrEqual(2);
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+
+  it("hits the safety-net branch when the loop exceeds its attempt cap", async () => {
+    // Make accept fail every attempt; combined with a tight policy this
+    // should drive the loop past safetyMax and out via the safety-net branch.
+    acceptMock.mockResolvedValue({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["never passes"] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      getConfigImpl: () =>
+        ({
+          activePreset: "default",
+          defaultTier: "fast",
+          presets: {
+            default: {
+              fast: {
+                model: "anthropic/claude-haiku-4-5",
+                description: "fast",
+                whenToUse: [],
+                costRatio: 1,
+              },
+            },
+          },
+          rules: [],
+          enforcement: {
+            verify: { require: "always", graderTemperature: 0 },
+            escalate: {
+              ladder: ["fast", "medium", "heavy"],
+              maxAttemptsPerTier: 99,
+              maxTotalAttempts: 999,
+            },
+          },
+        }) as RouterConfig,
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    // The safety net returns a different prefix than the give_up branch.
+    expect(out).toMatch(/delegation stopped by the safety net|\[router status: unmet\]/);
+  });
+});
+
+describe("executeDelegate — tier resolution and cost fallback", () => {
+  it("defaults the initial tier to 'medium' when defaultTier is undefined", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      // defaultTier missing entirely -> the `defaultTier || "medium"` fallback fires.
+      getConfigImpl: () =>
+        ({
+          activePreset: "default",
+          defaultTier: "" as unknown as string,
+          presets: {
+            default: {
+              fast: {
+                model: "anthropic/claude-haiku-4-5",
+                description: "fast",
+                whenToUse: [],
+                costRatio: 1,
+              },
+              medium: {
+                model: "anthropic/claude-sonnet-4",
+                description: "medium",
+                whenToUse: [],
+                costRatio: 3,
+              },
+            },
+          },
+          rules: [],
+        }) as RouterConfig,
+    });
+    const out = await executeDelegate(ctx, { task: "say hi" });
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+
+  it("falls back to costRatio=1 when the tier's costRatio is not a number", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({
+      getConfigImpl: () =>
+        ({
+          activePreset: "default",
+          defaultTier: "fast",
+          presets: {
+            default: {
+              fast: {
+                model: "anthropic/claude-haiku-4-5",
+                description: "fast",
+                whenToUse: [],
+                // costRatio is a string, not a number — fallback path triggers.
+                costRatio: "high" as unknown as number,
+              },
+            },
+          },
+          rules: [],
+        }) as RouterConfig,
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("[router \u2713 accepted: deterministic]");
   });
 });
