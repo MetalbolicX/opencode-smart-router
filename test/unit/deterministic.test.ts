@@ -510,9 +510,10 @@ describe("shapeMismatch", () => {
     expect(r).toContain("expected array");
   });
 
-  it("returns null for matching arrays (no element check)", () => {
-    expect(shapeMismatch([1, 2, 3], [99])).toBeNull();
+  it("returns null for matching arrays of equal length and compatible element types", () => {
     expect(shapeMismatch([], [])).toBeNull();
+    expect(shapeMismatch([1, 2, 3], [4, 5, 6])).toBeNull();
+    expect(shapeMismatch(["a", "b"], ["c", "d"])).toBeNull();
   });
 
   it("returns null for matching primitives", () => {
