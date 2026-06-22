@@ -186,8 +186,8 @@ describe("Layered config — bundled-only (no overrides)", () => {
     clearGlobal();
     clearLocal();
     const cfg = loadConfig();
-    // Bundled tiers.json sets activePreset to "anthropic" by default.
-    expect(cfg.activePreset).toBe("anthropic");
+    // Bundled tiers.json sets activePreset to "multi-provider" by default.
+    expect(cfg.activePreset).toBe("multi-provider");
     expect(cfg.presets["anthropic"]).toBeDefined();
     expect(cfg.presets["openai"]).toBeDefined();
   });
@@ -311,7 +311,7 @@ describe("Layered config — absence cases", () => {
     clearGlobal();
     clearLocal();
     const cfg = loadConfig();
-    expect(cfg.activePreset).toBe("anthropic");
+    expect(cfg.activePreset).toBe("multi-provider");
   });
 
   it("missing global only falls through to bundled (local wins over bundled)", () => {
@@ -438,7 +438,7 @@ describe("Layered config — state overlay", () => {
     clearGlobal();
     clearLocal();
     // No saveActivePreset call — bundled default must remain.
-    expect(loadConfig().activePreset).toBe("anthropic");
+    expect(loadConfig().activePreset).toBe("multi-provider");
   });
 
   it("state overlay does not leak into unrelated manual fields", () => {
@@ -484,7 +484,7 @@ describe("Layered config — cwd change requires cache invalidation", () => {
     process.chdir(otherCwd);
     invalidateConfigCache();
     // Bundled default wins back once cache is cleared and cwd no longer has a local file.
-    expect(loadConfig().activePreset).toBe("anthropic");
+    expect(loadConfig().activePreset).toBe("multi-provider");
   });
 
   it("editing the local file in place does NOT reload until cache is invalidated", () => {

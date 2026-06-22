@@ -1,5 +1,5 @@
 {
-  "activePreset": "anthropic",
+  "activePreset": "multi-provider",
   "activeMode": "normal",
   "tierCaps": {
     "fast": 8,
@@ -203,6 +203,48 @@
         "costRatio": 20,
         "description": "Claude Opus 4.8 max for architecture, complex debugging, and security",
         "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "multi-provider": {
+      "fast": {
+        "model": "opencode-go/mimo-v2.5",
+        "variant": "medium",
+        "costRatio": 1,
+        "description": "Mimo v2.5 for fast exploration and simple tasks",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "minimax/MiniMax-M3",
+        "variant": "thinking",
+        "costRatio": 5,
+        "description": "MiniMax M3 for implementation, refactoring, and tests",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Code review",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "openai/gpt-5.4",
+        "costRatio": 20,
+        "description": "GPT-5.4 for architecture, complex debugging, and security",
+        "steps": 120,
+        "reasoning": { "effort": "high", "summary": "detailed" },
         "whenToUse": [
           "Architecture decisions",
           "Complex debugging (after 2+ failures)",
