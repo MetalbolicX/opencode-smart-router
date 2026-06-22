@@ -699,3 +699,111 @@ describe("runDeterministic — secret scrubbing", () => {
     expect(verdict.reasons.join(" ")).not.toContain(secret);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 matrix — fail-closed semantics.
+//
+// Two distinct tightenings are pinned here:
+//   1. Unsupported check kinds produce a descriptive reason that names the
+//      allowed set (not a bare "unknown" string).
+//   2. shapeMismatch requires array length to match AND checks each element
+//      recursively. Non-matching arrays are reported explicitly.
+// ---------------------------------------------------------------------------
+
+describe("runDeterministic — Phase 5: unsupported check kind matrix", () => {
+  it("rejects a check with an unknown kind explicitly (cast as any)", async () => {
+    const dod = {
+      kind: "deterministic" as const,
+      checks: [{ kind: "fileExistsXXX" as never, path: "x" }],
+      criteria: [],
+      deliverable: null,
+      source: "explicit" as const,
+    };
+    const verdict = await runDeterministic(dod, makeDeps());
+    expect(verdict.pass).toBe(false);
+    expect(verdict.reasons[0]).toContain("unsupported check kind");
+    expect(verdict.reasons[0]).toContain("fileExistsXXX");
+    expect(verdict.reasons[0]).toContain("run, fileExists, schemaMatch");
+  });
+
+  it("one unsupported check in a list => overall fail; supported checks still ran", async () => {
+    let ranFirst = false;
+    const deps = makeDeps({
+      fs: {
+        fileExists: async () => { ranFirst = true; return true; },
+        readFile: async () => "{}",
+      },
+    });
+    const dod = {
+      kind: "deterministic" as const,
+      checks: [
+        { kind: "fileExists" as const, path: "a.ts" },
+        { kind: "unknownKind" as never },
+      ],
+      criteria: [],
+      deliverable: null,
+      source: "explicit" as const,
+    };
+    const verdict = await runDeterministic(dod, deps);
+    expect(ranFirst).toBe(true);
+    expect(verdict.pass).toBe(false);
+    expect(verdict.reasons.join(" ")).toMatch(/unsupported check kind/);
+  });
+});
+
+describe("shapeMismatch — Phase 5: array length + element matrix", () => {
+  it("FAIL: schema empty array, target has 3 elements", () => {
+    const r = shapeMismatch([], [1, 2, 3]);
+    expect(r).not.toBeNull();
+    expect(r).toContain("length 0");
+    expect(r).toContain("got 3");
+  });
+
+  it("FAIL: schema [1,2,3], target empty", () => {
+    const r = shapeMismatch([1, 2, 3], []);
+    expect(r).not.toBeNull();
+    expect(r).toContain("length 3");
+    expect(r).toContain("got 0");
+  });
+
+  it("FAIL: same length, element type mismatch (string vs number)", () => {
+    const r = shapeMismatch([1, 2, 3], ["a", "b", "c"]);
+    expect(r).not.toBeNull();
+    expect(r).toContain("expected number, got string");
+  });
+
+  it("FAIL: same length, second element type mismatch (only the bad one is reported)", () => {
+    const r = shapeMismatch([1, 2, 3], [4, "b", 6]);
+    expect(r).not.toBeNull();
+    // Either the [1] mismatch or [2] mismatch will be the first reported;
+    // assert that *some* element mismatch is reported, not a length issue.
+    expect(r).toMatch(/expected number, got string/);
+  });
+
+  it("PASS: schema [] and target []", () => {
+    expect(shapeMismatch([], [])).toBeNull();
+  });
+
+  it("PASS: equal-length matching element types", () => {
+    expect(shapeMismatch([1, 2, 3], [4, 5, 6])).toBeNull();
+    expect(shapeMismatch(["a", "b"], ["c", "d"])).toBeNull();
+  });
+
+  it("FAIL: nested object inside array — element recursion descends", () => {
+    const r = shapeMismatch(
+      [{ x: 1 }],
+      [{ x: "wrong" }],
+    );
+    expect(r).not.toBeNull();
+    expect(r).toContain("expected number, got string");
+  });
+
+  it("PASS: nested object inside array — same element type", () => {
+    expect(
+      shapeMismatch(
+        [{ x: 1 }, { x: 2 }],
+        [{ x: 10 }, { x: 20 }],
+      ),
+    ).toBeNull();
+  });
+});

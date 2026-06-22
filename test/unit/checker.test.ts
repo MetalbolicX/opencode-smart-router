@@ -525,3 +525,117 @@ describe("anti-rubber-stamp calibration", () => {
     expect(result.method).toBe("checker");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 matrix — pass / skip / fail outcomes for runChecker.
+//
+// Phase 5 does not change the checker contract itself, but the matrix
+// here pins the explicit outcomes the gate relies on: empty criteria
+// skip; grader pass accepts; grader fail rejects; unparseable JSON
+// rejects; non-independent session rejects; dispatch errors reject. The
+// pass/skip/fail vocabulary is what the Phase 5 fail-closed semantics
+// rest on.
+// ---------------------------------------------------------------------------
+
+describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
+  it("SKIP: empty criteria => method:none, skipped:true, no grader call", async () => {
+    const spy = vi.fn();
+    const result = await runChecker(makeInput([]), {
+      dispatchGrader: spy,
+    });
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.pass).toBe(false);
+    expect(result.method).toBe("none");
+    expect(result.skipped).toBe(true);
+    expect(result.reasons).toContain("no criteria to grade");
+  });
+
+  it("PASS: grader returns pass:true, independent session => accept", async () => {
+    const result = await runChecker(
+      makeInput(["criterion A"], makeArtefact(), "fast", "prod-1"),
+      {
+        dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":["met"]}'),
+      },
+    );
+    expect(result.pass).toBe(true);
+    expect(result.method).toBe("checker");
+    expect(result.skipped).toBeFalsy();
+  });
+
+  it("FAIL: grader returns pass:false => reject with reason surfaced", async () => {
+    const result = await runChecker(
+      makeInput(["criterion A"]),
+      {
+        dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":false,"reasons":["criterion A unmet"]}'),
+      },
+    );
+    expect(result.pass).toBe(false);
+    expect(result.method).toBe("checker");
+    expect(result.reasons).toContain("criterion A unmet");
+    expect(result.skipped).toBeFalsy();
+  });
+
+  it("FAIL: grader text is unparseable => reject with 'could not parse' reason", async () => {
+    const result = await runChecker(
+      makeInput(["criterion A"]),
+      {
+        dispatchGrader: fakeDispatch(GRADER_SESSION, "totally not json"),
+      },
+    );
+    expect(result.pass).toBe(false);
+    expect(result.method).toBe("checker");
+    expect(result.reasons[0]).toContain("could not parse grader verdict");
+  });
+
+  it("FAIL: grader shares producer sessionID => reject with 'not independent'", async () => {
+    const result = await runChecker(
+      makeInput(["c1"], makeArtefact(), "fast", "shared"),
+      {
+        dispatchGrader: fakeDispatch("shared", '{"pass":true,"reasons":[]}'),
+      },
+    );
+    expect(result.pass).toBe(false);
+    expect(result.method).toBe("checker");
+    expect(result.reasons[0]).toContain("not independent");
+  });
+
+  it("FAIL: grader returns empty sessionID => reject with 'not independent'", async () => {
+    const result = await runChecker(
+      makeInput(["c1"], makeArtefact(), "fast", "prod-1"),
+      {
+        dispatchGrader: fakeDispatch("", '{"pass":true,"reasons":[]}'),
+      },
+    );
+    expect(result.pass).toBe(false);
+    expect(result.reasons[0]).toContain("not independent");
+  });
+
+  it("FAIL: grader dispatch throws => reject with 'grader dispatch failed' (no throw out)", async () => {
+    const result = await runChecker(
+      makeInput(["c1"]),
+      {
+        dispatchGrader: async () => { throw new Error("network timeout"); },
+      },
+    );
+    expect(result.pass).toBe(false);
+    expect(result.method).toBe("checker");
+    expect(result.reasons[0]).toContain("grader dispatch failed");
+  });
+
+  it("PASS matrix: every happy-path shape returns pass:true with method:checker", async () => {
+    // Sanity sweep: a few criterion shapes that all should pass.
+    const cases = [
+      ["single criterion"],
+      ["a", "b"],
+      ["list", "of", "three", "criteria"],
+    ];
+    for (const criteria of cases) {
+      const r = await runChecker(
+        makeInput(criteria, makeArtefact(), "fast", "prod-1"),
+        { dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":[]}') },
+      );
+      expect(r.pass, `criteria=${JSON.stringify(criteria)}`).toBe(true);
+      expect(r.method).toBe("checker");
+    }
+  });
+});

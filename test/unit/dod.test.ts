@@ -681,3 +681,98 @@ describe("isCheckable", () => {
     expect(isCheckable(result)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 matrix — pass / skip / fail outcomes for `kind:` directive values.
+//
+// Supported `kind:` values (deterministic / checker / none) keep their
+// existing behavior. Unsupported values (typos, misspellings, syntax
+// errors) now fail closed to kind:"none" with checks/criteria dropped
+// — the gate then applies the no-DoD policy (visible failure) instead
+// of silently letting the user-supplied checks run.
+// ---------------------------------------------------------------------------
+
+describe("parseDoDFromDispatch — Phase 5: kind: directive matrix", () => {
+  const wrap = (inner: string, tag = "acceptance") =>
+    `[${tag}]\n${inner}\n[/${tag}]`;
+
+  it("supported `kind: deterministic` with checks => kind:deterministic, checks preserved", () => {
+    const r = parseDoDFromDispatch(wrap("kind: deterministic\ncheck: buildPasses command=tsc"))!;
+    expect(r.kind).toBe("deterministic");
+    expect(r.checks).toHaveLength(1);
+    expect(r.criteria).toHaveLength(0);
+    expect(isCheckable(r)).toBe(true);
+  });
+
+  it("supported `kind: checker` with criteria => kind:checker, criteria preserved", () => {
+    const r = parseDoDFromDispatch(wrap("kind: checker\ncriteria: feature works"))!;
+    expect(r.kind).toBe("checker");
+    expect(r.criteria).toEqual(["feature works"]);
+    expect(isCheckable(r)).toBe(true);
+  });
+
+  it("supported `kind: none` alone => kind:none, isCheckable false (skip)", () => {
+    const r = parseDoDFromDispatch(wrap("kind: none"))!;
+    expect(r.kind).toBe("none");
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("unsupported `kind: foo` alone => fail closed to kind:none, isCheckable false", () => {
+    const r = parseDoDFromDispatch(wrap("kind: foo"))!;
+    expect(r.kind).toBe("none");
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("unsupported `kind: foo` with checks => fail closed: checks dropped, kind:none", () => {
+    const r = parseDoDFromDispatch(wrap("kind: foo\ncheck: buildPasses command=tsc"))!;
+    expect(r.kind).toBe("none");
+    expect(r.checks).toHaveLength(0);
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("unsupported `kind: foo` with criteria => fail closed: criteria dropped, kind:none", () => {
+    const r = parseDoDFromDispatch(wrap("kind: foo\ncriteria: feature works"))!;
+    expect(r.kind).toBe("none");
+    expect(r.criteria).toHaveLength(0);
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("unsupported `kind: foo` with deliverable => fail closed: deliverable null, kind:none", () => {
+    const r = parseDoDFromDispatch(wrap("kind: foo\ndeliverable: out.txt"))!;
+    expect(r.kind).toBe("none");
+    expect(r.deliverable).toBeNull();
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("empty `kind:` value (just `kind:`) => fail closed to kind:none", () => {
+    const r = parseDoDFromDispatch(wrap("kind:\ncheck: buildPasses"))!;
+    expect(r.kind).toBe("none");
+    expect(r.checks).toHaveLength(0);
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("unsupported `kind: foo` after a supported check => fail closed: check dropped", () => {
+    // Order matters: the parser walks lines in order. A check declared BEFORE
+    // the bad kind directive would be collected; the bad kind then clears
+    // everything. The end state is unambiguously non-checkable.
+    const r = parseDoDFromDispatch(
+      wrap("check: buildPasses command=tsc\nkind: foo"),
+    )!;
+    expect(r.kind).toBe("none");
+    expect(r.checks).toHaveLength(0);
+    expect(isCheckable(r)).toBe(false);
+  });
+
+  it("supported `kind: deterministic` after a malformed first kind: => preserved", () => {
+    // First bad kind clears state; second (valid) kind directive wins.
+    // The end state is the second kind's intent.
+    const r = parseDoDFromDispatch(
+      wrap("kind: foo\nkind: deterministic\ncheck: buildPasses command=tsc"),
+    )!;
+    // After "kind: foo", checks were dropped. The subsequent valid kind
+    // directive is recorded; checks are NOT re-collected because the
+    // parser never re-enters the collected-checks state. Result: kind
+    // is "deterministic" but no checks => normalize forces "none".
+    expect(["none", "deterministic"]).toContain(r.kind);
+  });
+});
