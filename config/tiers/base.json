@@ -1,0 +1,10 @@
+{
+  "activePreset": "multi-provider",
+  "activeMode": "normal",
+  "tierCaps": {
+    "fast": 8,
+    "medium": 5,
+    "heavy": 3
+  },
+  "defaultTier": "medium"
+}

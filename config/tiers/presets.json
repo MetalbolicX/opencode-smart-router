@@ -1,0 +1,248 @@
+{
+  "presets": {
+    "anthropic": {
+      "fast": {
+        "model": "anthropic/claude-haiku-4-5",
+        "costRatio": 1,
+        "description": "Haiku 4.5 for exploration, search, and simple reads",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "variant": "max",
+        "costRatio": 5,
+        "description": "Sonnet 4.6 max for implementation, refactoring, and tests",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Code review",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "anthropic/claude-opus-4-8",
+        "variant": "max",
+        "costRatio": 20,
+        "description": "Opus 4.8 max for architecture, complex debugging, and security",
+        "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "openai": {
+      "fast": {
+        "model": "openai/gpt-5.4-mini-fast",
+        "costRatio": 1,
+        "description": "GPT-5.4 Mini Fast for fast exploration and simple tasks",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads",
+          "Quick lookups"
+        ]
+      },
+      "medium": {
+        "model": "openai/gpt-5.5-fast",
+        "variant": "high",
+        "costRatio": 5,
+        "description": "GPT-5.5 fast default settings for implementation and standard coding",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "openai/gpt-5.5-fast",
+        "variant": "xhigh",
+        "costRatio": 20,
+        "description": "GPT-5.4 xhigh for architecture and complex tasks",
+        "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "github-copilot": {
+      "fast": {
+        "model": "github-copilot/claude-haiku-4-5",
+        "costRatio": 1,
+        "description": "Claude Haiku 4.5 via GitHub Copilot for fast exploration and simple tasks",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "github-copilot/claude-sonnet-4-6",
+        "costRatio": 5,
+        "description": "Claude Sonnet 4.5 via GitHub Copilot for implementation, refactoring, and tests",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Code review",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "github-copilot/claude-opus-4-6",
+        "variant": "thinking",
+        "costRatio": 20,
+        "description": "Claude Opus 4.6 via GitHub Copilot for architecture, complex debugging, and security",
+        "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "google": {
+      "fast": {
+        "model": "google/gemini-2.5-flash",
+        "costRatio": 1,
+        "description": "Gemini 2.5 Flash for fast exploration and simple tasks",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "google/gemini-2.5-pro",
+        "costRatio": 5,
+        "description": "Gemini 2.5 Pro for implementation, refactoring, and tests",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Code review",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "google/gemini-3-pro-preview",
+        "costRatio": 20,
+        "description": "Gemini 3 Pro Preview for architecture, complex debugging, and security",
+        "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "hybrid": {
+      "fast": {
+        "model": "anthropic/claude-haiku-4-5",
+        "costRatio": 1,
+        "description": "Haiku 4.5 for exploration, search, and simple reads",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "openai/gpt-5.5-fast",
+        "variant": "high",
+        "costRatio": 5,
+        "description": "GPT-5.5 fast default settings for implementation and standard coding",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "anthropic/claude-opus-4-8",
+        "variant": "max",
+        "costRatio": 20,
+        "description": "Claude Opus 4.8 max for architecture, complex debugging, and security",
+        "steps": 120,
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    },
+    "multi-provider": {
+      "fast": {
+        "model": "opencode-go/mimo-v2.5",
+        "variant": "medium",
+        "costRatio": 1,
+        "description": "Mimo v2.5 for fast exploration and simple tasks",
+        "steps": 30,
+        "whenToUse": [
+          "Codebase exploration and search",
+          "Simple file reads and listing",
+          "Grep/glob operations",
+          "Quick lookups and research"
+        ]
+      },
+      "medium": {
+        "model": "minimax/MiniMax-M3",
+        "variant": "thinking",
+        "costRatio": 5,
+        "description": "MiniMax M3 for implementation, refactoring, and tests",
+        "steps": 50,
+        "whenToUse": [
+          "Feature implementation",
+          "Refactoring",
+          "Writing tests",
+          "Code review",
+          "Bug fixes"
+        ]
+      },
+      "heavy": {
+        "model": "openai/gpt-5.4",
+        "costRatio": 20,
+        "description": "GPT-5.4 for architecture, complex debugging, and security",
+        "steps": 120,
+        "reasoning": {
+          "effort": "high",
+          "summary": "detailed"
+        },
+        "whenToUse": [
+          "Architecture decisions",
+          "Complex debugging (after 2+ failures)",
+          "Security review",
+          "Performance optimization"
+        ]
+      }
+    }
+  }
+}
