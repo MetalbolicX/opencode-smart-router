@@ -89,7 +89,7 @@ afterAll(() => {
   }
 });
 
-function runAssembler(): { stdout: string; stderr: string } {
+const runAssembler = (): { stdout: string; stderr: string } => {
   return {
     stdout: execFileSync("node", [
       "--experimental-strip-types",
@@ -97,7 +97,7 @@ function runAssembler(): { stdout: string; stderr: string } {
     ], { encoding: "utf-8" }),
     stderr: "",
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Part files: presence + shape

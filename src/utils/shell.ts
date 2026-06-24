@@ -39,9 +39,9 @@ const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const FAIL_CLOSED_STDERR = "exec failed";
 
 /** Build a fail-closed ExecResult for thrown exceptions. */
-function failClosed(): ExecResult {
+const failClosed = (): ExecResult => {
   return { code: 1, stdout: "", stderr: FAIL_CLOSED_STDERR, timedOut: false };
-}
+};
 
 /**
  * Create a live exec seam bound to the given directory. The returned function
@@ -50,7 +50,7 @@ function failClosed(): ExecResult {
  * `code` set, stdout/stderr captured, and `timedOut` flagged when the child
  * was killed by SIGTERM. Synchronous throws resolve to the fail-closed shape.
  */
-export function createExecSeam(ctx: ExecSeamContext): ExecSeam {
+export const createExecSeam = (ctx: ExecSeamContext): ExecSeam => {
   return (command, opts) =>
     new Promise<ExecResult>((resolve) => {
       try {
@@ -78,4 +78,4 @@ export function createExecSeam(ctx: ExecSeamContext): ExecSeam {
         resolve(failClosed());
       }
     });
-}
+};

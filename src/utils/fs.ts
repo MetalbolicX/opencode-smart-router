@@ -23,9 +23,9 @@ export interface FsSeamContext {
 }
 
 /** Resolve a path: absolute paths pass through; relative paths join with `ctx.directory`. */
-function resolvePath(ctx: FsSeamContext, p: string): string {
+const resolvePath = (ctx: FsSeamContext, p: string): string => {
   return isAbsolute(p) ? p : join(ctx.directory ?? "", p);
-}
+};
 
 /**
  * Create a live fs seam bound to the given directory. fileExists resolves
@@ -34,18 +34,16 @@ function resolvePath(ctx: FsSeamContext, p: string): string {
  * behaviour. readFile propagates errors to the caller, also matching the
  * original.
  */
-export function createFsSeam(ctx: FsSeamContext): FsSeam {
-  return {
-    async fileExists(p: string): Promise<boolean> {
-      try {
-        await access(resolvePath(ctx, p));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    async readFile(p: string): Promise<string> {
-      return await fsReadFile(resolvePath(ctx, p), "utf-8");
-    },
-  };
-}
+export const createFsSeam = (ctx: FsSeamContext): FsSeam => ({
+  async fileExists(p: string): Promise<boolean> {
+    try {
+      await access(resolvePath(ctx, p));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  async readFile(p: string): Promise<string> {
+    return await fsReadFile(resolvePath(ctx, p), "utf-8");
+  },
+});

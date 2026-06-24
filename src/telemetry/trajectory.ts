@@ -36,10 +36,10 @@ export interface TrajectoryState {
   costUnits: number;
 }
 
-export function createTrajectory(
+export const createTrajectory = (
   sessionID: string,
   tier?: string | null,
-): TrajectoryState {
+): TrajectoryState => {
   return {
     sessionID,
     tier: tier ?? null,
@@ -61,12 +61,12 @@ export function createTrajectory(
     finalTier: null,
     costUnits: 0,
   };
-}
+};
 
-export function recordToolEvent(
+export const recordToolEvent = (
   state: TrajectoryState,
   event: TrajectoryToolEvent,
-): void {
+): void => {
   state.toolCallCount += 1;
 
   if (event.blocked) {
@@ -97,17 +97,17 @@ export function recordToolEvent(
   if (event.deliverable) {
     state.deliverableExecuted = true;
   }
-}
+};
 
-export function setStopReason(state: TrajectoryState, reason: string): void {
+export const setStopReason = (state: TrajectoryState, reason: string): void => {
   if (state.stopReason === null) {
     state.stopReason = reason;
   }
-}
+};
 
-export function trajectoryMetrics(
+export const trajectoryMetrics = (
   state: TrajectoryState,
-): Record<string, unknown> {
+): Record<string, unknown> => {
   const readExecRatio =
     state.execCount === 0
       ? state.readCount
@@ -129,27 +129,27 @@ export function trajectoryMetrics(
     final_tier: state.finalTier,
     cost_units: state.costUnits,
   };
-}
+};
 
-export function dumpTrajectory(state: TrajectoryState): string {
+export const dumpTrajectory = (state: TrajectoryState): string => {
   return `[trajectory ${state.sessionID}] ${JSON.stringify(trajectoryMetrics(state))}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Per-instance store factory — mirrors src/router/sessions.ts pattern
 // ---------------------------------------------------------------------------
 
-export function createTrajectoryStore() {
+export const createTrajectoryStore = () => {
   const store = new Map<string, TrajectoryState>();
 
-  function ensureState(sessionID: string, tier?: string | null): TrajectoryState {
+  const ensureState = (sessionID: string, tier?: string | null): TrajectoryState => {
     let s = store.get(sessionID);
     if (!s) {
       s = createTrajectory(sessionID, tier);
       store.set(sessionID, s);
     }
     return s;
-  }
+  };
 
   return {
     ensure(sessionID: string, tier?: string | null): TrajectoryState {
@@ -177,4 +177,4 @@ export function createTrajectoryStore() {
       return dumpTrajectory(s);
     },
   };
-}
+};

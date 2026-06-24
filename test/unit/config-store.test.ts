@@ -58,11 +58,11 @@ afterEach(() => {
   }
 });
 
-function stageLocal(cwd: string, content: Record<string, unknown>): void {
+const stageLocal = (cwd: string, content: Record<string, unknown>): void => {
   const dir = join(cwd, ".opencode");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "tiers.json"), JSON.stringify(content), "utf-8");
-}
+};
 
 describe("readMergedConfig", () => {
   it("returns the bundled default preset when no global/local override is staged", () => {

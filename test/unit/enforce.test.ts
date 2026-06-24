@@ -35,7 +35,7 @@ const enforcedCfg: RouterConfig = {
 // In-memory GuardStoreLike factory
 // ---------------------------------------------------------------------------
 
-function makeStore(): { store: GuardStoreLike; notes: Map<string, string> } {
+const makeStore = (): { store: GuardStoreLike; notes: Map<string, string> } => {
   const states = new Map<string, GuardState>();
   const notes = new Map<string, string>();
   const store: GuardStoreLike = {
@@ -56,7 +56,7 @@ function makeStore(): { store: GuardStoreLike; notes: Map<string, string> } {
     },
   };
   return { store, notes };
-}
+};
 
 // ---------------------------------------------------------------------------
 // formatScorecard

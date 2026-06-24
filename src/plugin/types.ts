@@ -59,11 +59,11 @@ export interface TextPart {
 }
 
 /** Type guard: returns true when `p` is a well-formed `TextPart`. */
-export function isTextPart(p: unknown): p is TextPart {
+export const isTextPart = (p: unknown): p is TextPart => {
   if (!p || typeof p !== "object") return false;
   const rec = p as Record<string, unknown>;
   return rec["type"] === "text" && typeof rec["text"] === "string";
-}
+};
 
 /**
  * Filter and concatenate the text content of a prompt result. Returns
@@ -71,9 +71,9 @@ export function isTextPart(p: unknown): p is TextPart {
  * Lines are joined with `\n` to preserve the original behavior of the
  * inline closures in `dispatchGrader` and `executeDelegate`.
  */
-export function extractPromptText(
+export const extractPromptText = (
   res: SessionPromptResult | null | undefined,
-): string {
+): string => {
   const parts = res?.data?.parts;
   if (!parts || parts.length === 0) return "";
   const chunks: string[] = [];
@@ -81,14 +81,14 @@ export function extractPromptText(
     if (isTextPart(p)) chunks.push(p.text);
   }
   return chunks.join("\n");
-}
+};
 
 /** Pull the session id out of a `session.create` result, or undefined. */
-export function extractSessionId(
+export const extractSessionId = (
   res: SessionCreateResult | null | undefined,
-): string | undefined {
+): string | undefined => {
   return res?.data?.id;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Built-in `task` tool args (narrow shape for the verify-dispatch path)
@@ -110,7 +110,7 @@ export interface TaskToolArgs {
  * payload is not an object. The fields stay optional — callers must
  * tolerate missing values (same as the original `any`-typed reads).
  */
-export function asTaskToolArgs(args: unknown): TaskToolArgs | null {
+export const asTaskToolArgs = (args: unknown): TaskToolArgs | null => {
   if (!args || typeof args !== "object") return null;
   const rec = args as Record<string, unknown>;
   const out: TaskToolArgs = {};
@@ -124,7 +124,7 @@ export function asTaskToolArgs(args: unknown): TaskToolArgs | null {
     out.description = rec["description"];
   }
   return out;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Hook IO shapes

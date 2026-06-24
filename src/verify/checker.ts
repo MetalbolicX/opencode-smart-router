@@ -51,15 +51,15 @@ export interface CheckerInput {
 // Tier helpers
 // ---------------------------------------------------------------------------
 
-export function tierRank(tier: string, ladder: string[]): number {
+export const tierRank = (tier: string, ladder: string[]): number => {
   const i = ladder.indexOf(tier);
   return i < 0 ? ladder.length : i; // unknown tier ranks highest = safe
-}
+};
 
-export function atLeastProducerTier(
+export const atLeastProducerTier = (
   producerTier: string,
   opts?: { ladder?: string[]; minGraderTier?: string | null }
-): string {
+): string => {
   const ladder = opts?.ladder ?? ["fast", "medium", "heavy"];
   let idx = tierRank(producerTier, ladder);
   if (opts?.minGraderTier != null) {
@@ -67,7 +67,7 @@ export function atLeastProducerTier(
   }
   const clamped = Math.min(idx, ladder.length - 1);
   return ladder[clamped] ?? producerTier;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Prompt builder
@@ -76,7 +76,7 @@ export function atLeastProducerTier(
 const GRADER_SYSTEM =
   'You are an independent, skeptical verification grader. You did NOT produce this work and have no stake in it. Evaluate ONLY whether the artefact satisfies EACH acceptance criterion below. For every criterion, cite concrete evidence from the artefact. If the evidence is missing, ambiguous, partial, or you are uncertain for ANY reason, you MUST fail that criterion. Default to FAIL. Do not give the benefit of the doubt. Output ONLY a single JSON object on one line: {"pass": boolean, "reasons": string[]}. Set pass=true ONLY if every criterion is satisfied with cited evidence; otherwise pass=false with a reason per failed criterion.';
 
-export function buildGradingPrompt(input: CheckerInput): { system: string; prompt: string } {
+export const buildGradingPrompt = (input: CheckerInput): { system: string; prompt: string } => {
   const lines: string[] = [];
 
   lines.push("## Acceptance criteria (ALL must be satisfied)");
@@ -113,13 +113,13 @@ export function buildGradingPrompt(input: CheckerInput): { system: string; promp
   lines.push("Respond with the JSON verdict now.");
 
   return { system: GRADER_SYSTEM, prompt: lines.join("\n") };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Verdict parser
 // ---------------------------------------------------------------------------
 
-export function parseGraderVerdict(text: string): { pass: boolean; reasons: string[] } | null {
+export const parseGraderVerdict = (text: string): { pass: boolean; reasons: string[] } | null => {
   try {
     let raw: string | null = null;
 
@@ -157,13 +157,13 @@ export function parseGraderVerdict(text: string): { pass: boolean; reasons: stri
   } catch {
     return null;
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-export async function runChecker(input: CheckerInput, deps: CheckerDeps): Promise<Verdict> {
+export const runChecker = async (input: CheckerInput, deps: CheckerDeps): Promise<Verdict> => {
   // 1. Empty criteria
   if (input.criteria.length === 0) {
     return { pass: false, method: "none", skipped: true, reasons: ["no criteria to grade"] };
@@ -221,4 +221,4 @@ export async function runChecker(input: CheckerInput, deps: CheckerDeps): Promis
     reasons: parsed.reasons.map(scrubText),
     evidence: scrubText("grader=" + graderTier),
   };
-}
+};

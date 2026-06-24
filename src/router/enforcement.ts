@@ -8,11 +8,11 @@ export type EnforcementMode = "off" | "advisory" | "enforced";
 
 export const DEFAULT_ENV_GATE = "MODEL_ROUTER_ENFORCE";
 
-export function resolveEnforcementMode(args: {
+export const resolveEnforcementMode = (args: {
   config: RouterConfig | undefined;
   tier?: string;
   env?: Record<string, string | undefined>;
-}): { mode: EnforcementMode; warning?: string } {
+}): { mode: EnforcementMode; warning?: string } => {
   const enf = args.config?.enforcement;
   const gateName = enf?.envGate ?? DEFAULT_ENV_GATE;
   const raw = args.env?.[gateName];

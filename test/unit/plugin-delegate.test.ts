@@ -80,7 +80,7 @@ interface SessionCall {
   promptText?: string;
 }
 
-function makeCtx(opts: {
+const makeCtx = (opts: {
   createImpl?: (req: any) => Promise<any>;
   promptImpl?: (req: any) => Promise<any>;
   getConfigImpl?: () => RouterConfig;
@@ -102,7 +102,7 @@ function makeCtx(opts: {
   ctx: PluginContext;
   sessions: SessionCall[];
   counters: { getConfig: number; refreshConfig: number };
-} {
+} => {
   const sessions: SessionCall[] = [];
   let createSeq = 0;
   const counters = { getConfig: 0, refreshConfig: 0 };

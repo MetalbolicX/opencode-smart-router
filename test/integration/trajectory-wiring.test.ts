@@ -14,9 +14,9 @@ import { createSessionStore } from "../../src/router/sessions";
  *    behaviour (the trajectory observation must add NOTHING to output).
  */
 
-function trajFile(sid: string): string {
+const trajFile = (sid: string): string => {
   return join(tmpdir(), "opencode-model-router-trajectory", `${sid}.log`);
-}
+};
 
 afterEach(() => {
   delete process.env.MODEL_ROUTER_TRAJECTORY_DEBUG;

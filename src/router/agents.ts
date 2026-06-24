@@ -9,7 +9,7 @@ import {
 // Build agent options from tier config
 // ---------------------------------------------------------------------------
 
-export function buildAgentOptions(tier: TierConfig): Record<string, unknown> {
+export const buildAgentOptions = (tier: TierConfig): Record<string, unknown> => {
   const opts: Record<string, unknown> = {};
 
   // Anthropic thinking config
@@ -46,11 +46,11 @@ export function buildAgentOptions(tier: TierConfig): Record<string, unknown> {
  *
  * Side-effect only — the returned void matches the original inline loop.
  */
-export function registerTierAgents(
+export const registerTierAgents = (
   opencodeConfig: { agent?: Record<string, Record<string, unknown>> },
   activeTiers: Preset,
   cfg: RouterConfig,
-): void {
+): void => {
   opencodeConfig.agent ??= {};
 
   for (const [name, tier] of Object.entries(activeTiers)) {

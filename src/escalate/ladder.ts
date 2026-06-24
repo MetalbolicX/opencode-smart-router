@@ -40,14 +40,14 @@ export interface LadderVerdict {
 // Helpers
 // ---------------------------------------------------------------------------
 
-export function tierRank(tier: string, ladder: string[]): number {
+export const tierRank = (tier: string, ladder: string[]): number => {
   return ladder.indexOf(tier);
 }
 
-export function resolveStartTier(
+export const resolveStartTier = (
   producerTier: string,
   policy: EscalatePolicy,
-): string {
+): string => {
   const pi = tierRank(producerTier, policy.ladder);
   const fi =
     policy.floorTier != null ? tierRank(policy.floorTier, policy.ladder) : -1;
@@ -55,10 +55,10 @@ export function resolveStartTier(
   return policy.ladder[startIdx] ?? producerTier;
 }
 
-export function newLadderState(
+export const newLadderState = (
   producerTier: string,
   policy: EscalatePolicy,
-): LadderState {
+): LadderState => {
   return {
     currentTier: resolveStartTier(producerTier, policy),
     attemptsThisTier: 0,
@@ -69,10 +69,10 @@ export function newLadderState(
   };
 }
 
-export function recordAttempt(
+export const recordAttempt = (
   state: LadderState,
   costUnits = 0,
-): LadderState {
+): LadderState => {
   return {
     ...state,
     totalAttempts: state.totalAttempts + 1,
@@ -82,10 +82,10 @@ export function recordAttempt(
   };
 }
 
-export function nextTierAfter(
+export const nextTierAfter = (
   currentTier: string,
   policy: EscalatePolicy,
-): string | null {
+): string | null => {
   const ci = tierRank(currentTier, policy.ladder);
   if (ci >= 0 && ci + 1 <= policy.ladder.length - 1) {
     return policy.ladder[ci + 1]!;
@@ -93,7 +93,7 @@ export function nextTierAfter(
   return null;
 }
 
-export function buildLadderForcingMessage(reasons: string[]): string {
+export const buildLadderForcingMessage = (reasons: string[]): string => {
   const list =
     reasons.length === 0
       ? "- (no reasons provided)"
@@ -105,11 +105,11 @@ export function buildLadderForcingMessage(reasons: string[]): string {
   );
 }
 
-export function nextAction(
+export const nextAction = (
   state: LadderState,
   verdict: LadderVerdict | null | undefined,
   policy: EscalatePolicy,
-): LadderAction {
+): LadderAction => {
   // (1) pass
   if (verdict?.pass === true) {
     return { action: "accept" };
@@ -158,7 +158,7 @@ export function nextAction(
   };
 }
 
-export function advance(state: LadderState, action: LadderAction): LadderState {
+export const advance = (state: LadderState, action: LadderAction): LadderState => {
   if (action.action === "retry") {
     return { ...state, attemptsThisTier: state.attemptsThisTier + 1 };
   }
@@ -174,7 +174,7 @@ export function advance(state: LadderState, action: LadderAction): LadderState {
   return state;
 }
 
-export function buildEscalatePolicy(cfg: RouterConfig): EscalatePolicy {
+export const buildEscalatePolicy = (cfg: RouterConfig): EscalatePolicy => {
   const esc = cfg.enforcement?.escalate;
   return {
     ladder: esc?.ladder ?? ["fast", "medium", "heavy"],
@@ -188,11 +188,11 @@ export function buildEscalatePolicy(cfg: RouterConfig): EscalatePolicy {
 /**
  * One-line, secret-free scorecard for a finished delegation (counts only).
  */
-export function formatLadderScorecard(
+export const formatLadderScorecard = (
   state: LadderState,
   accepted: boolean,
   method: string,
-): string {
+): string => {
   return (
     `[router delegate scorecard | final_tier=${state.currentTier} | ` +
     `attempts=${state.totalAttempts} | escalations=${state.escalations} | ` +
@@ -205,12 +205,12 @@ export function formatLadderScorecard(
  *  `<tmpdir>/opencode-model-router-trajectory/<sid>.delegate.log` (same dir
  *  the event-hook scorecard uses) and never throws — a logging failure must
  *  never crash a real session. */
-export function dumpDelegateScorecard(
+export const dumpDelegateScorecard = (
   sid: string,
   state: LadderState,
   accepted: boolean,
   method: string,
-): void {
+): void => {
   const line = formatLadderScorecard(state, accepted, method);
   writeTrajectoryLog(sid, line, "delegate");
 }

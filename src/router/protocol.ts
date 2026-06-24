@@ -4,11 +4,11 @@ import type { RouterConfig, Preset, ModeConfig } from "./config";
 // Tier / mode helpers
 // ---------------------------------------------------------------------------
 
-export function getActiveTiers(cfg: RouterConfig): Preset {
+export const getActiveTiers = (cfg: RouterConfig): Preset => {
   return cfg.presets[cfg.activePreset] ?? Object.values(cfg.presets)[0]!;
 }
 
-export function getActiveMode(cfg: RouterConfig): ModeConfig | undefined {
+export const getActiveMode = (cfg: RouterConfig): ModeConfig | undefined => {
   if (!cfg.modes || !cfg.activeMode) return undefined;
   return cfg.modes[cfg.activeMode];
 }
@@ -17,7 +17,7 @@ export function getActiveMode(cfg: RouterConfig): ModeConfig | undefined {
 // Fallback instructions builder
 // ---------------------------------------------------------------------------
 
-export function buildFallbackInstructions(cfg: RouterConfig): string {
+export const buildFallbackInstructions = (cfg: RouterConfig): string => {
   const fb = cfg.fallback;
   if (!fb) return "";
 
@@ -42,7 +42,7 @@ export function buildFallbackInstructions(cfg: RouterConfig): string {
 // Cost & taxonomy builders
 // ---------------------------------------------------------------------------
 
-export function buildTaskTaxonomy(cfg: RouterConfig): string {
+export const buildTaskTaxonomy = (cfg: RouterConfig): string => {
   if (!cfg.taskPatterns || Object.keys(cfg.taskPatterns).length === 0)
     return "";
   const lines = ["R:"];
@@ -60,7 +60,7 @@ export function buildTaskTaxonomy(cfg: RouterConfig): string {
  * so the cheap @fast tier handles exploration and @medium handles execution.
  * Only active in normal mode — budget/quality modes have their own override rules.
  */
-export function buildDecomposeHint(cfg: RouterConfig): string {
+export const buildDecomposeHint = (cfg: RouterConfig): string => {
   const mode = getActiveMode(cfg);
   // Budget and quality modes handle this via overrideRules — skip to avoid conflicts
   if (mode?.overrideRules?.length) return "";
@@ -84,7 +84,7 @@ export function buildDecomposeHint(cfg: RouterConfig): string {
 // System prompt builder
 // ---------------------------------------------------------------------------
 
-export function buildDelegationProtocol(cfg: RouterConfig): string {
+export const buildDelegationProtocol = (cfg: RouterConfig): string => {
   const tiers = getActiveTiers(cfg);
 
   // Compact tier summary: @name=model/variant(costRatio)
@@ -166,7 +166,7 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
 // providers gets the override only on its Claude-backed tiers.
 // ---------------------------------------------------------------------------
 
-export function isClaudeModel(modelID: string | undefined): boolean {
+export const isClaudeModel = (modelID: string | undefined): boolean => {
   if (!modelID) return false;
   const s = modelID.toLowerCase();
   if (s.startsWith("anthropic/")) return true;
@@ -261,7 +261,7 @@ export const CLAUDE_ANTI_NARRATION = [
  * Builds the DoD / Acceptance block protocol section shown when enforcement is ON.
  * Pure: no side-effects, no I/O.
  */
-export function buildDoDProtocolSection(cfg: RouterConfig): string {
+export const buildDoDProtocolSection = (cfg: RouterConfig): string => {
   const requireExplicit = cfg.enforcement?.verify?.requireExplicitDoD === true;
   const omitLine = requireExplicit
     ? "A DoD is REQUIRED: a non-trivial dispatch without an [acceptance] block is rejected."
@@ -293,11 +293,11 @@ export function buildDoDProtocolSection(cfg: RouterConfig): string {
  * When enforcementOn is true, appends the DoD/Acceptance protocol section.
  * When false/omitted (default), the output is byte-identical to the pre-enforcement baseline (GA-1).
  */
-export function assembleSystemPrompt(
+export const assembleSystemPrompt = (
   cfg: RouterConfig,
   orchestratorModel: string | undefined,
   enforcementOn: boolean = false,
-): string {
+): string => {
   const delegationProtocol = buildDelegationProtocol(cfg);
   const dodSection = enforcementOn ? `\n\n---\n\n${buildDoDProtocolSection(cfg)}` : "";
   return isClaudeModel(orchestratorModel)

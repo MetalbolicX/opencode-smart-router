@@ -85,11 +85,11 @@ const toEventPayload = (v: object): HookEventPayload =>
  * preserves the pre-refactor gating: the delegate tool only ships when
  * the experimental config flag is set OR `MODEL_ROUTER_VERIFIED_DELEGATE=1`.
  */
-export function assembleRuntimeHooks(
+export const assembleRuntimeHooks = (
   ctx: PluginContext,
   activeTiersAtLoad: Preset,
   enableDelegateTool: boolean,
-): Hooks {
+): Hooks => {
   return {
     tool: {
       ...(enableDelegateTool

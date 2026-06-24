@@ -66,7 +66,7 @@ const BASH_C_RE = /\bbash\s+-c\b/i;
 // newGuardState
 // ---------------------------------------------------------------------------
 
-export function newGuardState(policy: GuardPolicy): GuardState {
+export const newGuardState = (policy: GuardPolicy): GuardState => {
   return {
     budget: policy.budget,
     toolCallCount: 0,
@@ -81,13 +81,13 @@ export function newGuardState(policy: GuardPolicy): GuardState {
     seen: new Map(),
     lastBlock: null,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // isSelfScript
 // ---------------------------------------------------------------------------
 
-export function isSelfScript(call: GuardCall, policy: GuardPolicy): boolean {
+export const isSelfScript = (call: GuardCall, policy: GuardPolicy): boolean => {
   const args = call.args ?? {};
   const target = String(args.filePath ?? args.path ?? args.file ?? "");
 
@@ -125,7 +125,7 @@ export function isSelfScript(call: GuardCall, policy: GuardPolicy): boolean {
 // classify
 // ---------------------------------------------------------------------------
 
-export function classify(call: GuardCall, policy: GuardPolicy): GuardKind {
+export const classify = (call: GuardCall, policy: GuardPolicy): GuardKind => {
   if (FINISH_TOOLS.has(call.tool)) return "finish";
   if (isSelfScript(call, policy)) return "self_script";
   if (READ_ONLY_TOOLS.has(call.tool)) return "read";
@@ -137,11 +137,11 @@ export function classify(call: GuardCall, policy: GuardPolicy): GuardKind {
 // evaluateGuards
 // ---------------------------------------------------------------------------
 
-export function evaluateGuards(
+export const evaluateGuards = (
   state: GuardState,
   call: GuardCall,
   policy: GuardPolicy,
-): GuardDecision {
+): GuardDecision => {
   const fp = fingerprintToolCall(call.tool, call.args);
   let kind = classify(call, policy);
 
@@ -214,12 +214,12 @@ export function evaluateGuards(
 // updateState
 // ---------------------------------------------------------------------------
 
-export function updateState(
+export const updateState = (
   state: GuardState,
   call: GuardCall,
   opts: { ok: boolean },
   policy: GuardPolicy,
-): GuardState {
+): GuardState => {
   const kind = classify(call, policy);
 
   // finish: no count
@@ -261,10 +261,10 @@ export function updateState(
 // recordBlock
 // ---------------------------------------------------------------------------
 
-export function recordBlock(
+export const recordBlock = (
   state: GuardState,
   decision: GuardDecision,
-): GuardState {
+): GuardState => {
   state.lastBlock = decision.guard;
   state.blockedCount += 1;
   if (decision.guard === "redundant_read") state.redundantCount += 1;
@@ -275,7 +275,7 @@ export function recordBlock(
 // forcingMessage
 // ---------------------------------------------------------------------------
 
-export function forcingMessage(state: GuardState, policy: GuardPolicy): string {
+export const forcingMessage = (state: GuardState, policy: GuardPolicy): string => {
   const deliverable =
     policy.deliverableSignal == null
       ? "n/a"
@@ -295,7 +295,7 @@ export function forcingMessage(state: GuardState, policy: GuardPolicy): string {
 // trajectoryMetrics
 // ---------------------------------------------------------------------------
 
-export function trajectoryMetrics(state: GuardState): Record<string, unknown> {
+export const trajectoryMetrics = (state: GuardState): Record<string, unknown> => {
   return {
     ttfa: state.ttfa,
     read_exec_ratio:
@@ -332,7 +332,7 @@ const ERROR_PREFIXES = [
  * evidence of failure); otherwise false only when the (left-trimmed) text
  * starts with a known error prefix.
  */
-export function observationOk(output: unknown): boolean {
+export const observationOk = (output: unknown): boolean => {
   const s = typeof output === "string" ? output.trimStart() : "";
   if (s.length === 0) return true;
   return !ERROR_PREFIXES.some((p) => s.startsWith(p));

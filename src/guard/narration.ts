@@ -15,7 +15,7 @@ export const NARRATION_PATTERNS: RegExp[] = [
 ];
 
 /** Returns matched narration phrases, deduped and capped. Empty array = no narration detected. */
-export function detectNarration(text: string): string[] {
+export const detectNarration = (text: string): string[] => {
   if (text.length < 20) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -31,4 +31,4 @@ export function detectNarration(text: string): string[] {
     }
   }
   return out;
-}
+};

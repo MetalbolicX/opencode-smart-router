@@ -66,13 +66,13 @@ export interface GateResult {
   dodSource: DoD["source"];
 }
 
-function view(artefact: Artefact): ArtefactView {
+const view = (artefact: Artefact): ArtefactView => {
   return {
     finalReturnText: artefact.finalReturnText,
     changedFiles: artefact.changedFiles,
     declaredOutputs: artefact.declaredOutputs,
   };
-}
+};
 
 /**
  * Decide whether a delegation's artefact meets its DoD.
@@ -84,19 +84,19 @@ function view(artefact: Artefact): ArtefactView {
  * anything the schema does not recognize. Unknown strings are coerced to
  * "always" so a typo can never silently disable verification.
  */
-function normalizeRequire(
+const normalizeRequire = (
   raw: string | undefined,
-): "never" | "whenDoDPresent" | "always" {
+): "never" | "whenDoDPresent" | "always" => {
   if (raw === undefined) return "whenDoDPresent";
   if (raw === "never" || raw === "whenDoDPresent" || raw === "always") return raw;
   return "always";
-}
+};
 
-export async function accept(
+export const accept = async (
   delegation: Delegation,
   artefact: Artefact,
   deps: GateDeps,
-): Promise<GateResult> {
+): Promise<GateResult> => {
   const dod = delegation.dod;
   const dodSource = dod.source;
   const require = normalizeRequire(deps.require);
@@ -182,4 +182,4 @@ export async function accept(
   }
 
   return { accepted: verdict.pass === true, verdict, dodSource };
-}
+};

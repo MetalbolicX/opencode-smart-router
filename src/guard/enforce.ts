@@ -29,7 +29,7 @@ export interface GuardStoreLike {
 /** Build a GuardPolicy from config for a given subagent tier. deliverableSignal
  * is null in Wave 1 (Mode A/B signal wiring lands in Wave 2/4), which disables
  * the deliverable-first clause — the honest common case (M5). */
-export function buildGuardPolicy(cfg: RouterConfig, tier: string | null): GuardPolicy {
+export const buildGuardPolicy = (cfg: RouterConfig, tier: string | null): GuardPolicy => {
   const g = cfg.enforcement?.guard ?? {};
   return {
     budget: g.budget ?? DEFAULT_GUARD_BUDGET,
@@ -40,7 +40,7 @@ export function buildGuardPolicy(cfg: RouterConfig, tier: string | null): GuardP
     blockScriptWrites: g.blockScriptWrites ?? false,
     deliverableSignal: null,
   };
-}
+};
 
 export interface BeforeResult {
   block: boolean;
@@ -50,10 +50,10 @@ export interface BeforeResult {
 }
 
 /** Compact per-delegation scorecard, emitted only when enforcement was active. */
-export function formatScorecard(state: GuardState, tier: string | null): string {
+export const formatScorecard = (state: GuardState, tier: string | null): string => {
   const ttfa = state.ttfa == null ? "n/a" : String(state.ttfa);
   return `[router scorecard | tier=${tier ?? "?"} | ttfa=${ttfa} | read:exec=${state.readCount}:${state.execCount} | self_scripts=${state.selfScriptCount} | tool_calls=${state.toolCallCount} | blocks=${state.blockedCount} | stop=${state.lastBlock ?? "none"}]`;
-}
+};
 
 /**
  * Decide whether a subagent tool call must be hard-blocked. The caller (the
@@ -61,7 +61,7 @@ export function formatScorecard(state: GuardState, tier: string | null): string 
  * mode this returns immediately WITHOUT creating guard state, so the after-hook
  * stays a no-op and behaviour is byte-identical (GA-1).
  */
-export function guardBeforeCall(params: {
+export const guardBeforeCall = (params: {
   cfg: RouterConfig;
   tier: string | null;
   sessionID: string;
@@ -70,7 +70,7 @@ export function guardBeforeCall(params: {
   store: GuardStoreLike;
   env: Record<string, string | undefined>;
   trivial?: boolean;
-}): BeforeResult {
+}): BeforeResult => {
   const { cfg, tier, sessionID, tool, toolArgs, store, env, trivial } = params;
   let mode = resolveEnforcementMode({ config: cfg, tier: tier ?? undefined, env }).mode;
   if (
@@ -112,7 +112,7 @@ export function guardBeforeCall(params: {
  * surface any pending advisory banner by appending it to the tool output.
  * No-op when guard state was never created (off mode) => GA-1 preserved.
  */
-export function guardAfterCall(params: {
+export const guardAfterCall = (params: {
   cfg: RouterConfig;
   tier: string | null;
   sessionID: string;
@@ -120,7 +120,7 @@ export function guardAfterCall(params: {
   toolArgs: unknown;
   output: { output?: unknown };
   store: GuardStoreLike;
-}): void {
+}): void => {
   const { cfg, tier, sessionID, tool, toolArgs, output, store } = params;
   const state = store.get(sessionID);
   if (!state) return;

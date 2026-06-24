@@ -30,7 +30,7 @@ export interface ConfigStore {
  * resolved `RouterConfig` so `read()` is a no-op after the first call until
  * `refresh()` or `invalidate()` runs.
  */
-export function createConfigStore(opts: { cwd: string }): ConfigStore {
+export const createConfigStore = (opts: { cwd: string }): ConfigStore => {
   let cached: RouterConfig | null = null;
 
   return {

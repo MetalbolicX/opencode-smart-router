@@ -17,15 +17,15 @@ import { writeTrajectoryLog } from "../../src/utils/log";
 // ---------------------------------------------------------------------------
 
 let sidCounter = 0;
-function uniqueSid(prefix: string): string {
+const uniqueSid = (prefix: string): string => {
   sidCounter += 1;
   return `${prefix}-${process.pid}-${Date.now()}-${sidCounter}`;
-}
+};
 
-function trajPath(sid: string, subdir?: string): string {
+const trajPath = (sid: string, subdir?: string): string => {
   const filename = subdir ? `${sid}.${subdir}.log` : `${sid}.log`;
   return join(tmpdir(), "opencode-model-router-trajectory", filename);
-}
+};
 
 const written: string[] = [];
 

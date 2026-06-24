@@ -39,7 +39,7 @@ import { readState } from "./config-state";
  * Layer precedence (highest → lowest): local > global > bundled.
  * State precedence (highest): persisted state file.
  */
-export function readMergedConfig(opts: { cwd: string }): RouterConfig {
+export const readMergedConfig = (opts: { cwd: string }): RouterConfig => {
   const layers: ConfigLayer[] = [
     { kind: "bundled", path: configPath(), required: true },
     { kind: "global", path: globalConfigPath(), required: false },
@@ -67,7 +67,7 @@ export function readMergedConfig(opts: { cwd: string }): RouterConfig {
   return cfg;
 }
 
-function getPluginRoot(): string {
+const getPluginRoot = (): string => {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   // Probe both layouts:
   // 1. Source layout: src/router/config-loader.ts → ../../tiers.json (repo root)
@@ -78,17 +78,17 @@ function getPluginRoot(): string {
   return sourceRoot;
 }
 
-export function configPath(): string {
+export const configPath = (): string => {
   return join(getPluginRoot(), "tiers.json");
 }
 
 /** Global user-level override path (`~/.config/opencode-model-router/tiers.json`). */
-export function globalConfigPath(): string {
+export const globalConfigPath = (): string => {
   return join(homedir(), ".config", "opencode-model-router", "tiers.json");
 }
 
 /** Repo-local override path (`<cwd>/.opencode/tiers.json`). Re-evaluated per call. */
-export function localConfigPath(): string {
+export const localConfigPath = (): string => {
   return join(process.cwd(), ".opencode", "tiers.json");
 }
 
@@ -102,7 +102,7 @@ export function localConfigPath(): string {
  * Exported for `src/router/config-store.ts`; pure with respect to module state
  * (no shared mutable globals).
  */
-export function readConfigLayer(layer: ConfigLayer): Record<string, unknown> | undefined {
+export const readConfigLayer = (layer: ConfigLayer): Record<string, unknown> | undefined => {
   let raw: string;
   try {
     raw = readFileSync(layer.path, "utf-8");
@@ -146,7 +146,7 @@ export function readConfigLayer(layer: ConfigLayer): Record<string, unknown> | u
  *
  * Exported for `src/router/config-store.ts`; pure.
  */
-export function deepMergeConfig(base: unknown, override: unknown): unknown {
+export const deepMergeConfig = (base: unknown, override: unknown): unknown => {
   if (base === undefined) return override;
   if (override === undefined) return base;
   if (isPlainObject(base) && isPlainObject(override)) {
@@ -169,7 +169,7 @@ export function deepMergeConfig(base: unknown, override: unknown): unknown {
  * Exported for `src/router/config-store.ts`; mutates `cfg` in place but has
  * no shared state.
  */
-export function applyStateOverlay(cfg: RouterConfig, state: RouterState): void {
+export const applyStateOverlay = (cfg: RouterConfig, state: RouterState): void => {
   if (state.activePreset) {
     const resolved = resolvePresetName(cfg, state.activePreset);
     if (resolved) {
@@ -184,10 +184,10 @@ export function applyStateOverlay(cfg: RouterConfig, state: RouterState): void {
   }
 }
 
-export function resolvePresetName(
+export const resolvePresetName = (
   cfg: RouterConfig,
   requestedPreset: string,
-): string | undefined {
+): string | undefined => {
   if (cfg.presets[requestedPreset]) {
     return requestedPreset;
   }

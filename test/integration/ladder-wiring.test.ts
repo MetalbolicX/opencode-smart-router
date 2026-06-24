@@ -23,11 +23,11 @@ let sessionCounter = 0;
 // Fake ctx builder
 // ---------------------------------------------------------------------------
 
-function makeCtxWithQueues(
+const makeCtxWithQueues = (
   dir: string,
   producerCalls: Array<{ tier: string; text: string }>,
   graderQueue: string[],
-) {
+) => {
   return {
     directory: dir,
     worktree: dir,
@@ -58,7 +58,7 @@ function makeCtxWithQueues(
       },
     } as any,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Suite

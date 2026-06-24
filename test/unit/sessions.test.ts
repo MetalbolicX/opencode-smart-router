@@ -37,9 +37,9 @@ describe("parseCapDirective", () => {
   });
 });
 
-function st(partial: Partial<SubagentState> & { cap: Cap; calls: number }): SubagentState {
+const st = (partial: Partial<SubagentState> & { cap: Cap; calls: number }): SubagentState => {
   return { tierName: "fast", seen: new Map(), trivial: false, ...partial };
-}
+};
 
 describe("buildCapBanner", () => {
   it("emits the cap line with numeric cap", () => {
@@ -75,9 +75,9 @@ const cfg = {
 } as unknown as RouterConfig;
 const tierNames = ["fast", "medium", "heavy"];
 
-function dispatch(text: string) {
+const dispatch = (text: string) => {
   return { parts: [{ text }] };
-}
+};
 
 describe("createSessionStore", () => {
   it("starts with no tracked sessions", () => {

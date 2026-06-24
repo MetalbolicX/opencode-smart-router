@@ -28,7 +28,7 @@ import { readMergedConfig } from "./config-loader";
 // State file path
 // ---------------------------------------------------------------------------
 
-export function statePath(): string {
+export const statePath = (): string => {
   return join(
     homedir(),
     ".config",
@@ -42,7 +42,7 @@ export function statePath(): string {
 // ---------------------------------------------------------------------------
 
 /** Read current persisted state (or empty object on failure). */
-export function readState(): RouterState {
+export const readState = (): RouterState => {
   try {
     if (existsSync(statePath())) {
       return JSON.parse(readFileSync(statePath(), "utf-8")) as RouterState;
@@ -54,7 +54,7 @@ export function readState(): RouterState {
 }
 
 /** Write state to disk atomically (merges with existing keys). */
-export function writeState(patch: Partial<RouterState>): void {
+export const writeState = (patch: Partial<RouterState>): void => {
   const state = { ...readState(), ...patch };
   const p = statePath();
   mkdirSync(dirname(p), { recursive: true });
@@ -72,7 +72,7 @@ export function writeState(patch: Partial<RouterState>): void {
 // `readMergedConfig` call is a pure disk read.
 // ---------------------------------------------------------------------------
 
-export function saveActivePreset(presetName: string): void {
+export const saveActivePreset = (presetName: string): void => {
   const cfg = readMergedConfig({ cwd: process.cwd() });
   const resolved = resolvePresetName(cfg, presetName);
   if (!resolved) {
@@ -83,7 +83,7 @@ export function saveActivePreset(presetName: string): void {
   writeState({ activePreset: resolved });
 }
 
-export function saveActiveMode(modeName: string): void {
+export const saveActiveMode = (modeName: string): void => {
   const cfg = readMergedConfig({ cwd: process.cwd() });
   if (!cfg.modes?.[modeName]) {
     return;
@@ -92,16 +92,16 @@ export function saveActiveMode(modeName: string): void {
   writeState({ activeMode: modeName });
 }
 
-export function saveEnforcementMode(mode: "off" | "advisory" | "enforced"): void {
+export const saveEnforcementMode = (mode: "off" | "advisory" | "enforced"): void => {
   writeState({ enforcementMode: mode });
 }
 
 /** Inlined mirror of `config-loader.ts → resolvePresetName()`. Kept local to
  *  avoid widening the runtime dependency surface for a single call site. */
-function resolvePresetName(
+const resolvePresetName = (
   cfg: RouterConfig,
   requestedPreset: string,
-): string | undefined {
+): string | undefined => {
   if (cfg.presets[requestedPreset]) {
     return requestedPreset;
   }

@@ -49,7 +49,7 @@ afterEach(() => {
   }
 });
 
-function makeBaseConfig(extra: Partial<RouterConfig> = {}): RouterConfig {
+const makeBaseConfig = (extra: Partial<RouterConfig> = {}): RouterConfig => {
   return {
     activePreset: "default",
     defaultTier: "fast",
@@ -65,7 +65,7 @@ function makeBaseConfig(extra: Partial<RouterConfig> = {}): RouterConfig {
     rules: [],
     ...extra,
   } as RouterConfig;
-}
+};
 
 describe("PluginContext.getFreshConfig", () => {
   it("exposes getFreshConfig on the context interface", () => {

@@ -49,11 +49,11 @@ export type { DelegateArgs } from "./types";
  * on PASS, or an honest "unmet" status on FAIL — never a self-reported
  * completion.
  */
-export async function executeDelegate(
+export const executeDelegate = async (
   ctx: PluginContext,
   args: DelegateArgs,
   parentSessionID?: string,
-): Promise<string> {
+): Promise<string> => {
   try {
     let activeCfg = ctx.getConfig();
     try {

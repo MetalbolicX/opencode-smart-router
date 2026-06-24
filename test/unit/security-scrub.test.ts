@@ -32,11 +32,11 @@ const allSecretValues = [
   "supersecretvalue1234567890",
 ];
 
-function assertScrubbed(s: string): void {
+const assertScrubbed = (s: string): void => {
   for (const v of allSecretValues) {
     expect(s).not.toContain(v);
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 

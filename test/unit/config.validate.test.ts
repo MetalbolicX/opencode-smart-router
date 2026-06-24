@@ -7,7 +7,7 @@ import {
 } from "../../src/router/config";
 
 /** Build a minimal valid raw config object; merge `extra` to override/add keys. */
-function validRaw(extra: Record<string, unknown> = {}): Record<string, unknown> {
+const validRaw = (extra: Record<string, unknown> = {}): Record<string, unknown> => {
   return {
     activePreset: "anthropic",
     presets: {
@@ -23,7 +23,7 @@ function validRaw(extra: Record<string, unknown> = {}): Record<string, unknown> 
     defaultTier: "fast",
     ...extra,
   };
-}
+};
 
 describe("validateConfig — happy path", () => {
   it("accepts a minimal valid config and leaves enforcement undefined when absent", () => {

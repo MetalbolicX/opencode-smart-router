@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 /** Build a minimal RouterConfig with two presets and one mode for the unit tests. */
-function makeConfig(extra: Partial<RouterConfig> = {}): RouterConfig {
+const makeConfig = (extra: Partial<RouterConfig> = {}): RouterConfig => {
   const anthropicPreset: Preset = {
     fast: {
       model: "anthropic/claude-haiku-4-5",
@@ -75,7 +75,7 @@ function makeConfig(extra: Partial<RouterConfig> = {}): RouterConfig {
     defaultTier: "fast",
     ...extra,
   };
-}
+};
 
 describe("buildRouterOutput", () => {
   it("bare /router shows status", () => {

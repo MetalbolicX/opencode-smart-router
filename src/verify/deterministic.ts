@@ -10,7 +10,7 @@ import { scrubText } from "../guard/scrub";
 // MutexRegistry — per-key serialization via promise-chaining
 // ---------------------------------------------------------------------------
 
-export function createMutexRegistry(): MutexRegistry {
+export const createMutexRegistry = (): MutexRegistry => {
   const chains = new Map<string, Promise<unknown>>();
   return {
     runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -21,7 +21,7 @@ export function createMutexRegistry(): MutexRegistry {
       return run;
     },
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Command validation
@@ -44,7 +44,7 @@ const INTERPRETERS = new Set([
 // Inline-eval / inline-print flags: -e, -c, -p, --eval, --print (with optional =value).
 const EVAL_FLAG_RE = /^-(e|c|p)$|^--(eval|print)(=|$)/i;
 
-export function isCommandAllowed(command: string, allowlist: string[]): boolean {
+export const isCommandAllowed = (command: string, allowlist: string[]): boolean => {
   const trimmed = command.trim();
   if (!trimmed || FORBIDDEN_SHELL.test(command)) return false;
   const tokens = trimmed.split(/\s+/);
@@ -60,17 +60,17 @@ export function isCommandAllowed(command: string, allowlist: string[]): boolean 
     }
   }
   return true;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Shape check (exported for unit testing)
 // ---------------------------------------------------------------------------
 
-export function shapeMismatch(
+export const shapeMismatch = (
   schemaVal: unknown,
   targetVal: unknown,
   path = "",
-): string | null {
+): string | null => {
   if (schemaVal !== null && typeof schemaVal === "object" && !Array.isArray(schemaVal)) {
     // schema is a plain object
     if (targetVal === null || typeof targetVal !== "object" || Array.isArray(targetVal)) {
@@ -113,7 +113,7 @@ export function shapeMismatch(
     }
     return null;
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Internal runner result
@@ -129,7 +129,7 @@ interface CheckResult {
 // Per-kind runners
 // ---------------------------------------------------------------------------
 
-async function runFileExists(check: Check, deps: DeterministicDeps): Promise<CheckResult> {
+const runFileExists = async (check: Check, deps: DeterministicDeps): Promise<CheckResult> => {
   try {
     if (!check.path) return { ok: false, reason: "fileExists check missing 'path'" };
     const ok = await deps.fs.fileExists(check.path);
@@ -138,14 +138,14 @@ async function runFileExists(check: Check, deps: DeterministicDeps): Promise<Che
   } catch (err) {
     return { ok: false, reason: `fileExists check errored: ${scrubText(String(err))}` };
   }
-}
+};
 
-async function runRun(
+const runRun = async (
   check: Check,
   deps: DeterministicDeps,
   allowlist: string[],
   timeoutMs: number,
-): Promise<CheckResult> {
+): Promise<CheckResult> => {
   try {
     if (!check.command) return { ok: false, reason: "run check missing 'command'" };
     if (!isCommandAllowed(check.command, allowlist)) {
@@ -175,26 +175,26 @@ async function runRun(
   } catch (err) {
     return { ok: false, reason: `run check errored: ${scrubText(String(err))}` };
   }
-}
+};
 
-function resolveRepoCommand(
+const resolveRepoCommand = (
   check: Check,
   kind: "testsPass" | "buildPasses" | "lintClean",
   defaults: DeterministicDeps["defaults"],
-): string {
+): string => {
   if (check.command) return check.command;
   if (kind === "testsPass") return defaults?.testCommand ?? "npm test";
   if (kind === "buildPasses") return defaults?.buildCommand ?? "npm run build";
   return defaults?.lintCommand ?? "npm run lint";
-}
+};
 
-async function runCommandCheck(
+const runCommandCheck = async (
   check: Check,
   kind: "testsPass" | "buildPasses" | "lintClean",
   deps: DeterministicDeps,
   allowlist: string[],
   timeoutMs: number,
-): Promise<CheckResult> {
+): Promise<CheckResult> => {
   const command = resolveRepoCommand(check, kind, deps.defaults);
 
   const fn = async (): Promise<CheckResult> => {
@@ -225,9 +225,9 @@ async function runCommandCheck(
     return deps.mutex.runExclusive(deps.cwd, fn);
   }
   return fn();
-}
+};
 
-async function runSchemaMatch(check: Check, deps: DeterministicDeps): Promise<CheckResult> {
+const runSchemaMatch = async (check: Check, deps: DeterministicDeps): Promise<CheckResult> => {
   try {
     if (!check.path || !check.schema) {
       return { ok: false, reason: "schemaMatch requires 'path' and 'schema'" };
@@ -265,13 +265,13 @@ async function runSchemaMatch(check: Check, deps: DeterministicDeps): Promise<Ch
   } catch (err) {
     return { ok: false, reason: `schemaMatch check errored: ${scrubText(String(err))}` };
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // runDeterministic
 // ---------------------------------------------------------------------------
 
-export async function runDeterministic(dod: DoD, deps: DeterministicDeps): Promise<Verdict> {
+export const runDeterministic = async (dod: DoD, deps: DeterministicDeps): Promise<Verdict> => {
   const checks = dod.checks ?? [];
 
   if (checks.length === 0) {
@@ -342,4 +342,4 @@ export async function runDeterministic(dod: DoD, deps: DeterministicDeps): Promi
     reasons,
     ...(evidence !== undefined ? { evidence } : {}),
   };
-}
+};

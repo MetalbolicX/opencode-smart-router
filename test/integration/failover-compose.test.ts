@@ -26,10 +26,10 @@ let sessionCounter = 2000;
 // Fake ctx builder — mirrors ladder-wiring.test.ts harness pattern exactly.
 // ---------------------------------------------------------------------------
 
-function makeCtxCustom(
+const makeCtxCustom = (
   dir: string,
   promptHandler: (opts: any) => Promise<any>,
-) {
+) => {
   return {
     directory: dir,
     worktree: dir,
@@ -45,7 +45,7 @@ function makeCtxCustom(
       },
     } as any,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Suite

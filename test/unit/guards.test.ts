@@ -18,7 +18,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePolicy(overrides: Partial<GuardPolicy> = {}): GuardPolicy {
+const makePolicy = (overrides: Partial<GuardPolicy> = {}): GuardPolicy => {
   return {
     budget: 8,
     readDraftCap: 3,
@@ -28,11 +28,11 @@ function makePolicy(overrides: Partial<GuardPolicy> = {}): GuardPolicy {
     deliverableSignal: null,
     ...overrides,
   };
-}
+};
 
-function makeState(policy: GuardPolicy, overrides: Partial<GuardState> = {}): GuardState {
+const makeState = (policy: GuardPolicy, overrides: Partial<GuardState> = {}): GuardState => {
   return { ...newGuardState(policy), ...overrides };
-}
+};
 
 // ---------------------------------------------------------------------------
 // A) classify table
@@ -552,7 +552,7 @@ describe("trajectoryMetrics", () => {
 // F) Property-based tests
 // ---------------------------------------------------------------------------
 
-function mulberry32(seed: number) {
+const mulberry32 = (seed: number) => {
   return function () {
     seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
@@ -560,7 +560,7 @@ function mulberry32(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
+};
 
 describe("property-based: invariants over random sequences", () => {
   const tools = ["read", "grep", "write", "edit", "bash", "ls", "foo", "glob"];

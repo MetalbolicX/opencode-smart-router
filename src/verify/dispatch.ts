@@ -37,7 +37,7 @@ export interface ChangedFile {
 }
 
 /** Derive a {path,status} record from a write/edit tool call, or null. */
-export function extractChangedFile(tool: string, args: unknown): ChangedFile | null {
+export const extractChangedFile = (tool: string, args: unknown): ChangedFile | null => {
   if (!WRITE_TOOLS.has(tool)) return null;
   const a = (args ?? {}) as Record<string, unknown>;
   const path =
@@ -51,14 +51,14 @@ export function extractChangedFile(tool: string, args: unknown): ChangedFile | n
   if (!path) return null;
   const status = tool === "write" ? "written" : "modified";
   return { path, status };
-}
+};
 
 /**
  * Per-session changed-file tracker. We attribute changed files to a delegation
  * by observing that session's own edit/write tool calls (ADR 0002 D3 — NOT a
  * global git diff), which is concurrency-safe under interleaved subagents.
  */
-export function createChangedFileStore() {
+export const createChangedFileStore = () => {
   const bySession = new Map<string, Map<string, string>>();
   return {
     record(sessionID: string, tool: string, args: unknown): void {
@@ -82,7 +82,7 @@ export function createChangedFileStore() {
       bySession.delete(sessionID);
     },
   };
-}
+};
 
 const TASK_RESULT_RE = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/i;
 
@@ -91,10 +91,10 @@ const TASK_RESULT_RE = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/i;
  * is wrapped in <task_result>...</task_result> and the child session id lives in
  * output.metadata.sessionId (spike capability C).
  */
-export function parseTaskResult(output: unknown): {
+export const parseTaskResult = (output: unknown): {
   finalReturnText: string;
   childSessionID: string | null;
-} {
+} => {
   const o = (output ?? {}) as Record<string, unknown>;
   const raw = typeof o.output === "string" ? o.output : "";
   const m = raw.match(TASK_RESULT_RE);
@@ -107,29 +107,29 @@ export function parseTaskResult(output: unknown): {
         ? meta.sessionID
         : null;
   return { finalReturnText, childSessionID };
-}
+};
 
 /**
  * Build the DoD for a delegation from its dispatch text: an explicit
  * [acceptance] block wins; otherwise auto-infer a minimal, non-vacuous DoD
  * (M2 default). `acceptance` (if provided) is parsed for the block first.
  */
-export function buildDelegationDoD(
+export const buildDelegationDoD = (
   args: { prompt?: string; description?: string; acceptance?: string },
   hints: InferHints = {},
-): DoD {
+): DoD => {
   const blockSource = args.acceptance ?? args.prompt ?? args.description ?? "";
   const explicit = parseDoDFromDispatch(blockSource);
   if (explicit) return explicit;
   const dispatch = args.prompt ?? args.description ?? "";
   return inferDoD(dispatch, "", hints);
-}
+};
 
 /** Resolve a tier name to {providerID, modelID} for client.session.prompt. */
-export function tierModel(
+export const tierModel = (
   cfg: RouterConfig,
   tierName: string,
-): { providerID: string; modelID: string } | null {
+): { providerID: string; modelID: string } | null => {
   const tiers = getActiveTiers(cfg);
   const t = tiers[tierName];
   if (!t || typeof t.model !== "string") return null;
@@ -139,25 +139,25 @@ export function tierModel(
     providerID: t.model.slice(0, slash),
     modelID: t.model.slice(slash + 1),
   };
-}
+};
 
 /** Decide whether a built-in `task` tool call should be verify-dispatched (Option i). */
-export function shouldVerifyTask(
+export const shouldVerifyTask = (
   tool: string,
   mode: string,
   require: string | undefined,
-): boolean {
+): boolean => {
   if (tool !== "task") return false;
   if (mode === "off") return false;
   if ((require ?? "whenDoDPresent") === "never") return false;
   return true;
-}
+};
 
 /** Build the advisory forcing note appended to a task result the gate did not accept. */
-export function buildForcingNote(
+export const buildForcingNote = (
   reasons: string[],
   escalation?: { producerTier?: string; nextTier?: string | null },
-): string {
+): string => {
   const body =
     reasons.length > 0
       ? reasons.map((r) => `- ${r}`).join("\n")
@@ -173,12 +173,12 @@ export function buildForcingNote(
     `${body}\n` +
     next
   );
-}
+};
 
 /** Suffix appended to an accepted delegate-tool result. */
-export function buildAcceptedSuffix(method: string): string {
+export const buildAcceptedSuffix = (method: string): string => {
   return `\n\n[router \u2713 accepted: ${method}]`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Adapter functions (Slice 3).
@@ -193,11 +193,11 @@ export function buildAcceptedSuffix(method: string): string {
  *  grader temperature override, runs the prompt, and returns the assembled
  *  text. Failure modes (no session id, SDK throw) collapse to empty result
  *  — the gate treats grader errors as a fail-closed verdict anyway. */
-export async function dispatchGrader(
+export const dispatchGrader = async (
   ctx: PluginContext,
   req: { tier: string; system: string; prompt: string },
   parentSessionID?: string,
-): Promise<{ sessionID: string; text: string }> {
+): Promise<{ sessionID: string; text: string }> => {
   const cfg = ctx.getConfig();
   const created = (await ctx.plugin.client.session.create(
     parentSessionID ? { body: { parentID: parentSessionID } } : {},
@@ -220,15 +220,15 @@ export async function dispatchGrader(
   } finally {
     ctx.graderSessions.delete(sid);
   }
-}
+};
 
 /** Assemble `GateDeps` from the live seams and config snapshot. Reads
  *  `cfg.enforcement?.verify?.require` and `cfg.enforcement?.verify?.minGraderTier`
  *  at call time so /router switches take effect on the next delegate. */
-export function buildGateDeps(
+export const buildGateDeps = (
   ctx: PluginContext,
   parentSessionID?: string,
-): GateDeps {
+): GateDeps => {
   const cfg = ctx.getConfig();
   return {
     deterministic: {
@@ -244,18 +244,18 @@ export function buildGateDeps(
     },
     require: cfg.enforcement?.verify?.require,
   };
-}
+};
 
 /** Adapter for `tool.execute.after`: when a built-in `task` call should be
  *  verify-dispatched, parse the result, build a DoD, run the gate, and append
  *  a forcing note to `output.output` on rejection. Fail-closed: any throw is
  *  swallowed so the after-hook never crashes a real session. */
-export async function verifyTaskAfterHook(
+export const verifyTaskAfterHook = async (
   ctx: PluginContext,
   input: unknown,
   output: Record<string, unknown>,
   parentSessionID?: string,
-): Promise<void> {
+): Promise<void> => {
   const inputRec = (input ?? {}) as Record<string, unknown>;
   const toolName = inputRec["tool"];
   if (typeof toolName !== "string") return;
@@ -306,4 +306,4 @@ export async function verifyTaskAfterHook(
   } catch {
     // fail-closed: a verification error must NEVER throw out of the after-hook
   }
-}
+};

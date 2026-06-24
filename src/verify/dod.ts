@@ -53,7 +53,7 @@ const CLOSE_TAG_RE = /^\s*\[\/(acceptance|dod)\]\s*$/i;
 // summarizeDispatch
 // ---------------------------------------------------------------------------
 
-export function summarizeDispatch(text: string): string {
+export const summarizeDispatch = (text: string): string => {
   if (!text) return "";
   const lines = text.split("\n");
   for (const line of lines) {
@@ -61,13 +61,13 @@ export function summarizeDispatch(text: string): string {
     if (trimmed) return trimmed.slice(0, 120);
   }
   return "";
-}
+};
 
 // ---------------------------------------------------------------------------
 // normalizeDoD
 // ---------------------------------------------------------------------------
 
-export function normalizeDoD(d: DoD): DoD {
+export const normalizeDoD = (d: DoD): DoD => {
   const checks: Check[] = Array.isArray(d.checks) ? [...d.checks] : [];
   const criteria: string[] = Array.isArray(d.criteria) ? [...d.criteria] : [];
 
@@ -80,13 +80,13 @@ export function normalizeDoD(d: DoD): DoD {
   const deliverable: string | null = rawDeliverable.length > 0 ? rawDeliverable : null;
 
   return { kind, checks, criteria, deliverable, source: d.source };
-}
+};
 
 // ---------------------------------------------------------------------------
 // parseKvPairs — internal helper
 // ---------------------------------------------------------------------------
 
-function parseKvPairs(s: string): Record<string, string> {
+const parseKvPairs = (s: string): Record<string, string> => {
   const result: Record<string, string> = {};
   const re = /(\w+)=(?:"([^"]*)"|([\S]*))/g;
   let m: RegExpExecArray | null;
@@ -96,13 +96,13 @@ function parseKvPairs(s: string): Record<string, string> {
     result[key] = value;
   }
   return result;
-}
+};
 
 // ---------------------------------------------------------------------------
 // parseAcceptanceBlock
 // ---------------------------------------------------------------------------
 
-export function parseAcceptanceBlock(text: string, source: DoDSource = "explicit"): DoD | null {
+export const parseAcceptanceBlock = (text: string, source: DoDSource = "explicit"): DoD | null => {
   const lines = text.split("\n");
 
   let openIdx = -1;
@@ -204,25 +204,25 @@ export function parseAcceptanceBlock(text: string, source: DoDSource = "explicit
     deliverable,
     source,
   });
-}
+};
 
 // ---------------------------------------------------------------------------
 // parseDoDFromDispatch / parseDoDFromAnnotation
 // ---------------------------------------------------------------------------
 
-export function parseDoDFromDispatch(dispatchText: string): DoD | null {
+export const parseDoDFromDispatch = (dispatchText: string): DoD | null => {
   return parseAcceptanceBlock(dispatchText, "explicit");
-}
+};
 
-export function parseDoDFromAnnotation(annotationText: string): DoD | null {
+export const parseDoDFromAnnotation = (annotationText: string): DoD | null => {
   return parseAcceptanceBlock(annotationText, "annotation");
-}
+};
 
 // ---------------------------------------------------------------------------
 // inferDoD
 // ---------------------------------------------------------------------------
 
-export function inferDoD(dispatchText: string, tier: string, hints: InferHints): DoD {
+export const inferDoD = (dispatchText: string, tier: string, hints: InferHints): DoD => {
   // tier accepted for forward-compat; not used in phase 2.1
   const lower = dispatchText.toLowerCase();
 
@@ -293,12 +293,12 @@ export function inferDoD(dispatchText: string, tier: string, hints: InferHints):
     deliverable,
     source: "inferred",
   });
-}
+};
 
 // ---------------------------------------------------------------------------
 // isCheckable
 // ---------------------------------------------------------------------------
 
-export function isCheckable(d: DoD): boolean {
+export const isCheckable = (d: DoD): boolean => {
   return d.kind !== "none" && (d.checks.length > 0 || d.criteria.length > 0);
-}
+};

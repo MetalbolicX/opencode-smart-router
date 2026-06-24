@@ -28,11 +28,11 @@ import type { Preset } from "../router/config";
 // chat.params — temperature override for open grader sessions.
 // ---------------------------------------------------------------------------
 
-export async function handleChatParams(
+export const handleChatParams = async (
   ctx: PluginContext,
   input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   try {
     const sessionID = input?.sessionID as string | undefined;
     if (sessionID && ctx.graderSessions.has(sessionID)) {
@@ -50,11 +50,11 @@ export async function handleChatParams(
 // populated when system.transform asks `sessionStore.isSubagent(sessionID)`.
 // ---------------------------------------------------------------------------
 
-export async function handleChatMessage(
+export const handleChatMessage = async (
   ctx: PluginContext,
   input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   if (ctx.state.bypassed) return;
   // Re-read cfg so /preset switches take effect without restart.
   // getFreshConfig() tries a forced refresh and falls back to the cached
@@ -79,11 +79,11 @@ export async function handleChatMessage(
 // tool.execute.before — Layer 1 guard check; throws to abort when blocked.
 // ---------------------------------------------------------------------------
 
-export async function handleToolExecuteBefore(
+export const handleToolExecuteBefore = async (
   ctx: PluginContext,
   input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   if (ctx.state.bypassed) return;
   const sid = input?.sessionID as string | undefined;
   const tool = input?.tool as string | undefined;
@@ -120,11 +120,11 @@ export async function handleToolExecuteBefore(
 // tool.execute.after — cap banners, changed-file tracking, verify dispatch.
 // ---------------------------------------------------------------------------
 
-export async function handleToolExecuteAfter(
+export const handleToolExecuteAfter = async (
   ctx: PluginContext,
   input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   if (ctx.state.bypassed) return;
   ctx.sessionStore.recordToolCall(
     input as { sessionID: string; tool: string; args: unknown },
@@ -171,11 +171,11 @@ export async function handleToolExecuteAfter(
 // experimental.text.complete — narration detection on completed text parts.
 // ---------------------------------------------------------------------------
 
-export async function handleTextComplete(
+export const handleTextComplete = async (
   ctx: PluginContext,
   _input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   if (ctx.state.bypassed) return;
   const text = output?.text;
   if (typeof text !== "string" || text.length < 20) return;
@@ -193,10 +193,10 @@ export async function handleTextComplete(
 // event (session.idle) — record-only scorecard + opt-in trajectory dump.
 // ---------------------------------------------------------------------------
 
-export async function handleSessionIdle(
+export const handleSessionIdle = async (
   ctx: PluginContext,
   payload: HookEventPayload,
-): Promise<void> {
+): Promise<void> => {
   const event = payload?.event;
   if (event?.type !== "session.idle") return;
   const props = event?.properties as Record<string, unknown> | undefined;
@@ -226,11 +226,11 @@ export async function handleSessionIdle(
 // primary orchestrator only (never for tracked subagents).
 // ---------------------------------------------------------------------------
 
-export async function handleSystemTransform(
+export const handleSystemTransform = async (
   ctx: PluginContext,
   _input: HookPayload,
   output: HookPayload,
-): Promise<void> {
+): Promise<void> => {
   if (ctx.state.bypassed) return;
   // getFreshConfig() returns the refreshed config and falls back to the
   // cached value if the file read fails.
@@ -258,11 +258,11 @@ export async function handleSystemTransform(
 // config — register tier agents and router commands at load time.
 // ---------------------------------------------------------------------------
 
-export async function handleConfig(
+export const handleConfig = async (
   ctx: PluginContext,
   activeTiersAtLoad: Preset,
   opencodeConfig: any,
-): Promise<void> {
+): Promise<void> => {
   // The config() hook runs once at plugin load time, so the load-time
   // snapshot is the right cfg here (matches the original behaviour where
   // `cfg` was initialised from loadConfig() once at factory start).

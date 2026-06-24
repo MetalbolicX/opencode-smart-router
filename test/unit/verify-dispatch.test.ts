@@ -38,14 +38,14 @@ interface FakeStore {
   getTier?: (sid: string) => string;
 }
 
-function makeCtx(opts: {
+const makeCtx = (opts: {
   directory: string;
   createImpl?: (req: any) => Promise<any>;
   promptImpl?: (req: any) => Promise<any>;
   cfg?: Partial<RouterConfig>;
   changedFiles?: { path: string; status: string }[];
   sessionStore?: FakeStore;
-}): PluginContext {
+}): PluginContext => {
   const cfg: RouterConfig = {
     activePreset: "default",
     defaultTier: "fast",

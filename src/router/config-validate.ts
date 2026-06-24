@@ -15,7 +15,7 @@
 
 import type { EnforcementConfig, RouterConfig } from "./config.types";
 
-export function validateConfig(raw: unknown): RouterConfig {
+export const validateConfig = (raw: unknown): RouterConfig => {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("tiers.json: expected a JSON object at root");
   }
@@ -316,8 +316,8 @@ export function validateConfig(raw: unknown): RouterConfig {
 // ---------------------------------------------------------------------------
 
 /** Returns the effective enforcement mode. Missing enforcement ⇒ mode:"advisory". */
-export function normalizeEnforcement(
+export const normalizeEnforcement = (
   e: EnforcementConfig | undefined,
-): { mode: "off" | "advisory" | "enforced" } {
+): { mode: "off" | "advisory" | "enforced" } => {
   return { mode: e?.mode ?? "advisory" };
 }

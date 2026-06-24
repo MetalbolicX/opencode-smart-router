@@ -89,10 +89,10 @@ interface HookHarness {
   graderSessions: Set<string>;
 }
 
-function makeHarness(opts?: {
+const makeHarness = (opts?: {
   configOverrides?: Partial<RouterConfig>;
   graderTemperature?: number;
-}): HookHarness {
+}): HookHarness => {
   const cfg: RouterConfig = {
     activePreset: "default",
     defaultTier: "fast",

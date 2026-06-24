@@ -103,7 +103,7 @@ export interface PluginContext {
  * fresh per call, the config is loaded from disk once via the per-instance
  * ConfigStore, and seams are bound to the plugin's working directory.
  */
-export function createPluginContext(plugin: PluginInput): PluginContext {
+export const createPluginContext = (plugin: PluginInput): PluginContext => {
   const configStore = createConfigStore({
     cwd: plugin.directory ?? process.cwd(),
   });
@@ -124,9 +124,6 @@ export function createPluginContext(plugin: PluginInput): PluginContext {
       try {
         return this.refreshConfig();
       } catch {
-        // Best-effort: a disk-read error must never crash a real session.
-        // Fall back to the cached config so callers can keep using the last
-        // known good value.
         return this.getConfig();
       }
     },
@@ -144,4 +141,4 @@ export function createPluginContext(plugin: PluginInput): PluginContext {
       fs: createFsSeam({ directory: plugin.directory }),
     },
   };
-}
+};

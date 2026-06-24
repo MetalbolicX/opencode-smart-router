@@ -128,7 +128,7 @@ describe("saveEnforcementMode", () => {
 // ---------------------------------------------------------------------------
 
 /** Stage `content` at `<tmpHome>/.config/opencode-model-router/tiers.json`. */
-function stageGlobal(content: string | Record<string, unknown>): void {
+const stageGlobal = (content: string | Record<string, unknown>): void => {
   const dir = join(tmpHome, ".config", "opencode-model-router");
   mkdirSync(dir, { recursive: true });
   const p = join(dir, "tiers.json");
@@ -137,10 +137,10 @@ function stageGlobal(content: string | Record<string, unknown>): void {
   } else {
     writeFileSync(p, JSON.stringify(content), "utf-8");
   }
-}
+};
 
 /** Stage `content` at `<tmpCwd>/.opencode/tiers.json`. */
-function stageLocal(content: string | Record<string, unknown>): void {
+const stageLocal = (content: string | Record<string, unknown>): void => {
   const dir = join(tmpCwd, ".opencode");
   mkdirSync(dir, { recursive: true });
   const p = join(dir, "tiers.json");
@@ -149,15 +149,15 @@ function stageLocal(content: string | Record<string, unknown>): void {
   } else {
     writeFileSync(p, JSON.stringify(content), "utf-8");
   }
-}
+};
 
-function clearGlobal(): void {
+const clearGlobal = (): void => {
   rmSync(globalConfigPath(), { force: true });
-}
+};
 
-function clearLocal(): void {
+const clearLocal = (): void => {
   rmSync(localConfigPath(), { force: true });
-}
+};
 
 describe("globalConfigPath / localConfigPath", () => {
   it("globalConfigPath resolves under $HOME/.config/opencode-model-router/tiers.json", () => {

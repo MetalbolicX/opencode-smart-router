@@ -51,18 +51,18 @@ afterEach(() => {
   }
 });
 
-function stageLocal(cwd: string, content: Record<string, unknown>): void {
+const stageLocal = (cwd: string, content: Record<string, unknown>): void => {
   const dir = join(cwd, ".opencode");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "tiers.json"), JSON.stringify(content), "utf-8");
-}
+};
 
 /** A minimal PluginInput. Only `directory` and `client` are read by
  *  createPluginContext(); everything else is undefined and the seam
  *  factories tolerate it. */
-function makePluginInput(directory: string): any {
+const makePluginInput = (directory: string): any => {
   return { directory };
-}
+};
 
 describe("createPluginContext — getConfig / refreshConfig wiring", () => {
   it("returns a context whose getConfig() returns a RouterConfig", () => {

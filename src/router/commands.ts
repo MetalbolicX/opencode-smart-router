@@ -13,7 +13,7 @@ import type { PluginContext } from "../plugin/context";
 // /router command output
 // ---------------------------------------------------------------------------
 
-export function buildRouterOutput(cfg: RouterConfig, args: string): string {
+export const buildRouterOutput = (cfg: RouterConfig, args: string): string => {
   const tokens = (args ?? "").trim().split(/\s+/).filter(Boolean);
   const sub = (tokens[0] ?? "").toLowerCase();
   if (sub === "enforce") {
@@ -56,7 +56,7 @@ export function buildRouterOutput(cfg: RouterConfig, args: string): string {
 // /tiers command output
 // ---------------------------------------------------------------------------
 
-export function buildTiersOutput(cfg: RouterConfig): string {
+export const buildTiersOutput = (cfg: RouterConfig): string => {
   const tiers = getActiveTiers(cfg);
   const lines: string[] = [
     `# Model Delegation Tiers`,
@@ -89,7 +89,7 @@ export function buildTiersOutput(cfg: RouterConfig): string {
 // /budget command output
 // ---------------------------------------------------------------------------
 
-export function buildBudgetOutput(cfg: RouterConfig, args: string): string {
+export const buildBudgetOutput = (cfg: RouterConfig, args: string): string => {
   const modes = cfg.modes;
   if (!modes || Object.keys(modes).length === 0) {
     return 'No modes configured in tiers.json. Add a "modes" section to enable budget mode.';
@@ -135,7 +135,7 @@ export function buildBudgetOutput(cfg: RouterConfig, args: string): string {
 // /preset command output
 // ---------------------------------------------------------------------------
 
-export function buildPresetOutput(cfg: RouterConfig, args: string): string {
+export const buildPresetOutput = (cfg: RouterConfig, args: string): string => {
   const requestedPreset = args.trim();
 
   // No args: show available presets
@@ -186,11 +186,11 @@ export function buildPresetOutput(cfg: RouterConfig, args: string): string {
  *
  * Side-effect only — the returned void matches the original inline block.
  */
-export function registerRouterCommands(
+export const registerRouterCommands = (
   opencodeConfig: {
     command?: Record<string, { template: string; description: string }>;
   },
-): void {
+): void => {
   opencodeConfig.command ??= {};
   opencodeConfig.command["tiers"] = {
     template: "",
@@ -267,14 +267,14 @@ export function registerRouterCommands(
  * no asynchronous work (the await was structural). Errors in `refreshConfig()`
  * are swallowed (we fall back to the cached cfg) — same fail-soft semantics.
  */
-export async function handleCommandBefore(
+export const handleCommandBefore = async (
   ctx: PluginContext,
   input: { command: string; arguments?: string },
   // The SDK's `command.execute.before` output is `{ parts: Part[] }` where
   // `Part` is a discriminated union of text/reasoning/file/tool/etc. We only
   // push text parts, so a structural supertype is sufficient.
   output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
-): Promise<void> {
+): Promise<void> => {
   if (input.command === "tiers") {
     const cfg = ctx.getFreshConfig();
     output.parts.push({

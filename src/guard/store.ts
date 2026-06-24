@@ -8,7 +8,7 @@ import type { GuardState, GuardPolicy } from "./guards";
  * Also holds a per-session "pending note" used by advisory mode to defer a
  * banner from the before-hook to the after-hook (where output is mutable).
  */
-export function createGuardStore() {
+export const createGuardStore = () => {
   const states = new Map<string, GuardState>();
   const pendingNotes = new Map<string, string>();
   return {
@@ -36,4 +36,4 @@ export function createGuardStore() {
       pendingNotes.delete(sessionID);
     },
   };
-}
+};

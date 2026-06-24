@@ -33,7 +33,7 @@ export const DEFAULT_TIER_CAPS: Record<string, number> = {
 // ---------------------------------------------------------------------------
 
 /** Extract the first `CAP:N` or `CAP:none` directive from a dispatch prompt. */
-export function parseCapDirective(text: string): Cap | null {
+export const parseCapDirective = (text: string): Cap | null => {
   const m = text.match(/\bCAP\s*:\s*(none|\d+)\b/i);
   if (!m) return null;
   const raw = m[1]!.toLowerCase();
@@ -47,7 +47,7 @@ export function parseCapDirective(text: string): Cap | null {
 // ---------------------------------------------------------------------------
 
 /** Best-effort extraction of textual content from a chat.message output payload. */
-function extractDispatchText(output: unknown): string {
+const extractDispatchText = (output: unknown): string => {
   const o = output as Record<string, unknown> | undefined;
   const parts = (o?.parts as unknown[]) ?? [];
   const chunks: string[] = [];
@@ -75,12 +75,12 @@ function extractDispatchText(output: unknown): string {
 // ---------------------------------------------------------------------------
 
 /** Build the banner appended to every read-only tool result in a subagent session. */
-export function buildCapBanner(
+export const buildCapBanner = (
   state: SubagentState,
   isRedundant: boolean,
   previousCall: number | undefined,
   tool: string,
-): string {
+): string => {
   const lines: string[] = [];
   const capDisplay = state.cap === "none" ? "∞" : String(state.cap);
   lines.push(`[cap: ${state.calls}/${capDisplay}]`);
@@ -119,7 +119,7 @@ export const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
 // ---------------------------------------------------------------------------
 
 /** Normalise a taskPattern keyword to a lowercase stem for substring matching. */
-function normTaskKw(kw: string): string {
+const normTaskKw = (kw: string): string => {
   return kw.toLowerCase().split("(")[0]!.split("/")[0]!.trim();
 }
 
@@ -130,11 +130,11 @@ function normTaskKw(kw: string): string {
  * or implementation keywords) is NEVER trivial — so proportional bypass can
  * never silently disable enforcement on real work.
  */
-export function classifyTrivial(
+export const classifyTrivial = (
   dispatchText: string,
   tier: string | null,
   cfg: RouterConfig,
-): boolean {
+): boolean => {
   if (tier !== "fast") return false;
   const text = (dispatchText || "").toLowerCase();
   if (!text.trim()) return false;
@@ -163,7 +163,7 @@ export function classifyTrivial(
  * state (session IDs + cap state). Returns methods the hooks delegate to.
  * Concurrency: Set/Map are per-store-instance, NOT module-level singletons.
  */
-export function createSessionStore() {
+export const createSessionStore = () => {
   const subagentSessionIDs = new Set<string>();
   const subagentCapState = new Map<string, SubagentState>();
 

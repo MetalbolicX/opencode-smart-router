@@ -18,9 +18,9 @@ const TOKEN_PATTERNS: RegExp[] = [
  * it targets recognisable key/token shapes and `key=value` secrets, and does NOT
  * touch ordinary file paths or prose. Pure; safe on any input.
  */
-export function scrubText(input: string): string {
+export const scrubText = (input: string): string => {
   if (typeof input !== "string" || input.length === 0) return input;
   let out = input.replace(KEYVALUE_RE, "$1[REDACTED]");
   for (const re of TOKEN_PATTERNS) out = out.replace(re, "[REDACTED]");
   return out;
-}
+};

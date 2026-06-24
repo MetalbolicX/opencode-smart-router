@@ -15,9 +15,9 @@ import {
 import { validateConfig } from "../../src/router/config";
 import type { RouterConfig } from "../../src/router/config";
 
-function tier(model: string, extra: Record<string, unknown> = {}) {
+const tier = (model: string, extra: Record<string, unknown> = {}) => {
   return { model, description: "d", whenToUse: [], ...extra };
-}
+};
 
 /** Minimal config: single tier, no modes/taskPatterns/fallback/costRatio/variant. */
 const minimal = {

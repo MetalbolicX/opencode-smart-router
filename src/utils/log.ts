@@ -39,11 +39,11 @@ const TRAJECTORY_DIR = "opencode-model-router-trajectory";
  *                Used to disambiguate log kinds without changing the parent
  *                directory (e.g., `"scorecard"` → `<sid>.scorecard.log`).
  */
-export function writeTrajectoryLog(
+export const writeTrajectoryLog = (
   sid: string,
   content: string,
   subdir?: string,
-): void {
+): void => {
   try {
     const dir = join(tmpdir(), TRAJECTORY_DIR);
     mkdirSync(dir, { recursive: true });
@@ -53,4 +53,4 @@ export function writeTrajectoryLog(
   } catch {
     // best-effort only — a logging failure must never crash a real session.
   }
-}
+};

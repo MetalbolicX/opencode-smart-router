@@ -72,7 +72,7 @@ const MERGE_PLAN: Array<{ part: PartName; keys?: string[] }> = [
 
 const partCache = new Map<PartName, Record<string, unknown>>();
 
-function readPart(part: PartName): Record<string, unknown> {
+const readPart = (part: PartName): Record<string, unknown> => {
   const cached = partCache.get(part);
   if (cached) return cached;
 
@@ -105,9 +105,9 @@ function readPart(part: PartName): Record<string, unknown> {
   }
   partCache.set(part, parsed as Record<string, unknown>);
   return parsed as Record<string, unknown>;
-}
+};
 
-function main(): void {
+const main = (): void => {
   const merged: Record<string, unknown> = {};
   const seen = new Set<string>();
 

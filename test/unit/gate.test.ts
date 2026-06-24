@@ -8,12 +8,12 @@ import { normalizeDoD } from "../../src/verify/dod";
 
 // --- fakes -----------------------------------------------------------------
 
-function fakeDeterministicDeps(opts: {
+const fakeDeterministicDeps = (opts: {
   code?: number;
   stdout?: string;
   fileExists?: boolean;
   throws?: boolean;
-} = {}): DeterministicDeps {
+} = {}): DeterministicDeps => {
   return {
     exec: async () => {
       if (opts.throws) throw new Error("boom");
@@ -29,13 +29,13 @@ function fakeDeterministicDeps(opts: {
     cwd: "/ws",
     mutex: createMutexRegistry(),
   };
-}
+};
 
-function fakeCheckerDeps(opts: {
+const fakeCheckerDeps = (opts: {
   pass?: boolean;
   graderSessionID?: string;
   throws?: boolean;
-} = {}): CheckerDeps {
+} = {}): CheckerDeps => {
   return {
     dispatchGrader: async () => {
       if (opts.throws) throw new Error("grader down");
@@ -49,9 +49,9 @@ function fakeCheckerDeps(opts: {
     },
     ladder: ["fast", "medium", "heavy"],
   };
-}
+};
 
-function artefact(overrides: Partial<Artefact> = {}): Artefact {
+const artefact = (overrides: Partial<Artefact> = {}): Artefact => {
   return {
     changedFiles: [],
     finalReturnText: "done",
@@ -60,7 +60,7 @@ function artefact(overrides: Partial<Artefact> = {}): Artefact {
     producerTier: "fast",
     ...overrides,
   };
-}
+};
 
 const detDoD = () =>
   normalizeDoD({
@@ -89,13 +89,13 @@ const noneDoD = () =>
     source: "none",
   });
 
-function deps(over: Partial<GateDeps> = {}): GateDeps {
+const deps = (over: Partial<GateDeps> = {}): GateDeps => {
   return {
     deterministic: fakeDeterministicDeps(),
     checker: fakeCheckerDeps(),
     ...over,
   };
-}
+};
 
 // --- tests -----------------------------------------------------------------
 

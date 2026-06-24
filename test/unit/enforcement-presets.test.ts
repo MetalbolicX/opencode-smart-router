@@ -65,9 +65,9 @@ const PRESETS = {
   },
 } as const;
 
-function validated(presetName: keyof typeof PRESETS): RouterConfig {
+const validated = (presetName: keyof typeof PRESETS): RouterConfig => {
   return validateConfig({ ...baseConfig, enforcement: PRESETS[presetName] });
-}
+};
 
 describe("enforcement presets (docs/ENFORCEMENT_PRESETS.md)", () => {
   it("every preset passes validateConfig without throwing", () => {

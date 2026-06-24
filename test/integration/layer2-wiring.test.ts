@@ -19,7 +19,7 @@ import ModelRouterPlugin from "../../src/index";
 // Fake ctx builder
 // ---------------------------------------------------------------------------
 
-function makeCtx(dir: string, promptReply: string) {
+const makeCtx = (dir: string, promptReply: string) => {
   return {
     directory: dir,
     worktree: dir,
@@ -37,7 +37,7 @@ function makeCtx(dir: string, promptReply: string) {
       },
     } as any,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Suite

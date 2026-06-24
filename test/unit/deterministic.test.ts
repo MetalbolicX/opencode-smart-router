@@ -17,11 +17,11 @@ import type { DeterministicDeps, ExecResult } from "../../src/verify/types";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeDoD(checks: Check[]): DoD {
+const makeDoD = (checks: Check[]): DoD => {
   return { kind: "deterministic", checks, criteria: [], deliverable: null, source: "explicit" };
-}
+};
 
-function makeDeps(overrides: Partial<DeterministicDeps> = {}): DeterministicDeps {
+const makeDeps = (overrides: Partial<DeterministicDeps> = {}): DeterministicDeps => {
   return {
     exec: async (_cmd, _opts) => ({ code: 0, stdout: "", stderr: "" }),
     fs: {
@@ -31,24 +31,24 @@ function makeDeps(overrides: Partial<DeterministicDeps> = {}): DeterministicDeps
     cwd: "/fake/cwd",
     ...overrides,
   };
-}
+};
 
-function okExec(stdout = "", stderr = ""): DeterministicDeps["exec"] {
+const okExec = (stdout = "", stderr = ""): DeterministicDeps["exec"] => {
   return async (_cmd, _opts) => ({ code: 0, stdout, stderr });
-}
+};
 
-function failExec(code = 1, stdout = "", stderr = ""): DeterministicDeps["exec"] {
+const failExec = (code = 1, stdout = "", stderr = ""): DeterministicDeps["exec"] => {
   return async (_cmd, _opts) => ({ code, stdout, stderr });
-}
+};
 
-function timedOutExec(): DeterministicDeps["exec"] {
+const timedOutExec = (): DeterministicDeps["exec"] => {
   return async (_cmd, _opts): Promise<ExecResult> => ({
     code: 0,
     stdout: "",
     stderr: "",
     timedOut: true,
   });
-}
+};
 
 // ---------------------------------------------------------------------------
 // runDeterministic: empty checks

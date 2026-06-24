@@ -9,7 +9,7 @@ import type { RouterConfig } from "../../src/router/config";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cfg(enforcement?: RouterConfig["enforcement"]): RouterConfig {
+const cfg = (enforcement?: RouterConfig["enforcement"]): RouterConfig => {
   return {
     activePreset: "default",
     presets: {},
@@ -17,7 +17,7 @@ function cfg(enforcement?: RouterConfig["enforcement"]): RouterConfig {
     defaultTier: "fast",
     enforcement,
   } as RouterConfig;
-}
+};
 
 // ---------------------------------------------------------------------------
 // DEFAULT_ENV_GATE
