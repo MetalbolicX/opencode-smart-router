@@ -430,6 +430,46 @@ describe("Layered config — state overlay", () => {
     expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("enforced");
   });
 
+  it("invalid enforcementMode in raw state file is ignored", () => {
+    clearGlobal();
+    clearLocal();
+    // Write a raw state file with an invalid enforcement mode value.
+    mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
+    writeFileSync(
+      join(tmpHome, ".config", "opencode", "opencode-model-router.state.json"),
+      JSON.stringify({ enforcementMode: "bogus" }),
+      "utf-8",
+    );
+    // The bundled config has no enforcement block, so when the persisted
+    // mode is invalid, cfg.enforcement stays undefined.
+    expect(readMergedConfig({ cwd: process.cwd() }).enforcement).toBeUndefined();
+  });
+
+  it("invalid enforcementMode does not wipe out a valid manual enforcement.mode", () => {
+    clearLocal();
+    stageGlobal({ enforcement: { mode: "off" } });
+    mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
+    writeFileSync(
+      join(tmpHome, ".config", "opencode", "opencode-model-router.state.json"),
+      JSON.stringify({ enforcementMode: "bogus" }),
+      "utf-8",
+    );
+    // Manual "off" should survive when the persisted mode is invalid.
+    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("off");
+  });
+
+  it("valid enforcementMode in raw state file still overrides manual config", () => {
+    clearLocal();
+    stageGlobal({ enforcement: { mode: "off" } });
+    mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
+    writeFileSync(
+      join(tmpHome, ".config", "opencode", "opencode-model-router.state.json"),
+      JSON.stringify({ enforcementMode: "enforced" }),
+      "utf-8",
+    );
+    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("enforced");
+  });
+
   it("manual activePreset is preserved when no state is written", () => {
     clearGlobal();
     clearLocal();

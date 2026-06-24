@@ -65,6 +65,10 @@ describe("validateConfig — root shape", () => {
     expect(() => validateConfig(validRaw({ presets: [] }))).toThrow(/presets/);
   });
 
+  it("throws when presets is empty", () => {
+    expect(() => validateConfig(validRaw({ presets: {} }))).toThrow(/at least one preset/);
+  });
+
   it("throws when a preset is not an object", () => {
     expect(() => validateConfig(validRaw({ presets: { anthropic: 7 } }))).toThrow(/preset 'anthropic'/);
   });

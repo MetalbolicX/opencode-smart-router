@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { isPlainObject } from "./config.types";
 import type { ConfigLayer, RouterConfig, RouterState } from "./config.types";
+import { isValidEnforcementMode } from "./enforcement";
 import { validateConfig } from "./config-validate";
 import { readState } from "./config-state";
 
@@ -179,7 +180,7 @@ export const applyStateOverlay = (cfg: RouterConfig, state: RouterState): void =
   if (state.activeMode && cfg.modes?.[state.activeMode]) {
     cfg.activeMode = state.activeMode;
   }
-  if (state.enforcementMode) {
+  if (state.enforcementMode && isValidEnforcementMode(state.enforcementMode)) {
     cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
   }
 }

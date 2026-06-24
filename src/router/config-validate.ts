@@ -32,6 +32,9 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   ) {
     throw new Error("tiers.json: 'presets' must be a non-null object");
   }
+  if (Object.keys(obj.presets).length === 0) {
+    throw new Error("tiers.json: 'presets' must have at least one preset");
+  }
 
   const presets = obj.presets as Record<string, unknown>;
   for (const [presetName, preset] of Object.entries(presets)) {

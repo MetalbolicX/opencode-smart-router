@@ -6,6 +6,12 @@ import type { RouterConfig } from "./config";
 
 export type EnforcementMode = "off" | "advisory" | "enforced";
 
+export const VALID_ENFORCEMENT_MODES: readonly EnforcementMode[] = ["off", "advisory", "enforced"];
+
+export const isValidEnforcementMode = (v: unknown): v is EnforcementMode => {
+  return typeof v === "string" && (VALID_ENFORCEMENT_MODES as readonly string[]).includes(v);
+};
+
 export const DEFAULT_ENV_GATE = "MODEL_ROUTER_ENFORCE";
 
 export const resolveEnforcementMode = (args: {
