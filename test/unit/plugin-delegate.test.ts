@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { executeDelegate } from "../../src/plugin/delegate";
 import type { PluginContext } from "../../src/plugin/context";
 import type { RouterConfig } from "../../src/router/config";
-import { invalidateConfigCache } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------
 // Delegate-execution parity tests.
@@ -57,8 +56,6 @@ beforeEach(() => {
   tmpCwd = join(tmpHome, "cwd");
   mkdirSync(tmpCwd, { recursive: true });
   process.chdir(tmpCwd);
-
-  invalidateConfigCache();
 });
 
 afterEach(() => {
@@ -67,7 +64,6 @@ afterEach(() => {
   if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
   else process.env["USERPROFILE"] = origUSERPROFILE;
   process.chdir(origCwd);
-  invalidateConfigCache();
   try {
     rmSync(tmpHome, { recursive: true, force: true });
   } catch {
@@ -192,6 +188,15 @@ function makeCtx(opts: {
           counters.refreshConfig++;
           return baseConfig;
         },
+    getFreshConfig() {
+      try {
+        if (opts.refreshConfigImpl) return opts.refreshConfigImpl();
+        return baseConfig;
+      } catch {
+        if (opts.getConfigImpl) return opts.getConfigImpl();
+        return baseConfig;
+      }
+    },
     state: { bypassed: false },
     sessionStore: {
       registerProducerSession: () => undefined,
@@ -691,5 +696,115 @@ describe("executeDelegate — tier resolution and cost fallback", () => {
     });
     const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
     expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parentSessionID propagation — producer sessions inherit the parent's
+// sessionID so OpenCode treats them as child sessions (root cause of the
+// "all sessions show as root" bug).
+// ---------------------------------------------------------------------------
+
+describe("executeDelegate — parentSessionID propagation", () => {
+  it("forwards parentSessionID as parentID on session.create when provided", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const createCalls: unknown[] = [];
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_parent_child" } };
+      },
+    });
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" }, "parent-sid-42");
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({ body: { parentID: "parent-sid-42" } });
+  });
+
+  it("passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const createCalls: unknown[] = [];
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_root" } };
+      },
+    });
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({});
+  });
+
+  it("threads parentSessionID into buildGateDeps so the grader inherits it", async () => {
+    // Force the gate to call dispatchGrader (it would need to fail deterministic
+    // checks) by accepting with method 'grader' and making the result require
+    // an actual grader dispatch. Easier path: route dispatchGrader through the
+    // gate via a custom seam that we observe.
+    const dispatchGraderSpy = vi.fn(async () => ({ sessionID: "grader-sid", text: "ok" }));
+    const ctxBase = makeCtx({});
+    const ctx: PluginContext = {
+      ...ctxBase.ctx,
+      seams: { exec: ctxBase.ctx.seams.exec, fs: ctxBase.ctx.seams.fs },
+    };
+    // Build deps directly with the parent SID and exercise the closure path
+    // by mocking accept to invoke the provided dispatchGrader.
+    const { buildGateDeps, dispatchGrader } = await import("../../src/verify/dispatch");
+    // Spy on dispatchGrader by replacing ctx.client.session.create to capture
+    // the body the grader dispatch passes through.
+    const createCalls: unknown[] = [];
+    const wrappedCtx: PluginContext = {
+      ...ctx,
+      plugin: {
+        ...ctx.plugin,
+        client: {
+          ...ctx.plugin.client,
+          session: {
+            ...ctx.plugin.client.session,
+            create: async (req: unknown) => {
+              createCalls.push(req);
+              return { data: { id: "grader-sid" } };
+            },
+          } as any,
+        },
+      } as any,
+    };
+    const deps = buildGateDeps(wrappedCtx, "orch-sid-99");
+    // Directly call the closure to assert the parent SID is forwarded.
+    await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
+    // Silence unused warnings
+    void dispatchGraderSpy;
+    void dispatchGrader;
+  });
+
+  it("keeps parentID on a failing delegate attempt", async () => {
+    acceptMock.mockImplementation(async () => ({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["boom"] },
+      dodSource: "inferred",
+    }));
+    const createCalls: unknown[] = [];
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_parent_child" } };
+      },
+    });
+
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, "parent-sid-fail");
+
+    expect(out).toContain("[router status: unmet]");
+    expect(createCalls.length).toBeGreaterThan(0);
+    expect(createCalls.every((req) => {
+      return JSON.stringify(req) === JSON.stringify({ body: { parentID: "parent-sid-fail" } });
+    })).toBe(true);
   });
 });

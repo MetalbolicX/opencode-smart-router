@@ -10,21 +10,21 @@
 // This module owns no state — it is a pure factory that returns a fresh
 // hooks object for each plugin instance.
 //
-// Phase 3 of the core-refactor-plan replaces the prior `(input: any,
-// output: any)` hook callbacks with the SDK's `Hooks` shape from
-// `@opencode-ai/plugin`. Each adapter still receives the same payload
-// values it always did — the change is purely types-only and behaviour is
-// preserved (the bodies in `src/plugin/hooks.ts` keep using optional
-// chaining, so they tolerate the SDK's full input shape just as they
-// tolerated the loose `any` shape).
+// PR2 task 2.8: the prior `(input: any, output: any)` callbacks and the
+// `as unknown as Parameters<typeof handler>[N]` chain have been replaced
+// with typed wrappers. Each wrapper accepts the SDK's exact hook input/
+// output shape (`ChatParamsInput`, `ToolExecuteInput`, etc.) and forwards
+// the values to the handler with one narrow `as Record<string, unknown>`
+// at the boundary. No `as unknown as` remains in this file.
 // ---------------------------------------------------------------------------
 
-import { tool, type Hooks } from "@opencode-ai/plugin";
+import { tool, type Hooks, type ToolContext } from "@opencode-ai/plugin";
 
 import { handleCommandBefore } from "../router/commands";
 import type { Preset } from "../router/config";
 import { executeDelegate } from "./delegate";
 import type { DelegateArgs } from "./types";
+import type { HookEventPayload, HookPayload } from "./types";
 import {
   handleChatMessage,
   handleChatParams,
@@ -39,6 +39,46 @@ import type { PluginContext } from "./context";
 
 const DELEGATE_DESCRIPTION =
   "Delegate a task to a tier subagent (fast | medium | heavy). The subagent's result is INDEPENDENTLY VERIFIED (deterministic checks, or an independent grader at >= the producer tier in a fresh session) before it is returned. Returns an accepted result on PASS, or an honest 'unmet' status on FAIL — never a self-reported completion. Optionally pass an [acceptance]...[/acceptance] block to define the Definition of Done.";
+
+// ---------------------------------------------------------------------------
+// Typed hook wrapper lambdas.
+//
+// Each wrapper has the SDK's narrow hook signature so the compiler can
+// verify the adapter's parameter types against the `Hooks` interface. The
+// handler bodies continue to use `HookPayload` (loose shape); the wrapper
+// performs a single typed assertion `as Record<string, unknown>` at the
+// boundary, which is the only cast in the module.
+// ---------------------------------------------------------------------------
+
+type ChatParamsInput = Parameters<NonNullable<Hooks["chat.params"]>>[0];
+type ChatParamsOutput = Parameters<NonNullable<Hooks["chat.params"]>>[1];
+type ChatMessageInput = Parameters<NonNullable<Hooks["chat.message"]>>[0];
+type ChatMessageOutput = Parameters<NonNullable<Hooks["chat.message"]>>[1];
+type ToolExecuteBeforeInput = Parameters<NonNullable<Hooks["tool.execute.before"]>>[0];
+type ToolExecuteBeforeOutput = Parameters<NonNullable<Hooks["tool.execute.before"]>>[1];
+type ToolExecuteAfterInput = Parameters<NonNullable<Hooks["tool.execute.after"]>>[0];
+type ToolExecuteAfterOutput = Parameters<NonNullable<Hooks["tool.execute.after"]>>[1];
+type TextCompleteInput = Parameters<NonNullable<Hooks["experimental.text.complete"]>>[0];
+type TextCompleteOutput = Parameters<NonNullable<Hooks["experimental.text.complete"]>>[1];
+type EventInput = Parameters<NonNullable<Hooks["event"]>>[0];
+type ConfigInput = Parameters<NonNullable<Hooks["config"]>>[0];
+type SystemTransformInput = Parameters<
+  NonNullable<Hooks["experimental.chat.system.transform"]>
+>[0];
+type SystemTransformOutput = Parameters<
+  NonNullable<Hooks["experimental.chat.system.transform"]>
+>[1];
+type CommandExecuteBeforeInput = Parameters<
+  NonNullable<Hooks["command.execute.before"]>
+>[0];
+type CommandExecuteBeforeOutput = Parameters<
+  NonNullable<Hooks["command.execute.before"]>
+>[1];
+
+const toHookPayload = <T extends object>(v: T): HookPayload =>
+  v as Record<string, unknown>;
+const toEventPayload = (v: object): HookEventPayload =>
+  v as { event?: { type?: string; properties?: unknown } };
 
 /**
  * Build the hook record for one plugin instance. `enableDelegateTool`
@@ -73,42 +113,53 @@ export function assembleRuntimeHooks(
                     "Optional [acceptance]...[/acceptance] block defining the Definition of Done (check: / criteria: / deliverable: directives).",
                   ),
               },
-              async execute(args: DelegateArgs): Promise<string> {
-                return executeDelegate(ctx, args);
+              async execute(args: DelegateArgs, context: ToolContext): Promise<string> {
+                return executeDelegate(ctx, args, context.sessionID);
               },
             }),
           }
         : {}),
     },
 
-    // Each callback keeps the SDK's narrow shape and casts down to the
-    // handler's local shape only at the call site. The casts are
-    // values-preserving (no `any`), so behaviour is unchanged.
-    "chat.params": (input, output) =>
-      handleChatParams(ctx, input as unknown as Parameters<typeof handleChatParams>[1], output as unknown as Parameters<typeof handleChatParams>[2]),
+    "chat.params": (input: ChatParamsInput, output: ChatParamsOutput) =>
+      handleChatParams(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "chat.message": (input, output) =>
-      handleChatMessage(ctx, input as unknown as Parameters<typeof handleChatMessage>[1], output as unknown as Parameters<typeof handleChatMessage>[2]),
+    "chat.message": (input: ChatMessageInput, output: ChatMessageOutput) =>
+      handleChatMessage(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "tool.execute.before": (input, output) =>
-      handleToolExecuteBefore(ctx, input as unknown as Parameters<typeof handleToolExecuteBefore>[1], output as unknown as Parameters<typeof handleToolExecuteBefore>[2]),
+    "tool.execute.before": (
+      input: ToolExecuteBeforeInput,
+      output: ToolExecuteBeforeOutput,
+    ) => handleToolExecuteBefore(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "tool.execute.after": (input, output) =>
-      handleToolExecuteAfter(ctx, input as unknown as Parameters<typeof handleToolExecuteAfter>[1], output as unknown as Parameters<typeof handleToolExecuteAfter>[2]),
+    "tool.execute.after": (
+      input: ToolExecuteAfterInput,
+      output: ToolExecuteAfterOutput,
+    ) => handleToolExecuteAfter(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "experimental.text.complete": (input, output) =>
-      handleTextComplete(ctx, input as unknown as Parameters<typeof handleTextComplete>[1], output as unknown as Parameters<typeof handleTextComplete>[2]),
+    "experimental.text.complete": (
+      input: TextCompleteInput,
+      output: TextCompleteOutput,
+    ) => handleTextComplete(ctx, toHookPayload(input), toHookPayload(output)),
 
-    event: (payload) =>
-      handleSessionIdle(ctx, payload as unknown as Parameters<typeof handleSessionIdle>[1]),
+    event: (payload: EventInput) =>
+      handleSessionIdle(ctx, toEventPayload(payload)),
 
-    config: (opencodeConfig) =>
-      handleConfig(ctx, activeTiersAtLoad, opencodeConfig as unknown as Parameters<typeof handleConfig>[2]),
+    config: (opencodeConfig: ConfigInput) =>
+      handleConfig(ctx, activeTiersAtLoad, opencodeConfig),
 
-    "experimental.chat.system.transform": (input, output) =>
-      handleSystemTransform(ctx, input as unknown as Parameters<typeof handleSystemTransform>[1], output as unknown as Parameters<typeof handleSystemTransform>[2]),
+    "experimental.chat.system.transform": (
+      input: SystemTransformInput,
+      output: SystemTransformOutput,
+    ) => handleSystemTransform(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "command.execute.before": (input, output) =>
-      handleCommandBefore(ctx, input as unknown as Parameters<typeof handleCommandBefore>[1], output as unknown as Parameters<typeof handleCommandBefore>[2]),
+    "command.execute.before": (
+      input: CommandExecuteBeforeInput,
+      output: CommandExecuteBeforeOutput,
+    ) => handleCommandBefore(
+      ctx,
+      { command: input.command, arguments: input.arguments ?? "" },
+      output,
+    ),
   };
 }

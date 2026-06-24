@@ -29,9 +29,7 @@ import {
   type SessionCreateResult,
   type SessionPromptResult,
 } from "../plugin/types";
-
-/** Tools that mutate the workspace (mirrors the guard taxonomy). */
-const WRITE_TOOLS = new Set(["write", "edit", "patch", "multiedit"]);
+import { WRITE_TOOLS } from "../router/tools";
 
 export interface ChangedFile {
   path: string;
@@ -198,10 +196,11 @@ export function buildAcceptedSuffix(method: string): string {
 export async function dispatchGrader(
   ctx: PluginContext,
   req: { tier: string; system: string; prompt: string },
+  parentSessionID?: string,
 ): Promise<{ sessionID: string; text: string }> {
   const cfg = ctx.getConfig();
   const created = (await ctx.plugin.client.session.create(
-    {},
+    parentSessionID ? { body: { parentID: parentSessionID } } : {},
   )) as SessionCreateResult;
   const sid = extractSessionId(created);
   if (!sid) return { sessionID: "", text: "" };
@@ -226,7 +225,10 @@ export async function dispatchGrader(
 /** Assemble `GateDeps` from the live seams and config snapshot. Reads
  *  `cfg.enforcement?.verify?.require` and `cfg.enforcement?.verify?.minGraderTier`
  *  at call time so /router switches take effect on the next delegate. */
-export function buildGateDeps(ctx: PluginContext): GateDeps {
+export function buildGateDeps(
+  ctx: PluginContext,
+  parentSessionID?: string,
+): GateDeps {
   const cfg = ctx.getConfig();
   return {
     deterministic: {
@@ -236,7 +238,7 @@ export function buildGateDeps(ctx: PluginContext): GateDeps {
       mutex: ctx.verifyMutex,
     },
     checker: {
-      dispatchGrader: (req) => dispatchGrader(ctx, req),
+      dispatchGrader: (req) => dispatchGrader(ctx, req, parentSessionID),
       ladder: ["fast", "medium", "heavy"],
       minGraderTier: cfg.enforcement?.verify?.minGraderTier ?? null,
     },
@@ -252,6 +254,7 @@ export async function verifyTaskAfterHook(
   ctx: PluginContext,
   input: unknown,
   output: Record<string, unknown>,
+  parentSessionID?: string,
 ): Promise<void> {
   const inputRec = (input ?? {}) as Record<string, unknown>;
   const toolName = inputRec["tool"];
@@ -288,7 +291,7 @@ export async function verifyTaskAfterHook(
     const res = await accept(
       { dod, trivial, mode: "modeA" },
       artefact,
-      buildGateDeps(ctx),
+      buildGateDeps(ctx, parentSessionID),
     );
     if (!res.accepted && !res.verdict.skipped) {
       const ladder = activeCfg.enforcement?.escalate?.ladder ?? ["fast", "medium", "heavy"];

@@ -11,10 +11,6 @@
 // (`HookPayload` / `HookEventPayload`) instead of `any`.
 // ---------------------------------------------------------------------------
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { detectNarration } from "../guard/narration";
 import { formatScorecard, guardAfterCall, guardBeforeCall } from "../guard/enforce";
 import { registerTierAgents } from "../router/agents";
@@ -23,6 +19,7 @@ import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
 import { resolveEnforcementMode } from "../router/enforcement";
 import { READ_ONLY_TOOLS } from "../router/sessions";
 import { verifyTaskAfterHook } from "../verify/dispatch";
+import { writeTrajectoryLog } from "../utils/log";
 import type { PluginContext } from "./context";
 import type { HookEventPayload, HookPayload } from "./types";
 import type { Preset } from "../router/config";
@@ -59,13 +56,10 @@ export async function handleChatMessage(
   output: HookPayload,
 ): Promise<void> {
   if (ctx.state.bypassed) return;
-  // Re-read cfg so /preset switches take effect without restart
-  let cfg = ctx.getConfig();
-  try {
-    cfg = ctx.refreshConfig();
-  } catch {
-    // keep last known cfg if file read fails
-  }
+  // Re-read cfg so /preset switches take effect without restart.
+  // getFreshConfig() tries a forced refresh and falls back to the cached
+  // value on read failure.
+  const cfg = ctx.getFreshConfig();
   const tierNames = Object.keys(getActiveTiers(cfg));
   ctx.sessionStore.registerFromChatMessage(
     input as { agent?: string; sessionID: string },
@@ -170,7 +164,7 @@ export async function handleToolExecuteAfter(
   // Option (i): verify-dispatch around the built-in `task` tool (advisory-grade —
   // we observe the finished task result and append a forcing note if it is not
   // accepted; we cannot retry a task call that already finished).
-  await verifyTaskAfterHook(ctx, input, output);
+  await verifyTaskAfterHook(ctx, input, output, sid);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,9 +208,7 @@ export async function handleSessionIdle(
     const gstate = ctx.guardStore.get(sid);
     if (gstate) {
       const line = formatScorecard(gstate, ctx.sessionStore.getTier(sid));
-      const dir = join(tmpdir(), "opencode-model-router-trajectory");
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, `${sid}.scorecard.log`), line + "\n", { flag: "a" });
+      writeTrajectoryLog(sid, line, "scorecard");
     }
   } catch {
     // best-effort: a scorecard must never crash a real session
@@ -226,13 +218,7 @@ export async function handleSessionIdle(
   if (process.env.MODEL_ROUTER_TRAJECTORY_DEBUG !== "1") return;
   const dump = ctx.trajectoryStore.dump(sid);
   if (!dump) return;
-  try {
-    const dir = join(tmpdir(), "opencode-model-router-trajectory");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${sid}.log`), dump + "\n", { flag: "a" });
-  } catch {
-    // best-effort
-  }
+  writeTrajectoryLog(sid, dump);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,13 +232,9 @@ export async function handleSystemTransform(
   output: HookPayload,
 ): Promise<void> {
   if (ctx.state.bypassed) return;
-  // Returns cache unless invalidated
-  let cfg = ctx.getConfig();
-  try {
-    cfg = ctx.refreshConfig();
-  } catch {
-    // Use last known config if file read fails
-  }
+  // getFreshConfig() returns the refreshed config and falls back to the
+  // cached value if the file read fails.
+  const cfg = ctx.getFreshConfig();
 
   // Skip injection for child (subagent) sessions.
   // Child sessions are detected via session.created events with a parentID.

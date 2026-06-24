@@ -95,6 +95,7 @@ function makeCtx(opts: {
     activeTiersAtLoad: { fast: cfg.presets.default.fast },
     getConfig: () => cfg,
     refreshConfig: () => cfg,
+    getFreshConfig: () => cfg,
     state: { bypassed: false },
     sessionStore: sessionStore as any,
     trajectoryStore: { ensure: () => undefined, recordToolEvent: () => undefined, dump: () => null } as any,
@@ -798,5 +799,137 @@ describe("verifyTaskAfterHook — Phase 5: ambiguous verify.require end-to-end",
     await verifyTaskAfterHook(ctx, input, output);
 
     expect(output.output).toBe(original);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parentSessionID propagation — grader sessions inherit the parent's
+// sessionID so OpenCode treats them as child sessions.
+// ---------------------------------------------------------------------------
+
+describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSessionID propagation", () => {
+  it("dispatchGrader forwards parentSessionID as parentID on session.create when provided", async () => {
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+    });
+    const result = await dispatchGrader(
+      ctx,
+      { tier: "fast", system: "", prompt: "verify" },
+      "orch-sid-77",
+    );
+    expect(result.sessionID).toBe("grader-sid");
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-77" } });
+  });
+
+  it("dispatchGrader passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+    });
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "",
+      prompt: "verify",
+    });
+    expect(result.sessionID).toBe("grader-sid");
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({});
+  });
+
+  it("buildGateDeps threads parentSessionID from the closure to dispatchGrader", async () => {
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+    });
+    const deps = buildGateDeps(ctx, "orch-sid-99");
+    await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
+  });
+
+  it("buildGateDeps without parentSessionID leaves dispatchGrader parentless", async () => {
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+    });
+    const deps = buildGateDeps(ctx);
+    await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({});
+  });
+
+  it("verifyTaskAfterHook forwards its parentSessionID to buildGateDeps (and onward to dispatchGrader)", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    // To force the checker/grader path (which calls dispatchGrader), the DoD
+    // must have NO `check:` lines — a DoD with criteria only is normalized
+    // to kind "checker" by the gate, which then calls dispatchGrader.
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { require: "always" } } } as any,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+    });
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt:
+          "[acceptance]\ncriteria: result is reasonable\ndeliverable: a report\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-prop" },
+    };
+    await verifyTaskAfterHook(ctx, input, output, "orch-sid-abc");
+    // The grader path runs (DoD has no deterministic checks) and dispatches a
+    // grader session — assert the parentID was propagated end-to-end.
+    const graderCreate = createCalls.find(
+      (c: any) => c?.body?.parentID === "orch-sid-abc",
+    );
+    expect(graderCreate).toBeDefined();
+  });
+
+  it("dispatchGrader still creates a child session when the grader prompt fails", async () => {
+    const createCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "grader-sid" } };
+      },
+      promptImpl: async () => {
+        throw new Error("grader boom");
+      },
+    });
+
+    await expect(
+      dispatchGrader(ctx, { tier: "fast", system: "", prompt: "verify" }, "orch-sid-fail"),
+    ).rejects.toThrow("grader boom");
+
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-fail" } });
   });
 });

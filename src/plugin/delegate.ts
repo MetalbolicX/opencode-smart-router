@@ -52,6 +52,7 @@ export type { DelegateArgs } from "./types";
 export async function executeDelegate(
   ctx: PluginContext,
   args: DelegateArgs,
+  parentSessionID?: string,
 ): Promise<string> {
   try {
     let activeCfg = ctx.getConfig();
@@ -96,7 +97,9 @@ export async function executeDelegate(
         ? `${scrubText(forcing)}\n\n${args.task}`
         : args.task;
 
-      const created: SessionCreateResult = await ctx.plugin.client.session.create({});
+      const created: SessionCreateResult = await ctx.plugin.client.session.create(
+        parentSessionID ? { body: { parentID: parentSessionID } } : {},
+      );
       const producerSid = extractSessionId(created);
       if (!producerSid) {
         return "[router] delegate failed: could not create a producer session.";
@@ -149,7 +152,7 @@ export async function executeDelegate(
         gateRes = await accept(
           { dod, trivial: false, mode: "modeA" },
           artefact,
-          buildGateDeps(ctx),
+          buildGateDeps(ctx, parentSessionID),
         );
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
