@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
+    "build": "npm run build:tiers && npx tsc --project tsconfig.build.json && pnpm exec -- rolldown --config rolldown.config.js build",
     "build:tiers": "node --experimental-strip-types scripts/build-tiers-config.ts",
     "prebuild": "node --experimental-strip-types scripts/build-tiers-config.ts",
     "test": "vitest run",
@@ -49,6 +50,7 @@
     "@types/node": "^25.2.3",
     "@vitest/coverage-v8": "^3.2.4",
     "cross-env": "^7.0.3",
+    "rolldown": "^1.1.2",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
