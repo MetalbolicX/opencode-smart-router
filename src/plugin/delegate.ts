@@ -49,11 +49,33 @@ export type { DelegateArgs } from "./types";
  * tier in a fresh session) before it is returned. Returns an accepted result
  * on PASS, or an honest "unmet" status on FAIL — never a self-reported
  * completion.
+ *
+ * Cancellation (PR 2 of fix-delegate-cancellation): if `signal` is supplied
+ * and fires while the loop is mid-flight, `executeDelegate` returns the empty
+ * string `""` silently — no `[router status: unmet]`, no fail-closed sentinel.
+ * The caller treats `""` as "the user cancelled; don't surface a fake error".
+ *
+ * Abort check points (each → silent `""`):
+ *   1. Top of the while-loop (covers the case where the abort fires between
+ *      attempts or before the loop starts).
+ *   2. After `session.create` resolves — we still own a producer session,
+ *      so the per-attempt `finally` cleanup must run before we return.
+ *   3. Inside the `session.prompt` catch — `withTimeout` rejects with a
+ *      `DOMException('aborted', 'AbortError')`; we early-return `""` so
+ *      we don't run the gate against an empty artefact.
+ *   4. After the gate, when `nextAction` returns `{give_up, "aborted"}` —
+ *      the ladder's abort guard fires and we short-circuit to `""` instead
+ *      of the normal `[router status: unmet]` formatting.
+ *
+ * The `session.create`/`session.prompt` SDK options also receive `signal`
+ * so the network request itself honours cancellation when the SDK supports
+ * it. The `withTimeout` wrapper is the timing-independent safety net.
  */
 export const executeDelegate = async (
   ctx: PluginContext,
   args: DelegateArgs,
   parentSessionID?: string,
+  signal?: AbortSignal,
 ): Promise<string> => {
   try {
     let activeCfg = ctx.getConfig();
@@ -87,6 +109,13 @@ export const executeDelegate = async (
     let forcing: string | null = null;
 
     while (true) {
+      // Abort check (1): top of loop. If we were cancelled while idle
+      // (between attempts, before the loop, or after the last cleanup),
+      // exit silently with no producer session to clean up.
+      if (signal?.aborted) {
+        return "";
+      }
+
       if (safety++ > safetyMax) {
         return (
           `[router status: unmet] delegation stopped by the safety net after ` +
@@ -98,13 +127,47 @@ export const executeDelegate = async (
         ? `${scrubText(forcing)}\n\n${args.task}`
         : args.task;
 
-      const created: SessionCreateResult = await withTimeout(
-        ctx.plugin.client.session.create(
-          parentSessionID ? { body: { parentID: parentSessionID } } : {},
-        ),
-        30_000,
-        "session.create",
-      );
+      let created: SessionCreateResult;
+      try {
+        created = await withTimeout(
+          ctx.plugin.client.session.create({
+            ...(parentSessionID ? { body: { parentID: parentSessionID } } : {}),
+            ...(signal ? { signal } : {}),
+          }),
+          30_000,
+          "session.create",
+          signal,
+        );
+      } catch (err) {
+        // AbortError during session.create: bail silently. We never
+        // produced a producer sid, so no per-attempt cleanup is needed
+        // — the outer while-loop will exit on the next top-of-loop check.
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return "";
+        }
+        throw err;
+      }
+
+      // Abort check (2): after create. We own a producer session at this
+      // point — let the per-attempt `finally` block clean it up.
+      if (signal?.aborted) {
+        const producerSid = extractSessionId(created);
+        if (producerSid) {
+          ctx.changedFileStore.clear(producerSid);
+          try {
+            ctx.sessionStore.unregister(producerSid);
+          } catch {
+            // non-fatal
+          }
+          try {
+            ctx.guardStore.clear(producerSid);
+          } catch {
+            // non-fatal
+          }
+        }
+        return "";
+      }
+
       const producerSid = extractSessionId(created);
       if (!producerSid) {
         return "[router] delegate failed: could not create a producer session.";
@@ -130,6 +193,7 @@ export const executeDelegate = async (
           const res: SessionPromptResult = await withTimeout(
             ctx.plugin.client.session.prompt({
               path: { id: producerSid },
+              ...(signal ? { signal } : {}),
               body: {
                 ...(model ? { model } : {}),
                 ...(tier ? { agent: tier } : {}),
@@ -138,9 +202,16 @@ export const executeDelegate = async (
             }),
             600_000,
             "session.prompt (producer)",
+            signal,
           );
           producerText = extractPromptText(res);
         } catch (err) {
+          // AbortError (3): user cancelled while the prompt was in flight
+          // (or while the 600s timeout wrapper was racing). Bail out
+          // silently — the per-attempt `finally` will clean up.
+          if (err instanceof DOMException && err.name === "AbortError") {
+            return "";
+          }
           // Provider-failover design (see header comment): a transport/API
           // error yields an empty artefact and counts as exactly ONE failed
           // attempt. `err` is bound so the failure is observable at debug
@@ -187,9 +258,12 @@ export const executeDelegate = async (
           state,
           { pass: gateRes.accepted, reasons: gateRes.verdict.reasons },
           policy,
+          signal,
         );
 
         if (action.action === "accept") {
+          // Accept still wins on the very last attempt even if the user
+          // cancelled mid-prompt — the producer's verified text is real.
           dumpDelegateScorecard(
             producerSid,
             state,
@@ -199,6 +273,12 @@ export const executeDelegate = async (
           return producerText + buildAcceptedSuffix(gateRes.verdict.method);
         }
         if (action.action === "give_up") {
+          // Abort guard (4): ladder returned give_up because signal fired.
+          // Return silently — no unmet message, no scorecard dump, no
+          // forcing note surfaced to the caller.
+          if (action.reason === "aborted") {
+            return "";
+          }
           dumpDelegateScorecard(
             producerSid,
             state,
@@ -218,8 +298,9 @@ export const executeDelegate = async (
         state = advance(state, action);
       } finally {
         // Per-attempt cleanup (drop producer session tracking + state).
-        // Always runs — even on timeout or throw from session.prompt / gate —
-        // so a single stuck subagent cannot leak tracking entries forever.
+        // Always runs — even on timeout, abort, or throw from
+        // session.prompt / gate — so a single stuck or cancelled subagent
+        // cannot leak tracking entries forever.
         ctx.changedFileStore.clear(producerSid);
         try {
           ctx.sessionStore.unregister(producerSid);

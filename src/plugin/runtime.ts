@@ -114,7 +114,7 @@ export const assembleRuntimeHooks = (
                   ),
               },
               async execute(args: DelegateArgs, context: ToolContext): Promise<string> {
-                return executeDelegate(ctx, args, context.sessionID);
+                return executeDelegate(ctx, args, context.sessionID, context.abort);
               },
             }),
           }

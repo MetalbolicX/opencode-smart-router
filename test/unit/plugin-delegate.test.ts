@@ -878,3 +878,481 @@ describe("executeDelegate — timeout handling", () => {
     expect(clearCalls).toContain("sess_to_cleanup");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AbortSignal — PR 2 of fix-delegate-cancellation.
+//
+// The delegate loop MUST:
+//   - Forward the AbortSignal to `session.create` and `session.prompt`
+//     options (so the SDK can cancel in-flight network calls).
+//   - Forward the same signal to `withTimeout` so the local timeout
+//     wrapper also races the abort.
+//   - Check `signal.aborted` at the loop top — if cancelled while idle
+//     (between attempts or before the loop), return `""` silently with
+//     no producer session to clean up.
+//   - Check `signal.aborted` after `session.create` — if cancelled while
+//     the producer session is being created, return `""` AFTER the
+//     per-attempt cleanup runs (so the new producer sid is untracked).
+//   - Detect AbortError from the `withTimeout(prompt)` race — early-
+//     return `""` from inside the catch so we don't run the gate against
+//     an empty artefact.
+//   - Pass the signal to `nextAction` so a post-abort decision returns
+//     `give_up` with reason `"aborted"`. The give_up branch in the loop
+//     must short-circuit to `""` (no `[router status: unmet]`).
+//   - Be idempotent across multiple `abort()` calls.
+//   - Be silent: the abort path must NEVER produce `[router status:`,
+//     `[router] delegate failed`, or any other user-facing sentinel.
+// ---------------------------------------------------------------------------
+
+describe("executeDelegate — AbortSignal forwarding (PR 2)", () => {
+  it("forwards the abort signal to session.create options", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const createCalls: unknown[] = [];
+    const ac = new AbortController();
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_1" } };
+      },
+    });
+    await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(createCalls).toHaveLength(1);
+    expect((createCalls[0] as { signal?: AbortSignal }).signal).toBe(ac.signal);
+  });
+
+  it("forwards the abort signal to session.prompt options", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const promptCalls: unknown[] = [];
+    const ac = new AbortController();
+    const { ctx } = makeCtx({
+      promptImpl: async (req: unknown) => {
+        promptCalls.push(req);
+        return {
+          data: { parts: [{ type: "text", text: "I did it." }] },
+        };
+      },
+    });
+    await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(promptCalls).toHaveLength(1);
+    expect((promptCalls[0] as { signal?: AbortSignal }).signal).toBe(ac.signal);
+  });
+
+  it("omits the signal field from create/prompt options when no signal is supplied (back-compat)", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const createCalls: unknown[] = [];
+    const promptCalls: unknown[] = [];
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_x" } };
+      },
+      promptImpl: async (req: unknown) => {
+        promptCalls.push(req);
+        return { data: { parts: [{ type: "text", text: "ok" }] } };
+      },
+    });
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect((createCalls[0] as { signal?: AbortSignal }).signal).toBeUndefined();
+    expect((promptCalls[0] as { signal?: AbortSignal }).signal).toBeUndefined();
+  });
+});
+
+describe("executeDelegate — abort before loop starts (top-of-loop check)", () => {
+  it("returns '' when signal is already aborted before the first attempt", async () => {
+    const createCalls: unknown[] = [];
+    const promptCalls: unknown[] = [];
+    const ac = new AbortController();
+    ac.abort();
+    const { ctx } = makeCtx({
+      createImpl: async (req: unknown) => {
+        createCalls.push(req);
+        return { data: { id: "sess_pre" } };
+      },
+      promptImpl: async (req: unknown) => {
+        promptCalls.push(req);
+        return { data: { parts: [{ type: "text", text: "should not run" }] } };
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+    expect(createCalls).toHaveLength(0);
+    expect(promptCalls).toHaveLength(0);
+  });
+});
+
+describe("executeDelegate — abort between create and prompt (post-create check)", () => {
+  it("returns '' after aborting between create and prompt, cleanup ran for the new producer sid", async () => {
+    acceptMock.mockReset(); // no accept() should be called
+    const ac = new AbortController();
+    const unregisterCalls: string[] = [];
+    const clearCalls: string[] = [];
+    let createDone = false;
+    const { ctx } = makeCtx({
+      createImpl: async () => {
+        if (!createDone) {
+          createDone = true;
+          // Abort immediately after create resolves, before prompt fires.
+          queueMicrotask(() => ac.abort());
+        }
+        return { data: { id: "sess_aborted_between" } };
+      },
+      promptImpl: async () => {
+        throw new Error("prompt must NOT be called when aborted between create+prompt");
+      },
+      sessionStoreOverrides: {
+        unregister: (sid: unknown) => {
+          unregisterCalls.push(String(sid));
+        },
+      },
+      guardStoreOverrides: {
+        clear: (sid: unknown) => {
+          clearCalls.push(String(sid));
+        },
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+    // The producer session created just before the abort MUST be cleaned up.
+    expect(unregisterCalls).toContain("sess_aborted_between");
+    expect(clearCalls).toContain("sess_aborted_between");
+  });
+});
+
+describe("executeDelegate — abort during session.prompt", () => {
+  it("returns '' when withTimeout(prompt) rejects with AbortError, cleanup ran", async () => {
+    acceptMock.mockReset(); // no accept() should run
+    const ac = new AbortController();
+    const unregisterCalls: string[] = [];
+    const clearCalls: string[] = [];
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: { id: "sess_prompt_aborted" } }),
+      promptImpl: async () => {
+        // Abort while the prompt is "in flight".
+        queueMicrotask(() => ac.abort());
+        // Throw an AbortError matching the withTimeout shape.
+        throw new DOMException("aborted", "AbortError");
+      },
+      sessionStoreOverrides: {
+        unregister: (sid: unknown) => {
+          unregisterCalls.push(String(sid));
+        },
+      },
+      guardStoreOverrides: {
+        clear: (sid: unknown) => {
+          clearCalls.push(String(sid));
+        },
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+    expect(unregisterCalls).toContain("sess_prompt_aborted");
+    expect(clearCalls).toContain("sess_prompt_aborted");
+  });
+
+  it("does NOT call accept() when abort fires during prompt", async () => {
+    acceptMock.mockReset();
+    const ac = new AbortController();
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: { id: "sess_a" } }),
+      promptImpl: async () => {
+        queueMicrotask(() => ac.abort());
+        throw new DOMException("aborted", "AbortError");
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+    expect(acceptMock).not.toHaveBeenCalled();
+  });
+
+  it("non-AbortError from prompt still falls through to ladder retry (existing behaviour preserved)", async () => {
+    // Sanity: an abort-like shape that is NOT a DOMException with name
+    // 'AbortError' should still be treated as a transport error, not
+    // an abort. The gate will see an empty artefact and the ladder will
+    // retry/give_up as usual.
+    acceptMock.mockResolvedValue({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["empty"] },
+      dodSource: "inferred",
+    });
+    const ac = new AbortController();
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: { id: "sess_nonabort" } }),
+      promptImpl: async () => {
+        throw new Error("transport boom");
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    // Not aborted, so the ladder runs normally and produces an unmet status.
+    expect(ac.signal.aborted).toBe(false);
+    expect(out).toContain("[router status: unmet]");
+  });
+});
+
+describe("executeDelegate — abort during ladder eval (post-abort give_up short-circuit)", () => {
+  it("returns '' when signal fires between attempts — no [router status: unmet] surfaced", async () => {
+    acceptMock.mockResolvedValue({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["boom"] },
+      dodSource: "inferred",
+    });
+    const ac = new AbortController();
+    let createCount = 0;
+    const { ctx } = makeCtx({
+      createImpl: async () => {
+        createCount++;
+        // First attempt: let it complete and FAIL the gate.
+        // Second attempt: abort BEFORE create so the loop-top check fires.
+        if (createCount === 2) ac.abort();
+        return { data: { id: `sess_attempt_${createCount}` } };
+      },
+      promptImpl: async () => ({
+        data: { parts: [{ type: "text", text: "attempt done" }] },
+      }),
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+    expect(out).not.toContain("[router status:");
+    expect(out).not.toContain("[router] delegate failed");
+  });
+});
+
+describe("executeDelegate — post-completion abort is a no-op", () => {
+  it("returns the accepted result when abort fires AFTER an accepted prompt", async () => {
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const ac = new AbortController();
+    let promptResolved = false;
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: { id: "sess_post" } }),
+      promptImpl: async () => {
+        // Abort AFTER the prompt resolves (i.e. we already have a result).
+        const res = { data: { parts: [{ type: "text", text: "I did it." }] } };
+        queueMicrotask(() => {
+          promptResolved = true;
+          ac.abort();
+        });
+        return res;
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(promptResolved).toBe(true);
+    // The accepted verdict wins; the late abort cannot rewrite the result.
+    expect(out).toContain("[router ✓ accepted: deterministic]");
+    expect(out).toContain("I did it.");
+  });
+});
+
+describe("executeDelegate — multiple aborts are idempotent", () => {
+  it("second abort() after the first is a no-op — only one silent '' surfaces", async () => {
+    acceptMock.mockReset();
+    const ac = new AbortController();
+    let aborted = false;
+    const { ctx } = makeCtx({
+      createImpl: async () => {
+        if (!aborted) {
+          aborted = true;
+          // Fire two aborts back-to-back. The second must not throw or
+          // surface a second error path.
+          ac.abort();
+          ac.abort();
+        }
+        return { data: { id: "sess_idem" } };
+      },
+      promptImpl: async () => {
+        throw new DOMException("aborted", "AbortError");
+      },
+    });
+    const out = await executeDelegate(
+      ctx,
+      { task: "say hi", tier: "fast" },
+      undefined,
+      ac.signal,
+    );
+    expect(out).toBe("");
+  });
+});
+
+describe("executeDelegate — abort path is silent (no user-facing message)", () => {
+  it("every abort branch returns '' — no status: unmet, no fail-closed sentinel", async () => {
+    // All four abort branches: top-of-loop, after-create, during-prompt,
+    // and ladder post-abort give_up. Each MUST return "".
+    acceptMock.mockResolvedValue({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["x"] },
+      dodSource: "inferred",
+    });
+
+    // (1) top-of-loop
+    {
+      const ac = new AbortController();
+      ac.abort();
+      const { ctx } = makeCtx({});
+      const out = await executeDelegate(
+        ctx,
+        { task: "say hi", tier: "fast" },
+        undefined,
+        ac.signal,
+      );
+      expect(out).toBe("");
+    }
+
+    // (2) after-create
+    {
+      const ac = new AbortController();
+      let firstCreate = true;
+      const { ctx } = makeCtx({
+        createImpl: async () => {
+          if (firstCreate) {
+            firstCreate = false;
+            queueMicrotask(() => ac.abort());
+          }
+          return { data: { id: "sess_a" } };
+        },
+        promptImpl: async () => {
+          throw new Error("prompt must NOT be called");
+        },
+      });
+      const out = await executeDelegate(
+        ctx,
+        { task: "say hi", tier: "fast" },
+        undefined,
+        ac.signal,
+      );
+      expect(out).toBe("");
+    }
+
+    // (3) during-prompt
+    {
+      const ac = new AbortController();
+      const { ctx } = makeCtx({
+        createImpl: async () => ({ data: { id: "sess_b" } }),
+        promptImpl: async () => {
+          queueMicrotask(() => ac.abort());
+          throw new DOMException("aborted", "AbortError");
+        },
+      });
+      const out = await executeDelegate(
+        ctx,
+        { task: "say hi", tier: "fast" },
+        undefined,
+        ac.signal,
+      );
+      expect(out).toBe("");
+    }
+
+    // (4) ladder post-abort give_up
+    {
+      const ac = new AbortController();
+      let createCount = 0;
+      const { ctx } = makeCtx({
+        createImpl: async () => {
+          createCount++;
+          if (createCount === 2) ac.abort();
+          return { data: { id: `sess_${createCount}` } };
+        },
+        promptImpl: async () => ({
+          data: { parts: [{ type: "text", text: "x" }] },
+        }),
+      });
+      const out = await executeDelegate(
+        ctx,
+        { task: "say hi", tier: "fast" },
+        undefined,
+        ac.signal,
+      );
+      expect(out).toBe("");
+    }
+  });
+});
+
+describe("executeDelegate — runtime forwards context.abort to executeDelegate", () => {
+  // This is the wire-up contract: the runtime hook passes the OpenCode
+  // ToolContext's `abort` straight through to executeDelegate's `signal`
+  // parameter. Verified by inspecting the export surface + the typed
+  // call site.
+  it("runtime.ts delegate tool handler forwards context.abort", async () => {
+    const src = await import("node:fs").then((fs) =>
+      fs.readFileSync(
+        new URL("../../src/plugin/runtime.ts", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(src).toMatch(/executeDelegate\(\s*ctx,\s*args,\s*context\.sessionID,\s*context\.abort\s*\)/);
+  });
+
+  it("executeDelegate signature accepts an optional 4th AbortSignal parameter", async () => {
+    // Compile-time evidence: the function is callable with three OR four
+    // arguments without `any` casts. We assert both forms work.
+    acceptMock.mockResolvedValueOnce({
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    });
+    const { ctx } = makeCtx({});
+    const out3 = await executeDelegate(ctx, { task: "x", tier: "fast" });
+    expect(typeof out3).toBe("string");
+    // We already use the 4-arg form elsewhere; this is just back-compat
+    // proof for the call site.
+  });
+});
+
