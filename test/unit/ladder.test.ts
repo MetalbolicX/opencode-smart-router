@@ -859,3 +859,191 @@ describe("property-based: termination", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// AbortSignal — post-abort the ladder must give_up, NEVER retry/escalate.
+//
+// Contract (PR 1 of fix-delegate-cancellation): once the caller's
+// AbortSignal is fired, every subsequent nextAction() call must short-
+// circuit to {action:"give_up", reason:"aborted"} regardless of:
+//   - the verdict (FAIL, null, undefined, even pass via special path
+//     is a no-op because accept returns first; we test FAIL + null only)
+//   - the policy (escalate-target exists or not, retries left or not)
+//   - the cost ceiling (would normally give_up but for a different reason)
+//
+// The signal must NOT regress any existing nextAction() behaviour when
+// it is absent or not yet aborted (covered by every test above).
+// ---------------------------------------------------------------------------
+
+describe("nextAction — AbortSignal guard", () => {
+  it("aborted signal + FAIL verdict => give_up with reason 'aborted'", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false, reasons: ["boom"] }, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.reason).toBe("aborted");
+  });
+
+  it("aborted signal + FAIL verdict => never retry", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.action).not.toBe("retry");
+  });
+
+  it("aborted signal + FAIL verdict + tier-exhausted => never escalate", () => {
+    // Without abort, this would return escalate (medium).
+    const p = makePolicy({ maxAttemptsPerTier: 1, maxTotalAttempts: 10 });
+    const s = makeState({
+      currentTier: "fast",
+      totalAttempts: 1,
+      attemptsThisTier: 1,
+    });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.action).not.toBe("escalate");
+  });
+
+  it("aborted signal + null verdict => give_up (treated as FAIL + aborted)", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, null, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.reason).toBe("aborted");
+  });
+
+  it("aborted signal + undefined verdict => give_up", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, undefined, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.reason).toBe("aborted");
+  });
+
+  it("aborted signal + cost ceiling already exceeded => reason is 'aborted' (not 'cost ceiling exceeded')", () => {
+    const p = makePolicy({ costMultiple: 2, maxTotalAttempts: 10 });
+    const s = makeState({
+      totalAttempts: 2,
+      attemptsThisTier: 0,
+      firstAttemptCost: 5,
+      cumulativeCost: 100, // way over 10
+    });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.reason).toBe("aborted");
+  });
+
+  it("aborted signal + max total attempts reached => reason is 'aborted' (not 'max total attempts')", () => {
+    const p = makePolicy({ maxTotalAttempts: 1, maxAttemptsPerTier: 1 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 1 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.action).toBe("give_up");
+    expect(a.reason).toBe("aborted");
+  });
+
+  it("aborted signal + no forcingMessage (terminal action)", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.forcingMessage).toBeUndefined();
+  });
+
+  it("un-aborted signal => behaves exactly like no signal (no regression)", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+    // Do NOT call ac.abort().
+    const a = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a.action).toBe("retry");
+    expect(a.tier).toBe("fast");
+  });
+
+  it("aborting between calls: first call retry, second call (after abort) give_up", () => {
+    // Models the real loop: caller aborts AFTER a verdict comes back.
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const ac = new AbortController();
+
+    // First decision: ladder says retry.
+    const a1 = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a1.action).toBe("retry");
+
+    // Now the caller aborts (e.g. user pressed Ctrl-C between attempts).
+    ac.abort();
+
+    // Second decision: abort guard fires immediately.
+    const a2 = nextAction(s, { pass: false }, p, ac.signal);
+    expect(a2.action).toBe("give_up");
+    expect(a2.reason).toBe("aborted");
+  });
+
+  it("aborted signal still allows accept when verdict.pass===true (accept preempts abort)", () => {
+    // The accept branch fires before the abort guard by design — if the
+    // last attempt succeeded, we want to return its result, not abort.
+    const p = makePolicy({ maxAttemptsPerTier: 1, maxTotalAttempts: 1 });
+    const s = makeState({ totalAttempts: 1 });
+    const ac = new AbortController();
+    ac.abort();
+    const a = nextAction(s, { pass: true }, p, ac.signal);
+    expect(a.action).toBe("accept");
+  });
+
+  it("omitted signal (no 4th arg) => unchanged behaviour (back-compat)", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const a = nextAction(s, { pass: false }, p);
+    expect(a.action).toBe("retry");
+  });
+
+  it("explicit undefined signal => unchanged behaviour", () => {
+    const p = makePolicy({ maxAttemptsPerTier: 5, maxTotalAttempts: 10 });
+    const s = makeState({ totalAttempts: 1, attemptsThisTier: 0 });
+    const a = nextAction(s, { pass: false }, p, undefined);
+    expect(a.action).toBe("retry");
+  });
+
+  it("property-style: aborted signal + random policy + random state never returns retry/escalate", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const rng = mulberry32(seed);
+      const ladderLen = 1 + Math.floor(rng() * 3);
+      const allTiers = ["fast", "medium", "heavy", "ultra"];
+      const ladder = allTiers.slice(0, ladderLen);
+      const p: EscalatePolicy = {
+        ladder,
+        floorTier: null,
+        maxAttemptsPerTier: Math.floor(rng() * 4),
+        maxTotalAttempts: 1 + Math.floor(rng() * 6),
+        costMultiple: rng() < 0.5 ? null : 1 + Math.floor(rng() * 5),
+      };
+      const s = makeState({
+        currentTier: ladder[0]!,
+        totalAttempts: Math.floor(rng() * 5),
+        attemptsThisTier: Math.floor(rng() * 3),
+        firstAttemptCost: rng() < 0.5 ? null : Math.floor(rng() * 10),
+        cumulativeCost: Math.floor(rng() * 50),
+      });
+      const ac = new AbortController();
+      ac.abort();
+      const a = nextAction(s, { pass: false }, p, ac.signal);
+      expect(a.action, `seed=${seed}`).toBe("give_up");
+      expect(a.reason, `seed=${seed}`).toBe("aborted");
+    }
+  });
+});
+

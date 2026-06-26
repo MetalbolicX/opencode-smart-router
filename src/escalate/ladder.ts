@@ -109,19 +109,26 @@ export const nextAction = (
   state: LadderState,
   verdict: LadderVerdict | null | undefined,
   policy: EscalatePolicy,
+  signal?: AbortSignal,
 ): LadderAction => {
   // (1) pass
   if (verdict?.pass === true) {
     return { action: "accept" };
   }
 
-  // (2) cost check
+  // (2) abort guard — once the caller is cancelled, never retry or escalate.
+  // Must run before any decision that could spawn another attempt.
+  if (signal?.aborted) {
+    return { action: "give_up", reason: "aborted" };
+  }
+
+  // (3) cost check
   const costExceeded =
     policy.costMultiple != null &&
     state.firstAttemptCost != null &&
     state.cumulativeCost > state.firstAttemptCost * policy.costMultiple;
 
-  // (3) max total attempts
+  // (4) max total attempts
   if (state.totalAttempts >= policy.maxTotalAttempts) {
     return {
       action: "give_up",
@@ -129,12 +136,12 @@ export const nextAction = (
     };
   }
 
-  // (4) cost ceiling
+  // (5) cost ceiling
   if (costExceeded) {
     return { action: "give_up", reason: "cost ceiling exceeded" };
   }
 
-  // (5) retry within tier
+  // (6) retry within tier
   if (state.attemptsThisTier < policy.maxAttemptsPerTier) {
     return {
       action: "retry",
@@ -143,7 +150,7 @@ export const nextAction = (
     };
   }
 
-  // (6) escalate or give_up
+  // (7) escalate or give_up
   const next = nextTierAfter(state.currentTier, policy);
   if (next == null) {
     return {
