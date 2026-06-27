@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConfigLayer, RouterConfig, RouterState } from "./config.types";
 import { isPlainObject } from "./config.types";
+import { resolvePresetName } from "./config-resolve";
 import { readState } from "./config-state";
 import { validateConfig } from "./config-validate";
 import { isValidEnforcementMode } from "./enforcement";
@@ -177,20 +178,4 @@ export const applyStateOverlay = (cfg: RouterConfig, state: RouterState): void =
   if (state.enforcementMode && isValidEnforcementMode(state.enforcementMode)) {
     cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
   }
-};
-
-export const resolvePresetName = (
-  cfg: RouterConfig,
-  requestedPreset: string,
-): string | undefined => {
-  if (cfg.presets[requestedPreset]) {
-    return requestedPreset;
-  }
-
-  const normalized = requestedPreset.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-
-  return Object.keys(cfg.presets).find((name) => name.toLowerCase() === normalized);
 };

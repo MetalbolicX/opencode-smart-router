@@ -20,9 +20,10 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-
-import type { RouterConfig, RouterState } from "./config.types";
+import type { RouterState } from "./config.types";
+import { RouterStateError } from "./config-errors";
 import { readMergedConfig } from "./config-loader";
+import { resolvePresetName } from "./config-resolve";
 
 // ---------------------------------------------------------------------------
 // State file path
@@ -36,16 +37,42 @@ export const statePath = (): string => {
 // State persistence helpers
 // ---------------------------------------------------------------------------
 
-/** Read current persisted state (or empty object on failure). */
+/**
+ * Read current persisted state.
+ *
+ * Policy (per config-error-handling spec):
+ *   - Missing file → operator-facing warning + return `{}` (warn+default).
+ *   - Present-but-unreadable / unparsable / non-object file → throw
+ *     `RouterStateError` so the loader fails loud instead of silently
+ *     dropping the user's `/preset` / `/router` overrides.
+ *
+ * This replaces the prior silent `catch {}` that suppressed every
+ * failure mode and returned `{}` — which caused corrupted state to look
+ * identical to "first run" and lose user choices without any signal.
+ */
 export const readState = (): RouterState => {
-  try {
-    if (existsSync(statePath())) {
-      return JSON.parse(readFileSync(statePath(), "utf-8")) as RouterState;
-    }
-  } catch {
-    // ignore
+  const p = statePath();
+  if (!existsSync(p)) {
+    // eslint-disable-next-line no-console
+    console.warn(`router state: no file at ${p}; starting with empty state`);
+    return {};
   }
-  return {};
+  let raw: string;
+  try {
+    raw = readFileSync(p, "utf-8");
+  } catch (err) {
+    throw new RouterStateError(p, err);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new RouterStateError(p, err);
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new RouterStateError(p, new Error("state file root must be a JSON object"));
+  }
+  return parsed as RouterState;
 };
 
 /** Write state to disk atomically (merges with existing keys). */
@@ -89,17 +116,4 @@ export const saveActiveMode = (modeName: string): void => {
 
 export const saveEnforcementMode = (mode: "off" | "advisory" | "enforced"): void => {
   writeState({ enforcementMode: mode });
-};
-
-/** Inlined mirror of `config-loader.ts → resolvePresetName()`. Kept local to
- *  avoid widening the runtime dependency surface for a single call site. */
-const resolvePresetName = (cfg: RouterConfig, requestedPreset: string): string | undefined => {
-  if (cfg.presets[requestedPreset]) {
-    return requestedPreset;
-  }
-  const normalized = requestedPreset.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-  return Object.keys(cfg.presets).find((name) => name.toLowerCase() === normalized);
 };

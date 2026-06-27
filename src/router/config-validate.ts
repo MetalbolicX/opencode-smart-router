@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { EnforcementConfig, RouterConfig } from "./config.types";
+import { ENFORCEMENT_MODES, VERIFY_REQUIRE_MODES } from "./config-resolve";
 
 export const validateConfig = (raw: unknown): RouterConfig => {
   if (typeof raw !== "object" || raw === null) {
@@ -140,7 +141,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
     }
     const enforcement = obj.enforcement as Record<string, unknown>;
     if (enforcement.mode !== undefined) {
-      if (!["off", "advisory", "enforced"].includes(enforcement.mode as string)) {
+      if (!(ENFORCEMENT_MODES as readonly string[]).includes(enforcement.mode as string)) {
         throw new Error("tiers.json: enforcement.mode must be one of off|advisory|enforced");
       }
     }
@@ -161,8 +162,10 @@ export const validateConfig = (raw: unknown): RouterConfig => {
       // defense — a typo in tiers.json must surface at config-load time so
       // the operator sees it before the gate runs.
       if (verify.require !== undefined) {
-        const requireAllowed = ["never", "whenDoDPresent", "always"];
-        if (typeof verify.require !== "string" || !requireAllowed.includes(verify.require)) {
+        if (
+          typeof verify.require !== "string" ||
+          !(VERIFY_REQUIRE_MODES as readonly string[]).includes(verify.require)
+        ) {
           throw new Error(
             `tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always (got ${JSON.stringify(verify.require)})`,
           );
@@ -235,7 +238,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
     ) {
       const perTier = enforcement.perTier as Record<string, unknown>;
       for (const [tierName, tierMode] of Object.entries(perTier)) {
-        if (!["off", "advisory", "enforced"].includes(tierMode as string)) {
+        if (!(ENFORCEMENT_MODES as readonly string[]).includes(tierMode as string)) {
           throw new Error(
             `tiers.json: enforcement.perTier.${tierName} must be one of off|advisory|enforced`,
           );

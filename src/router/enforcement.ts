@@ -3,13 +3,22 @@
 // ---------------------------------------------------------------------------
 
 import type { RouterConfig } from "./config";
+import { ENFORCEMENT_MODES, type EnforcementMode } from "./config-resolve";
 
-export type EnforcementMode = "off" | "advisory" | "enforced";
+// Re-export so existing `import type { EnforcementMode } from "./enforcement"`
+// keeps resolving. The canonical declaration now lives in `./config-resolve.ts`.
+export type { EnforcementMode };
 
-export const VALID_ENFORCEMENT_MODES: readonly EnforcementMode[] = ["off", "advisory", "enforced"];
+/**
+ * Back-compat alias preserved for callers that already imported the
+ * runtime-validator constant under its old name. The canonical constant
+ * now lives in `./config-resolve.ts` so `config-validate.ts` and the
+ * runtime resolver cannot drift out of sync.
+ */
+export const VALID_ENFORCEMENT_MODES = ENFORCEMENT_MODES;
 
 export const isValidEnforcementMode = (v: unknown): v is EnforcementMode => {
-  return typeof v === "string" && (VALID_ENFORCEMENT_MODES as readonly string[]).includes(v);
+  return typeof v === "string" && (ENFORCEMENT_MODES as readonly string[]).includes(v);
 };
 
 export const DEFAULT_ENV_GATE = "MODEL_ROUTER_ENFORCE";
