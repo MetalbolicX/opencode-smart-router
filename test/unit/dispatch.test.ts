@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest";
-import {
-  extractChangedFile,
-  createChangedFileStore,
-  parseTaskResult,
-  buildDelegationDoD,
-  tierModel,
-  shouldVerifyTask,
-  buildForcingNote,
-  buildAcceptedSuffix,
-} from "../../src/verify/dispatch";
+import { describe, expect, it } from "vitest";
 import type { RouterConfig } from "../../src/router/config";
+import {
+  buildAcceptedSuffix,
+  buildDelegationDoD,
+  buildForcingNote,
+  createChangedFileStore,
+  extractChangedFile,
+  parseTaskResult,
+  shouldVerifyTask,
+  tierModel,
+} from "../../src/verify/dispatch";
 
 const cfg = {
   activePreset: "p",
@@ -43,9 +43,7 @@ describe("extractChangedFile", () => {
   });
   it("patch and multiedit => modified", () => {
     expect(extractChangedFile("patch", { file: "c.ts" })?.status).toBe("modified");
-    expect(extractChangedFile("multiedit", { filePath: "d.ts" })?.status).toBe(
-      "modified",
-    );
+    expect(extractChangedFile("multiedit", { filePath: "d.ts" })?.status).toBe("modified");
   });
   it("non-write tool => null", () => {
     expect(extractChangedFile("read", { filePath: "a.ts" })).toBeNull();
@@ -142,15 +140,9 @@ describe("parseTaskResult", () => {
     expect(r.parentSessionID).toBeNull();
   });
   it("parentSessionID is null when metadata is not an object", () => {
-    expect(
-      parseTaskResult({ output: "x", metadata: "not-an-object" }).parentSessionID,
-    ).toBeNull();
-    expect(
-      parseTaskResult({ output: "x", metadata: 42 }).parentSessionID,
-    ).toBeNull();
-    expect(
-      parseTaskResult({ output: "x", metadata: null }).parentSessionID,
-    ).toBeNull();
+    expect(parseTaskResult({ output: "x", metadata: "not-an-object" }).parentSessionID).toBeNull();
+    expect(parseTaskResult({ output: "x", metadata: 42 }).parentSessionID).toBeNull();
+    expect(parseTaskResult({ output: "x", metadata: null }).parentSessionID).toBeNull();
   });
   it("parentSessionID is null when the metadata field is missing", () => {
     const r = parseTaskResult({
@@ -161,16 +153,13 @@ describe("parseTaskResult", () => {
   });
   it("parentSessionID is null when the metadata field is non-string", () => {
     expect(
-      parseTaskResult({ output: "x", metadata: { parentSessionId: 42 } })
-        .parentSessionID,
+      parseTaskResult({ output: "x", metadata: { parentSessionId: 42 } }).parentSessionID,
     ).toBeNull();
     expect(
-      parseTaskResult({ output: "x", metadata: { parentSessionID: { x: 1 } } })
-        .parentSessionID,
+      parseTaskResult({ output: "x", metadata: { parentSessionID: { x: 1 } } }).parentSessionID,
     ).toBeNull();
     expect(
-      parseTaskResult({ output: "x", metadata: { parentSessionID: null } })
-        .parentSessionID,
+      parseTaskResult({ output: "x", metadata: { parentSessionID: null } }).parentSessionID,
     ).toBeNull();
   });
 });

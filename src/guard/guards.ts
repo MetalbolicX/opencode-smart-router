@@ -1,10 +1,6 @@
-import { fingerprintToolCall } from "./fingerprint";
 import { READ_ONLY_TOOLS } from "../router/sessions";
-import {
-  FINISH_TOOLS,
-  MUTATION_TOOLS,
-  WRITE_TOOLS,
-} from "../router/tools";
+import { FINISH_TOOLS, MUTATION_TOOLS, WRITE_TOOLS } from "../router/tools";
+import { fingerprintToolCall } from "./fingerprint";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,7 +115,7 @@ export const isSelfScript = (call: GuardCall, policy: GuardPolicy): boolean => {
   }
 
   return false;
-}
+};
 
 // ---------------------------------------------------------------------------
 // classify
@@ -131,7 +127,7 @@ export const classify = (call: GuardCall, policy: GuardPolicy): GuardKind => {
   if (READ_ONLY_TOOLS.has(call.tool)) return "read";
   if (MUTATION_TOOLS.has(call.tool)) return "mutation";
   return "other";
-}
+};
 
 // ---------------------------------------------------------------------------
 // evaluateGuards
@@ -208,7 +204,7 @@ export const evaluateGuards = (
 
   // CLAUSE 7: allow
   return { allow: true, guard: null, observation: null };
-}
+};
 
 // ---------------------------------------------------------------------------
 // updateState
@@ -255,21 +251,18 @@ export const updateState = (
   // other
   state.consecutiveNonProducing += 1;
   return state;
-}
+};
 
 // ---------------------------------------------------------------------------
 // recordBlock
 // ---------------------------------------------------------------------------
 
-export const recordBlock = (
-  state: GuardState,
-  decision: GuardDecision,
-): GuardState => {
+export const recordBlock = (state: GuardState, decision: GuardDecision): GuardState => {
   state.lastBlock = decision.guard;
   state.blockedCount += 1;
   if (decision.guard === "redundant_read") state.redundantCount += 1;
   return state;
-}
+};
 
 // ---------------------------------------------------------------------------
 // forcingMessage
@@ -277,11 +270,7 @@ export const recordBlock = (
 
 export const forcingMessage = (state: GuardState, policy: GuardPolicy): string => {
   const deliverable =
-    policy.deliverableSignal == null
-      ? "n/a"
-      : state.deliverableExecuted
-        ? "ran"
-        : "NOT RUN";
+    policy.deliverableSignal == null ? "n/a" : state.deliverableExecuted ? "ran" : "NOT RUN";
 
   const next =
     policy.deliverableSignal != null && !state.deliverableExecuted
@@ -289,7 +278,7 @@ export const forcingMessage = (state: GuardState, policy: GuardPolicy): string =
       : "take a producing action (write/edit) or emit your final answer";
 
   return `[budget ${state.toolCallCount}/${state.budget} | deliverable=${deliverable} | reads_since_produce=${state.consecutiveNonProducing}] NEXT: ${next}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // trajectoryMetrics
@@ -298,8 +287,7 @@ export const forcingMessage = (state: GuardState, policy: GuardPolicy): string =
 export const trajectoryMetrics = (state: GuardState): Record<string, unknown> => {
   return {
     ttfa: state.ttfa,
-    read_exec_ratio:
-      state.execCount === 0 ? state.readCount : state.readCount / state.execCount,
+    read_exec_ratio: state.execCount === 0 ? state.readCount : state.readCount / state.execCount,
     self_script_count: state.selfScriptCount,
     tool_call_count: state.toolCallCount,
     deliverable_executed: state.deliverableExecuted,
@@ -307,7 +295,7 @@ export const trajectoryMetrics = (state: GuardState): Record<string, unknown> =>
     redundant_count: state.redundantCount,
     consecutive_non_producing: state.consecutiveNonProducing,
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // observationOk
@@ -336,4 +324,4 @@ export const observationOk = (output: unknown): boolean => {
   const s = typeof output === "string" ? output.trimStart() : "";
   if (s.length === 0) return true;
   return !ERROR_PREFIXES.some((p) => s.startsWith(p));
-}
+};

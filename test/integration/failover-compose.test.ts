@@ -7,11 +7,11 @@
  * No live models, no network.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
-import * as path from "node:path";
 import { readFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 import { validateConfig } from "../../src/router/config";
 import { assembleSystemPrompt } from "../../src/router/protocol";
@@ -26,10 +26,7 @@ let sessionCounter = 2000;
 // Fake ctx builder — mirrors ladder-wiring.test.ts harness pattern exactly.
 // ---------------------------------------------------------------------------
 
-const makeCtxCustom = (
-  dir: string,
-  promptHandler: (opts: any) => Promise<any>,
-) => {
+const makeCtxCustom = (dir: string, promptHandler: (opts: any) => Promise<any>) => {
   return {
     directory: dir,
     worktree: dir,
@@ -129,17 +126,14 @@ describe("Phase 3.3 — provider-failover / quality-escalation orthogonality", (
     };
 
     process.env.MODEL_ROUTER_ENFORCE = "1";
-    const hooks: any = await ModelRouterPlugin(
-      makeCtxCustom(dir, promptHandler) as any,
-    );
+    const hooks: any = await ModelRouterPlugin(makeCtxCustom(dir, promptHandler) as any);
 
     // Note: acceptance criteria must NOT mention "GOOD_RESULT" directly.
     // If the criteria text contains the grader check-string, the grader prompt
     // will always contain it (even for empty output) and always return pass.
     // We decouple them: criteria is neutral; GOOD_RESULT appears only in the
     // producer output, which the grader prompt embeds verbatim.
-    const acceptance =
-      "[acceptance]\ncriteria: the task output is satisfactory\n[/acceptance]";
+    const acceptance = "[acceptance]\ncriteria: the task output is satisfactory\n[/acceptance]";
     const result: string = await hooks.tool.delegate.execute({
       task: "produce something good",
       acceptance,
@@ -160,20 +154,10 @@ describe("Phase 3.3 — provider-failover / quality-escalation orthogonality", (
   // -------------------------------------------------------------------------
 
   it("CASE B: provider-failover advisory is present regardless of enforcement (orthogonal)", () => {
-    const cfg = validateConfig(
-      JSON.parse(readFileSync("tiers.json", "utf-8")),
-    );
+    const cfg = validateConfig(JSON.parse(readFileSync("tiers.json", "utf-8")));
 
-    const withoutEnf = assembleSystemPrompt(
-      cfg,
-      "anthropic/claude-haiku-4-5",
-      false,
-    );
-    const withEnf = assembleSystemPrompt(
-      cfg,
-      "anthropic/claude-haiku-4-5",
-      true,
-    );
+    const withoutEnf = assembleSystemPrompt(cfg, "anthropic/claude-haiku-4-5", false);
+    const withEnf = assembleSystemPrompt(cfg, "anthropic/claude-haiku-4-5", true);
 
     // Provider-failover chain is present without enforcement.
     expect(withoutEnf).toContain("Chain:");
@@ -227,15 +211,12 @@ describe("Phase 3.3 — provider-failover / quality-escalation orthogonality", (
     };
 
     process.env.MODEL_ROUTER_ENFORCE = "1";
-    const hooks: any = await ModelRouterPlugin(
-      makeCtxCustom(dir, promptHandler) as any,
-    );
+    const hooks: any = await ModelRouterPlugin(makeCtxCustom(dir, promptHandler) as any);
 
     // Same decoupling as Case A: criteria text must not contain the grader
     // check-string, otherwise the grader prompt always matches regardless of
     // what the producer actually returned.
-    const acceptance =
-      "[acceptance]\ncriteria: the task output is satisfactory\n[/acceptance]";
+    const acceptance = "[acceptance]\ncriteria: the task output is satisfactory\n[/acceptance]";
     const result: string = await hooks.tool.delegate.execute({
       task: "produce something",
       acceptance,

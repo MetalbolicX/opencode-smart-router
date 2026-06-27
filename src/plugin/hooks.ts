@@ -11,18 +11,23 @@
 // (`HookPayload` / `HookEventPayload`) instead of `any`.
 // ---------------------------------------------------------------------------
 
+import {
+  type BeforeResult,
+  formatScorecard,
+  guardAfterCall,
+  guardBeforeCall,
+} from "../guard/enforce";
 import { detectNarration } from "../guard/narration";
-import { formatScorecard, guardAfterCall, guardBeforeCall } from "../guard/enforce";
 import { registerTierAgents } from "../router/agents";
 import { registerRouterCommands } from "../router/commands";
-import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
+import type { Preset } from "../router/config";
 import { resolveEnforcementMode } from "../router/enforcement";
+import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
 import { READ_ONLY_TOOLS } from "../router/sessions";
-import { verifyTaskAfterHook } from "../verify/dispatch";
 import { writeTrajectoryLog } from "../utils/log";
+import { verifyTaskAfterHook } from "../verify/dispatch";
 import type { PluginContext } from "./context";
 import type { HookEventPayload, HookPayload } from "./types";
-import type { Preset } from "../router/config";
 
 // ---------------------------------------------------------------------------
 // chat.params — temperature override for open grader sessions.
@@ -41,7 +46,7 @@ export const handleChatParams = async (
   } catch {
     // best-effort: never crash a real session
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // chat.message — register tier info and initialise trajectory scorecard.
@@ -73,7 +78,7 @@ export const handleChatMessage = async (
   if (sid && ctx.sessionStore.isSubagent(sid)) {
     ctx.trajectoryStore.ensure(sid, (input?.agent as string | undefined) ?? null);
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // tool.execute.before — Layer 1 guard check; throws to abort when blocked.
@@ -90,7 +95,7 @@ export const handleToolExecuteBefore = async (
   if (!sid || !ctx.sessionStore.isSubagent(sid) || typeof tool !== "string") {
     return;
   }
-  let res;
+  let res: BeforeResult;
   try {
     res = guardBeforeCall({
       cfg: ctx.getConfig(),
@@ -114,7 +119,7 @@ export const handleToolExecuteBefore = async (
     });
     throw new Error(res.message);
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // tool.execute.after — cap banners, changed-file tracking, verify dispatch.
@@ -175,7 +180,7 @@ export const handleToolExecuteAfter = async (
   // the grader parent — grader creation simply stays parentless instead
   // (SDD change: fix-task-verifier-session-parenting).
   await verifyTaskAfterHook(ctx, input, output);
-}
+};
 
 // ---------------------------------------------------------------------------
 // experimental.text.complete — narration detection on completed text parts.
@@ -193,11 +198,9 @@ export const handleTextComplete = async (
   const found = detectNarration(text);
   if (found.length === 0) return;
 
-  const quoted = found
-    .map((m) => `"${m.slice(0, 60)}${m.length > 60 ? "…" : ""}"`)
-    .join(", ");
+  const quoted = found.map((m) => `"${m.slice(0, 60)}${m.length > 60 ? "…" : ""}"`).join(", ");
   output.text = `${text}\n\n[⚠ narration detected: ${quoted}]`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // event (session.idle) — record-only scorecard + opt-in trajectory dump.
@@ -229,7 +232,7 @@ export const handleSessionIdle = async (
   const dump = ctx.trajectoryStore.dump(sid);
   if (!dump) return;
   writeTrajectoryLog(sid, dump);
-}
+};
 
 // ---------------------------------------------------------------------------
 // experimental.chat.system.transform — inject delegation protocol for the
@@ -260,9 +263,11 @@ export const handleSystemTransform = async (
   const orchestratorModel = providerID && modelID ? `${providerID}/${modelID}` : modelID;
 
   let enfOn = false;
-  try { enfOn = resolveEnforcementMode({ config: cfg, env: process.env }).mode !== "off"; } catch {}
+  try {
+    enfOn = resolveEnforcementMode({ config: cfg, env: process.env }).mode !== "off";
+  } catch {}
   (output.system as string[]).push(assembleSystemPrompt(cfg, orchestratorModel, enfOn));
-}
+};
 
 // ---------------------------------------------------------------------------
 // config — register tier agents and router commands at load time.
@@ -278,4 +283,4 @@ export const handleConfig = async (
   // `cfg` was initialised from loadConfig() once at factory start).
   registerTierAgents(opencodeConfig, activeTiersAtLoad, ctx.initialConfig);
   registerRouterCommands(opencodeConfig);
-}
+};

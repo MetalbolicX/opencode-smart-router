@@ -13,15 +13,9 @@
  * the module itself; their only external side-effects are the SDK calls
  * (`ctx.plugin.client.session.*`) that the original index.ts already made.
  */
-import type { RouterConfig } from "../router/config";
-import { getActiveTiers } from "../router/protocol";
-import { parseDoDFromDispatch, inferDoD } from "./dod";
-import type { DoD, InferHints } from "./dod";
-import type { PluginContext } from "../plugin/context";
-import type { GateDeps } from "./gate";
-import { accept } from "./gate";
-import { resolveEnforcementMode } from "../router/enforcement";
+
 import { scrubText } from "../guard/scrub";
+import type { PluginContext } from "../plugin/context";
 import {
   asTaskToolArgs,
   extractPromptText,
@@ -29,8 +23,15 @@ import {
   type SessionCreateResult,
   type SessionPromptResult,
 } from "../plugin/types";
+import type { RouterConfig } from "../router/config";
+import { resolveEnforcementMode } from "../router/enforcement";
+import { getActiveTiers } from "../router/protocol";
 import { WRITE_TOOLS } from "../router/tools";
 import { withTimeout } from "../utils/timeout";
+import type { DoD, InferHints } from "./dod";
+import { inferDoD, parseDoDFromDispatch } from "./dod";
+import type { GateDeps } from "./gate";
+import { accept } from "./gate";
 
 export interface ChangedFile {
   path: string;
@@ -183,15 +184,12 @@ export const buildForcingNote = (
   escalation?: { producerTier?: string; nextTier?: string | null },
 ): string => {
   const body =
-    reasons.length > 0
-      ? reasons.map((r) => `- ${r}`).join("\n")
-      : "- (no reasons provided)";
-  const next =
-    escalation?.nextTier
-      ? `NEXT: address the above, then re-run via \`Task(subagent_type="${escalation.nextTier}")\`` +
-        `${escalation.producerTier ? ` (escalated from ${escalation.producerTier})` : ""}; ` +
-        `do not treat the prior result as complete.`
-      : `NEXT: address the above and re-run the delegation; do not treat the prior result as complete.`;
+    reasons.length > 0 ? reasons.map((r) => `- ${r}`).join("\n") : "- (no reasons provided)";
+  const next = escalation?.nextTier
+    ? `NEXT: address the above, then re-run via \`Task(subagent_type="${escalation.nextTier}")\`` +
+      `${escalation.producerTier ? ` (escalated from ${escalation.producerTier})` : ""}; ` +
+      `do not treat the prior result as complete.`
+    : `NEXT: address the above and re-run the delegation; do not treat the prior result as complete.`;
   return (
     `[router \u26a0 NOT ACCEPTED] The delegated result was not accepted by independent verification:\n` +
     `${body}\n` +
@@ -257,10 +255,7 @@ export const dispatchGrader = async (
 /** Assemble `GateDeps` from the live seams and config snapshot. Reads
  *  `cfg.enforcement?.verify?.require` and `cfg.enforcement?.verify?.minGraderTier`
  *  at call time so /router switches take effect on the next delegate. */
-export const buildGateDeps = (
-  ctx: PluginContext,
-  parentSessionID?: string | null,
-): GateDeps => {
+export const buildGateDeps = (ctx: PluginContext, parentSessionID?: string | null): GateDeps => {
   const cfg = ctx.getConfig();
   return {
     deterministic: {
@@ -319,17 +314,13 @@ export const verifyTaskAfterHook = async (
       description: taskArgs?.description,
     });
     const artefact = {
-      changedFiles: childSessionID
-        ? ctx.changedFileStore.get(childSessionID)
-        : [],
+      changedFiles: childSessionID ? ctx.changedFileStore.get(childSessionID) : [],
       finalReturnText,
       declaredOutputs: dod.deliverable ? [dod.deliverable] : [],
       producerSessionID: childSessionID ?? "",
       producerTier,
     };
-    const trivial = childSessionID
-      ? ctx.sessionStore.isTrivial(childSessionID)
-      : false;
+    const trivial = childSessionID ? ctx.sessionStore.isTrivial(childSessionID) : false;
     const res = await accept(
       { dod, trivial, mode: "modeA" },
       artefact,
@@ -341,8 +332,7 @@ export const verifyTaskAfterHook = async (
       const nextTier = li >= 0 && li < ladder.length - 1 ? ladder[li + 1] : null;
       const note = scrubText(buildForcingNote(res.verdict.reasons, { producerTier, nextTier }));
       const existing = output["output"];
-      output["output"] =
-        typeof existing === "string" ? existing + "\n\n" + note : note;
+      output["output"] = typeof existing === "string" ? existing + "\n\n" + note : note;
     }
     if (childSessionID) ctx.changedFileStore.clear(childSessionID);
   } catch {

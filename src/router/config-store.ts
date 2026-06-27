@@ -10,7 +10,7 @@
 // module-level cache for existing callers until PR2 task 2.7 removes it.
 // ---------------------------------------------------------------------------
 
-import { readMergedConfig, type RouterConfig } from "./config";
+import { type RouterConfig, readMergedConfig } from "./config";
 
 /**
  * Per-instance config cache. One ConfigStore per PluginContext; the cache is
@@ -47,4 +47,4 @@ export const createConfigStore = (opts: { cwd: string }): ConfigStore => {
       cached = null;
     },
   };
-}
+};

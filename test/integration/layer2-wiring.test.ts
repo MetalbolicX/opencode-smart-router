@@ -9,10 +9,10 @@
  * Option (ii) — delegate tool returns accepted vs unmet correctly.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 
 // ---------------------------------------------------------------------------
@@ -185,9 +185,7 @@ describe("Layer-2 wiring", () => {
 
     it("CASE E: returns honest unmet on deterministic FAIL", async () => {
       // Fresh temp dir, nope.txt never created.
-      const hooks: any = await ModelRouterPlugin(
-        makeCtx(dir, "I totally did it (lying).") as any,
-      );
+      const hooks: any = await ModelRouterPlugin(makeCtx(dir, "I totally did it (lying).") as any);
 
       const out: string = await hooks.tool.delegate.execute({
         task: "Write the file.\n[acceptance]\ncheck: fileExists path=nope.txt\n[/acceptance]",

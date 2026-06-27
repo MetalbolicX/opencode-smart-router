@@ -1,9 +1,6 @@
-import { describe, it, expect } from "vitest";
-import {
-  resolveEnforcementMode,
-  DEFAULT_ENV_GATE,
-} from "../../src/router/enforcement";
+import { describe, expect, it } from "vitest";
 import type { RouterConfig } from "../../src/router/config";
+import { DEFAULT_ENV_GATE, resolveEnforcementMode } from "../../src/router/enforcement";
 
 // ---------------------------------------------------------------------------
 // Helpers

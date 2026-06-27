@@ -1,18 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  type RouterConfig,
-  type TierConfig,
-  type Preset,
-} from "../../src/router/config";
-import {
-  buildRouterOutput,
-  buildTiersOutput,
   buildBudgetOutput,
   buildPresetOutput,
+  buildRouterOutput,
+  buildTiersOutput,
 } from "../../src/router/commands";
+import type { Preset, RouterConfig, TierConfig } from "../../src/router/config";
 
 let tmpHome: string;
 let origHOME: string | undefined;

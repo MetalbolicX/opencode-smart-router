@@ -12,8 +12,8 @@
 // behaviour stays byte-identical.
 // ---------------------------------------------------------------------------
 
-import { exec as nodeExec, type ExecException } from "node:child_process";
-import type { ExecSeam, ExecResult } from "../verify/types";
+import { type ExecException, exec as nodeExec } from "node:child_process";
+import type { ExecResult, ExecSeam } from "../verify/types";
 
 /** Per-call options accepted by the exec seam. */
 export interface ExecSeamOptions {
@@ -64,8 +64,7 @@ export const createExecSeam = (ctx: ExecSeamContext): ExecSeam => {
           },
           (err: ExecException | null, stdout: string, stderr: string) => {
             const timedOut = !!(err && err.killed && err.signal === "SIGTERM");
-            const code =
-              err && typeof err.code === "number" ? err.code : err ? 1 : 0;
+            const code = err && typeof err.code === "number" ? err.code : err ? 1 : 0;
             resolve({
               code,
               stdout: String(stdout ?? ""),

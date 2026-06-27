@@ -19,18 +19,17 @@
 // ---------------------------------------------------------------------------
 
 import type { PluginInput } from "@opencode-ai/plugin";
-import type { RouterConfig, Preset } from "../router/config";
+import { createGuardStore } from "../guard/store";
+import type { Preset, RouterConfig } from "../router/config";
+import { createConfigStore } from "../router/config-store";
 import { getActiveTiers } from "../router/protocol";
 import { createSessionStore } from "../router/sessions";
 import { createTrajectoryStore } from "../telemetry/trajectory";
-import { createGuardStore } from "../guard/store";
-import { createChangedFileStore } from "../verify/dispatch";
-import { createMutexRegistry } from "../verify/deterministic";
-import type { MutexRegistry } from "../verify/types";
-import { createExecSeam } from "../utils/shell";
 import { createFsSeam } from "../utils/fs";
-import type { ExecSeam, FsSeam } from "../verify/types";
-import { createConfigStore } from "../router/config-store";
+import { createExecSeam } from "../utils/shell";
+import { createMutexRegistry } from "../verify/deterministic";
+import { createChangedFileStore } from "../verify/dispatch";
+import type { ExecSeam, FsSeam, MutexRegistry } from "../verify/types";
 
 /**
  * Mutable per-plugin state that isn't a store (today: only the bypass flag).

@@ -1,15 +1,9 @@
-import {
-  evaluateGuards,
-  updateState,
-  recordBlock,
-  forcingMessage,
-  observationOk,
-} from "./guards";
-import type { GuardPolicy, GuardCall, GuardState } from "./guards";
-import { scrubText } from "./scrub";
-import { resolveEnforcementMode } from "../router/enforcement";
-import type { EnforcementMode } from "../router/enforcement";
 import type { RouterConfig } from "../router/config";
+import type { EnforcementMode } from "../router/enforcement";
+import { resolveEnforcementMode } from "../router/enforcement";
+import type { GuardCall, GuardPolicy, GuardState } from "./guards";
+import { evaluateGuards, forcingMessage, observationOk, recordBlock, updateState } from "./guards";
+import { scrubText } from "./scrub";
 
 /**
  * Default total tool-call ceiling for an enforced subagent delegation. This is a
@@ -105,7 +99,7 @@ export const guardBeforeCall = (params: {
     scrubText(`[\u26a0 GUARD:${decision.guard}] ${forcingMessage(state, policy)}`),
   );
   return { block: false, mode, guard: decision.guard };
-}
+};
 
 /**
  * Update guard state after an ALLOWED call has executed (we now know ok), and
@@ -132,4 +126,4 @@ export const guardAfterCall = (params: {
     const existing = typeof output.output === "string" ? output.output : "";
     output.output = existing ? `${existing}\n\n${note}` : note;
   }
-}
+};

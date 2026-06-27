@@ -1,16 +1,16 @@
 // test/unit/deterministic.test.ts
 // Unit tests for src/verify/deterministic.ts — all seams are faked; no real fs/exec.
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  runDeterministic,
   createMutexRegistry,
   DEFAULT_ALLOWLIST,
   FORBIDDEN_SHELL,
   isCommandAllowed,
+  runDeterministic,
   shapeMismatch,
 } from "../../src/verify/deterministic";
-import type { DoD, Check } from "../../src/verify/dod";
+import type { Check, DoD } from "../../src/verify/dod";
 import type { DeterministicDeps, ExecResult } from "../../src/verify/types";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,10 @@ describe("runDeterministic — empty checks", () => {
 describe("runDeterministic — fileExists", () => {
   it("passes when file exists", async () => {
     const deps = makeDeps({ fs: { fileExists: async () => true, readFile: async () => "{}" } });
-    const verdict = await runDeterministic(makeDoD([{ kind: "fileExists", path: "dist/out.js" }]), deps);
+    const verdict = await runDeterministic(
+      makeDoD([{ kind: "fileExists", path: "dist/out.js" }]),
+      deps,
+    );
     expect(verdict.pass).toBe(true);
     expect(verdict.method).toBe("deterministic");
     expect(verdict.evidence).toContain("exists: dist/out.js");
@@ -80,7 +83,10 @@ describe("runDeterministic — fileExists", () => {
 
   it("fails when file does not exist, reason includes 'file not found'", async () => {
     const deps = makeDeps({ fs: { fileExists: async () => false, readFile: async () => "{}" } });
-    const verdict = await runDeterministic(makeDoD([{ kind: "fileExists", path: "missing.ts" }]), deps);
+    const verdict = await runDeterministic(
+      makeDoD([{ kind: "fileExists", path: "missing.ts" }]),
+      deps,
+    );
     expect(verdict.pass).toBe(false);
     expect(verdict.reasons[0]).toContain("file not found");
     expect(verdict.reasons[0]).toContain("missing.ts");
@@ -89,7 +95,9 @@ describe("runDeterministic — fileExists", () => {
   it("fails with errored reason when fs throws", async () => {
     const deps = makeDeps({
       fs: {
-        fileExists: async () => { throw new Error("EACCES"); },
+        fileExists: async () => {
+          throw new Error("EACCES");
+        },
         readFile: async () => "{}",
       },
     });
@@ -220,7 +228,10 @@ describe("isCommandAllowed + allowlist gate", () => {
   it("run check: non-allowlisted command => fail, exec NEVER called", async () => {
     let execCalled = false;
     const deps = makeDeps({
-      exec: async (_cmd, _opts) => { execCalled = true; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (_cmd, _opts) => {
+        execCalled = true;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     const verdict = await runDeterministic(makeDoD([{ kind: "run", command: "rm -rf /" }]), deps);
     expect(verdict.pass).toBe(false);
@@ -231,7 +242,10 @@ describe("isCommandAllowed + allowlist gate", () => {
   it("chaining attempt (npm test && rm -rf /) => blocked, exec NEVER called", async () => {
     let execCalled = false;
     const deps = makeDeps({
-      exec: async (_cmd, _opts) => { execCalled = true; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (_cmd, _opts) => {
+        execCalled = true;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     const verdict = await runDeterministic(
       makeDoD([{ kind: "run", command: "npm test && rm -rf /" }]),
@@ -292,7 +306,10 @@ describe("runDeterministic — repo-command defaults", () => {
   it("testsPass uses default 'npm test' when command absent", async () => {
     let capturedCmd = "";
     const deps = makeDeps({
-      exec: async (cmd, _opts) => { capturedCmd = cmd; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (cmd, _opts) => {
+        capturedCmd = cmd;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     await runDeterministic(makeDoD([{ kind: "testsPass" }]), deps);
     expect(capturedCmd).toBe("npm test");
@@ -301,7 +318,10 @@ describe("runDeterministic — repo-command defaults", () => {
   it("buildPasses uses default 'npm run build' when command absent", async () => {
     let capturedCmd = "";
     const deps = makeDeps({
-      exec: async (cmd, _opts) => { capturedCmd = cmd; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (cmd, _opts) => {
+        capturedCmd = cmd;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     await runDeterministic(makeDoD([{ kind: "buildPasses" }]), deps);
     expect(capturedCmd).toBe("npm run build");
@@ -310,7 +330,10 @@ describe("runDeterministic — repo-command defaults", () => {
   it("lintClean uses default 'npm run lint' when command absent", async () => {
     let capturedCmd = "";
     const deps = makeDeps({
-      exec: async (cmd, _opts) => { capturedCmd = cmd; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (cmd, _opts) => {
+        capturedCmd = cmd;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     await runDeterministic(makeDoD([{ kind: "lintClean" }]), deps);
     expect(capturedCmd).toBe("npm run lint");
@@ -320,7 +343,10 @@ describe("runDeterministic — repo-command defaults", () => {
     let capturedCmd = "";
     const deps = makeDeps({
       defaults: { testCommand: "pnpm test" },
-      exec: async (cmd, _opts) => { capturedCmd = cmd; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (cmd, _opts) => {
+        capturedCmd = cmd;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     await runDeterministic(makeDoD([{ kind: "testsPass" }]), deps);
     expect(capturedCmd).toBe("pnpm test");
@@ -330,7 +356,10 @@ describe("runDeterministic — repo-command defaults", () => {
     let capturedCmd = "";
     const deps = makeDeps({
       defaults: { testCommand: "pnpm test" },
-      exec: async (cmd, _opts) => { capturedCmd = cmd; return { code: 0, stdout: "", stderr: "" }; },
+      exec: async (cmd, _opts) => {
+        capturedCmd = cmd;
+        return { code: 0, stdout: "", stderr: "" };
+      },
     });
     await runDeterministic(makeDoD([{ kind: "testsPass", command: "npx vitest run" }]), deps);
     expect(capturedCmd).toBe("npx vitest run");
@@ -539,7 +568,10 @@ describe("runDeterministic — aggregation", () => {
     let callCount = 0;
     const deps = makeDeps({
       fs: {
-        fileExists: async () => { callCount++; return callCount !== 2; }, // second call fails
+        fileExists: async () => {
+          callCount++;
+          return callCount !== 2;
+        }, // second call fails
         readFile: async () => "{}",
       },
     });
@@ -551,7 +583,7 @@ describe("runDeterministic — aggregation", () => {
       deps,
     );
     expect(verdict.pass).toBe(false);
-    expect(verdict.reasons.some(r => r.includes("file not found"))).toBe(true);
+    expect(verdict.reasons.some((r) => r.includes("file not found"))).toBe(true);
   });
 
   it("all pass => reasons=['all N deterministic checks passed'], evidence present", async () => {
@@ -595,7 +627,7 @@ describe("createMutexRegistry", () => {
   it("serializes same-key calls (start,end,start,end — never start,start)", async () => {
     const registry = createMutexRegistry();
     const log: string[] = [];
-    const delay = () => new Promise<void>(resolve => setTimeout(resolve, 10));
+    const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 
     const p1 = registry.runExclusive("key", async () => {
       log.push("start1");
@@ -620,7 +652,7 @@ describe("createMutexRegistry", () => {
   it("different keys may run concurrently", async () => {
     const registry = createMutexRegistry();
     const starts: string[] = [];
-    const delay = () => new Promise<void>(resolve => setTimeout(resolve, 10));
+    const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 
     const p1 = registry.runExclusive("a", async () => {
       starts.push("a");
@@ -659,7 +691,9 @@ describe("createMutexRegistry", () => {
 
   it("rejection propagates from runExclusive when fn throws", async () => {
     const registry = createMutexRegistry();
-    const p = registry.runExclusive("k", async () => { throw new Error("boom"); });
+    const p = registry.runExclusive("k", async () => {
+      throw new Error("boom");
+    });
     await expect(p).rejects.toThrow("boom");
   });
 });
@@ -674,10 +708,7 @@ describe("runDeterministic — secret scrubbing", () => {
     const deps = makeDeps({
       exec: async (_cmd, _opts) => ({ code: 1, stdout: "", stderr: `auth error: ${secret}` }),
     });
-    const verdict = await runDeterministic(
-      makeDoD([{ kind: "run", command: "npm test" }]),
-      deps,
-    );
+    const verdict = await runDeterministic(makeDoD([{ kind: "run", command: "npm test" }]), deps);
     expect(verdict.pass).toBe(false);
     expect(verdict.evidence).toBeDefined();
     expect(verdict.evidence).not.toContain(secret);
@@ -689,12 +720,11 @@ describe("runDeterministic — secret scrubbing", () => {
   it("redacts secrets from exec errors in reason", async () => {
     const secret = "sk-ant-ZZZZYYYY11112222333344445555666677778888";
     const deps = makeDeps({
-      exec: async (_cmd, _opts) => { throw new Error(`network error token=${secret}`); },
+      exec: async (_cmd, _opts) => {
+        throw new Error(`network error token=${secret}`);
+      },
     });
-    const verdict = await runDeterministic(
-      makeDoD([{ kind: "run", command: "npm test" }]),
-      deps,
-    );
+    const verdict = await runDeterministic(makeDoD([{ kind: "run", command: "npm test" }]), deps);
     expect(verdict.pass).toBe(false);
     expect(verdict.reasons.join(" ")).not.toContain(secret);
   });
@@ -730,16 +760,16 @@ describe("runDeterministic — Phase 5: unsupported check kind matrix", () => {
     let ranFirst = false;
     const deps = makeDeps({
       fs: {
-        fileExists: async () => { ranFirst = true; return true; },
+        fileExists: async () => {
+          ranFirst = true;
+          return true;
+        },
         readFile: async () => "{}",
       },
     });
     const dod = {
       kind: "deterministic" as const,
-      checks: [
-        { kind: "fileExists" as const, path: "a.ts" },
-        { kind: "unknownKind" as never },
-      ],
+      checks: [{ kind: "fileExists" as const, path: "a.ts" }, { kind: "unknownKind" as never }],
       criteria: [],
       deliverable: null,
       source: "explicit" as const,
@@ -790,20 +820,12 @@ describe("shapeMismatch — Phase 5: array length + element matrix", () => {
   });
 
   it("FAIL: nested object inside array — element recursion descends", () => {
-    const r = shapeMismatch(
-      [{ x: 1 }],
-      [{ x: "wrong" }],
-    );
+    const r = shapeMismatch([{ x: 1 }], [{ x: "wrong" }]);
     expect(r).not.toBeNull();
     expect(r).toContain("expected number, got string");
   });
 
   it("PASS: nested object inside array — same element type", () => {
-    expect(
-      shapeMismatch(
-        [{ x: 1 }, { x: 2 }],
-        [{ x: 10 }, { x: 20 }],
-      ),
-    ).toBeNull();
+    expect(shapeMismatch([{ x: 1 }, { x: 2 }], [{ x: 10 }, { x: 20 }])).toBeNull();
   });
 });

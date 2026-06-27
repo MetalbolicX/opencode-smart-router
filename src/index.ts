@@ -11,18 +11,18 @@ import { assembleRuntimeHooks } from "./plugin/runtime";
 // Tests import from their specific source files instead of this entry point.
 // ---------------------------------------------------------------------------
 
+export type { GuardCall, GuardDecision, GuardPolicy, GuardState } from "./guard/guards";
 export type {
+  EnforcementConfig,
+  FallbackConfig,
+  ModeConfig,
+  Preset,
   RouterConfig,
   TierConfig,
-  Preset,
-  ModeConfig,
-  FallbackConfig,
-  EnforcementConfig,
 } from "./router/config";
+export type { EnforcementMode } from "./router/enforcement";
 export type { Cap, SubagentState } from "./router/sessions";
 export type { TrajectoryState, TrajectoryToolEvent } from "./telemetry/trajectory";
-export type { EnforcementMode } from "./router/enforcement";
-export type { GuardPolicy, GuardState, GuardCall, GuardDecision } from "./guard/guards";
 
 // ---------------------------------------------------------------------------
 // Plugin factory — composition root.

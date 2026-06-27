@@ -1,16 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  dispatchGrader,
-  buildGateDeps,
-  verifyTaskAfterHook,
-} from "../../src/verify/dispatch";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { dumpDelegateScorecard } from "../../src/escalate/ladder";
 import type { PluginContext } from "../../src/plugin/context";
 import type { RouterConfig } from "../../src/router/config";
 import { createFsSeam } from "../../src/utils/fs";
+import { buildGateDeps, dispatchGrader, verifyTaskAfterHook } from "../../src/verify/dispatch";
 
 // ---------------------------------------------------------------------------
 // Slice 3 — Verification adapter contract tests.
@@ -98,7 +94,11 @@ const makeCtx = (opts: {
     getFreshConfig: () => cfg,
     state: { bypassed: false },
     sessionStore: sessionStore as any,
-    trajectoryStore: { ensure: () => undefined, recordToolEvent: () => undefined, dump: () => null } as any,
+    trajectoryStore: {
+      ensure: () => undefined,
+      recordToolEvent: () => undefined,
+      dump: () => null,
+    } as any,
     guardStore: { get: () => undefined, clear: () => undefined } as any,
     changedFileStore: {
       get: () => opts.changedFiles ?? [],
@@ -112,7 +112,7 @@ const makeCtx = (opts: {
       fs: createFsSeam({ directory: opts.directory }),
     },
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Test isolation: every test uses its own temp dir and SID.
@@ -210,9 +210,9 @@ describe("dispatchGrader", () => {
       },
     });
 
-    await expect(
-      dispatchGrader(ctx, { tier: "fast", system: "sys", prompt: "p" }),
-    ).rejects.toThrow("boom");
+    await expect(dispatchGrader(ctx, { tier: "fast", system: "sys", prompt: "p" })).rejects.toThrow(
+      "boom",
+    );
 
     expect(ctx.graderSessions.has("sess_x")).toBe(false);
   });
@@ -330,8 +330,7 @@ describe("verifyTaskAfterHook", () => {
       sessionID: "orch",
       args: {
         subagent_type: "fast",
-        prompt:
-          "Create the file.\n[acceptance]\ncheck: fileExists path=present.txt\n[/acceptance]",
+        prompt: "Create the file.\n[acceptance]\ncheck: fileExists path=present.txt\n[/acceptance]",
       },
     };
     const output = {
@@ -414,8 +413,7 @@ describe("verifyTaskAfterHook", () => {
       tool: "delegate",
       sessionID: "orch",
       args: {
-        prompt:
-          "Create the file.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+        prompt: "Create the file.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
       },
     };
     const output = {
@@ -477,11 +475,7 @@ describe("dumpDelegateScorecard", () => {
     dumpDelegateScorecard(sid, { ...base }, true, "deterministic");
     dumpDelegateScorecard(sid, { ...base, totalAttempts: 2 }, false, "checker");
 
-    const path = join(
-      tmpdir(),
-      "opencode-model-router-trajectory",
-      `${sid}.delegate.log`,
-    );
+    const path = join(tmpdir(), "opencode-model-router-trajectory", `${sid}.delegate.log`);
     const contents = readFileSync(path, "utf-8");
     const lines = contents.trim().split("\n");
     expect(lines).toHaveLength(2);
@@ -631,7 +625,9 @@ describe("verifyTaskAfterHook — narrowed shape tolerance", () => {
     const input = {
       tool: "task",
       sessionID: "orch",
-      args: { prompt: "Do something.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]" },
+      args: {
+        prompt: "Do something.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
     };
     const output = {
       output: "<task_result>\nDONE.</task_result>",

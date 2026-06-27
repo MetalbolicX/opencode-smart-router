@@ -1,9 +1,5 @@
-import type { TierConfig, Preset, RouterConfig } from "./config";
-import {
-  isClaudeModel,
-  CLAUDE_TIER_PREFIX,
-  CLAUDE_ANTI_NARRATION,
-} from "./protocol";
+import type { Preset, RouterConfig, TierConfig } from "./config";
+import { CLAUDE_ANTI_NARRATION, CLAUDE_TIER_PREFIX, isClaudeModel } from "./protocol";
 
 // ---------------------------------------------------------------------------
 // Build agent options from tier config
@@ -30,7 +26,7 @@ export const buildAgentOptions = (tier: TierConfig): Record<string, unknown> => 
   }
 
   return Object.keys(opts).length > 0 ? opts : {};
-}
+};
 
 // ---------------------------------------------------------------------------
 // Register tier agents on the opencode config object
@@ -91,4 +87,4 @@ export const registerTierAgents = (
 
     opencodeConfig.agent[name] = agentDef;
   }
-}
+};

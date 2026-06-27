@@ -1,19 +1,16 @@
-import { describe, it, expect } from "vitest";
-import { accept } from "../../src/verify/gate";
-import type { Artefact, Delegation, GateDeps } from "../../src/verify/gate";
-import type { DeterministicDeps } from "../../src/verify/types";
-import { createMutexRegistry } from "../../src/verify/deterministic";
+import { describe, expect, it } from "vitest";
 import type { CheckerDeps } from "../../src/verify/checker";
+import { createMutexRegistry } from "../../src/verify/deterministic";
 import { normalizeDoD } from "../../src/verify/dod";
+import type { Artefact, Delegation, GateDeps } from "../../src/verify/gate";
+import { accept } from "../../src/verify/gate";
+import type { DeterministicDeps } from "../../src/verify/types";
 
 // --- fakes -----------------------------------------------------------------
 
-const fakeDeterministicDeps = (opts: {
-  code?: number;
-  stdout?: string;
-  fileExists?: boolean;
-  throws?: boolean;
-} = {}): DeterministicDeps => {
+const fakeDeterministicDeps = (
+  opts: { code?: number; stdout?: string; fileExists?: boolean; throws?: boolean } = {},
+): DeterministicDeps => {
   return {
     exec: async () => {
       if (opts.throws) throw new Error("boom");
@@ -31,11 +28,9 @@ const fakeDeterministicDeps = (opts: {
   };
 };
 
-const fakeCheckerDeps = (opts: {
-  pass?: boolean;
-  graderSessionID?: string;
-  throws?: boolean;
-} = {}): CheckerDeps => {
+const fakeCheckerDeps = (
+  opts: { pass?: boolean; graderSessionID?: string; throws?: boolean } = {},
+): CheckerDeps => {
   return {
     dispatchGrader: async () => {
       if (opts.throws) throw new Error("grader down");
@@ -118,7 +113,13 @@ describe("accept() — gate policy", () => {
   });
 
   it("2b. trivial + auto-inferred checkable DoD => skip + accept, grader NOT called (GA-6)", async () => {
-    const dod = normalizeDoD({ kind: "checker", checks: [], criteria: ["the result is correct"], deliverable: null, source: "inferred" });
+    const dod = normalizeDoD({
+      kind: "checker",
+      checks: [],
+      criteria: ["the result is correct"],
+      deliverable: null,
+      source: "inferred",
+    });
     let graderCalls = 0;
     const d = deps();
     d.checker = {
@@ -136,11 +137,20 @@ describe("accept() — gate policy", () => {
   });
 
   it("2c. trivial + EXPLICIT checkable DoD => still verified (explicit overrides trivial)", async () => {
-    const dod = normalizeDoD({ kind: "checker", checks: [], criteria: ["the result is correct"], deliverable: null, source: "explicit" });
+    const dod = normalizeDoD({
+      kind: "checker",
+      checks: [],
+      criteria: ["the result is correct"],
+      deliverable: null,
+      source: "explicit",
+    });
     const d = deps();
     d.checker = {
       ...d.checker,
-      dispatchGrader: async () => ({ sessionID: "grader_sess", text: '{"pass":false,"reasons":["nope"]}' }),
+      dispatchGrader: async () => ({
+        sessionID: "grader_sess",
+        text: '{"pass":false,"reasons":["nope"]}',
+      }),
     };
     const r = await accept({ dod, trivial: true }, artefact(), d);
     expect(r.accepted).toBe(false);
@@ -298,30 +308,21 @@ describe("accept() — Phase 5: verify.require matrix", () => {
   });
 
   it("require:'whenDoDPresent' + checkable DoD => verifies (default)", async () => {
-    const r = await runRequire(
-      "whenDoDPresent",
-      fakeDeterministicDeps({ fileExists: true }),
-    );
+    const r = await runRequire("whenDoDPresent", fakeDeterministicDeps({ fileExists: true }));
     expect(r.accepted).toBe(true);
     expect(r.verdict.method).toBe("deterministic");
     expect(r.verdict.skipped).toBeFalsy();
   });
 
   it("require:'always' + checkable DoD => verifies, no skip", async () => {
-    const r = await runRequire(
-      "always",
-      fakeDeterministicDeps({ fileExists: true }),
-    );
+    const r = await runRequire("always", fakeDeterministicDeps({ fileExists: true }));
     expect(r.accepted).toBe(true);
     expect(r.verdict.method).toBe("deterministic");
     expect(r.verdict.skipped).toBeFalsy();
   });
 
   it("require: undefined => defaults to 'whenDoDPresent'", async () => {
-    const r = await runRequire(
-      undefined,
-      fakeDeterministicDeps({ fileExists: true }),
-    );
+    const r = await runRequire(undefined, fakeDeterministicDeps({ fileExists: true }));
     expect(r.accepted).toBe(true);
     expect(r.verdict.method).toBe("deterministic");
   });
@@ -330,38 +331,26 @@ describe("accept() — Phase 5: verify.require matrix", () => {
   it("require: 'sometimes' (unknown) => coerced to 'always' (fail closed)", async () => {
     // 'always' means verify — so a DoD that fails the check must produce
     // accepted:false, not the 'never'-style accept-with-skip.
-    const r = await runRequire(
-      "sometimes",
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire("sometimes", fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(false);
     expect(r.verdict.skipped).toBeFalsy();
     expect(r.verdict.method).toBe("deterministic");
   });
 
   it("require: '' (empty) => coerced to 'always' (fail closed)", async () => {
-    const r = await runRequire(
-      "",
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire("", fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(false);
     expect(r.verdict.skipped).toBeFalsy();
   });
 
   it("require: null => coerced to 'always' (fail closed)", async () => {
-    const r = await runRequire(
-      null,
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire(null, fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(false);
     expect(r.verdict.skipped).toBeFalsy();
   });
 
   it("require: 42 (non-string) => coerced to 'always' (fail closed)", async () => {
-    const r = await runRequire(
-      42,
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire(42, fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(false);
     expect(r.verdict.skipped).toBeFalsy();
   });
@@ -369,10 +358,7 @@ describe("accept() — Phase 5: verify.require matrix", () => {
   it("require: 'NEVER' (case-sensitive) => coerced to 'always' (fail closed)", async () => {
     // Phase 5: the coercion is type-strict, not case-insensitive. An
     // uppercased "NEVER" is unknown, so it fails closed to "always".
-    const r = await runRequire(
-      "NEVER",
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire("NEVER", fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(false);
     expect(r.verdict.skipped).toBeFalsy();
   });
@@ -380,10 +366,7 @@ describe("accept() — Phase 5: verify.require matrix", () => {
   it("require: 'never' (the only escape hatch) still skips", async () => {
     // Even on a failing check, 'never' must still skip — the value is in
     // the allowed set, so the gate's disable branch runs as before.
-    const r = await runRequire(
-      "never",
-      fakeDeterministicDeps({ fileExists: false }),
-    );
+    const r = await runRequire("never", fakeDeterministicDeps({ fileExists: false }));
     expect(r.accepted).toBe(true);
     expect(r.verdict.skipped).toBe(true);
   });

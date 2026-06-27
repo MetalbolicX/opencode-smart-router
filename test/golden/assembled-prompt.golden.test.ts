@@ -1,14 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { RouterConfig } from "../../src/router/config";
 import { validateConfig } from "../../src/router/config";
 import { assembleSystemPrompt } from "../../src/router/protocol";
-import type { RouterConfig } from "../../src/router/config";
 
 describe("assembled-prompt golden", () => {
-  const raw = JSON.parse(
-    readFileSync(join(process.cwd(), "tiers.json"), "utf-8"),
-  );
+  const raw = JSON.parse(readFileSync(join(process.cwd(), "tiers.json"), "utf-8"));
   const base = validateConfig(raw);
 
   const modelCases: Array<{ label: string; modelID: string | undefined }> = [

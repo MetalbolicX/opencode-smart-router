@@ -2,9 +2,9 @@
 // Deterministic verifier: runs DoD checks using injected seams (no real fs/exec imports).
 // PURE: no Node built-ins; all I/O goes through DeterministicDeps seams.
 
-import type { Check, DoD } from "./dod";
-import type { Verdict, DeterministicDeps, MutexRegistry, ExecResult } from "./types";
 import { scrubText } from "../guard/scrub";
+import type { Check, DoD } from "./dod";
+import type { DeterministicDeps, ExecResult, MutexRegistry, Verdict } from "./types";
 
 // ---------------------------------------------------------------------------
 // MutexRegistry — per-key serialization via promise-chaining
@@ -15,9 +15,18 @@ export const createMutexRegistry = (): MutexRegistry => {
   return {
     runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
       const prev = chains.get(key) ?? Promise.resolve();
-      const run = prev.then(() => fn(), () => fn());
+      const run = prev.then(
+        () => fn(),
+        () => fn(),
+      );
       // Tail swallows errors so the lock never wedges; run still rejects/resolves with fn's result.
-      chains.set(key, run.then(() => {}, () => {}));
+      chains.set(
+        key,
+        run.then(
+          () => {},
+          () => {},
+        ),
+      );
       return run;
     },
   };
@@ -28,8 +37,18 @@ export const createMutexRegistry = (): MutexRegistry => {
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_ALLOWLIST = [
-  "npm", "npx", "pnpm", "yarn", "bun", "node",
-  "tsc", "tsx", "vitest", "jest", "eslint", "prettier",
+  "npm",
+  "npx",
+  "pnpm",
+  "yarn",
+  "bun",
+  "node",
+  "tsc",
+  "tsx",
+  "vitest",
+  "jest",
+  "eslint",
+  "prettier",
 ];
 
 // Any shell-chaining / redirection / substitution metacharacter.
@@ -39,7 +58,15 @@ export const FORBIDDEN_SHELL = /[;&|`$><\n]|\$\(|&&|\|\|/;
 // Interpreters that can execute arbitrary inline code via a flag. An allowlisted
 // interpreter must not be turned into an arbitrary-code runner (e.g. `node -e ...`).
 const INTERPRETERS = new Set([
-  "node", "deno", "bun", "tsx", "ts-node", "python", "python3", "ruby", "perl",
+  "node",
+  "deno",
+  "bun",
+  "tsx",
+  "ts-node",
+  "python",
+  "python3",
+  "ruby",
+  "perl",
 ]);
 // Inline-eval / inline-print flags: -e, -c, -p, --eval, --print (with optional =value).
 const EVAL_FLAG_RE = /^-(e|c|p)$|^--(eval|print)(=|$)/i;
@@ -66,11 +93,7 @@ export const isCommandAllowed = (command: string, allowlist: string[]): boolean 
 // Shape check (exported for unit testing)
 // ---------------------------------------------------------------------------
 
-export const shapeMismatch = (
-  schemaVal: unknown,
-  targetVal: unknown,
-  path = "",
-): string | null => {
+export const shapeMismatch = (schemaVal: unknown, targetVal: unknown, path = ""): string | null => {
   if (schemaVal !== null && typeof schemaVal === "object" && !Array.isArray(schemaVal)) {
     // schema is a plain object
     if (targetVal === null || typeof targetVal !== "object" || Array.isArray(targetVal)) {
@@ -98,11 +121,7 @@ export const shapeMismatch = (
       return `${path || "<root>"}: expected array length ${schemaVal.length}, got ${targetVal.length}`;
     }
     for (let i = 0; i < schemaVal.length; i++) {
-      const nested = shapeMismatch(
-        schemaVal[i],
-        targetVal[i],
-        `${path || "<root>"}[${i}].`,
-      );
+      const nested = shapeMismatch(schemaVal[i], targetVal[i], `${path || "<root>"}[${i}].`);
       if (nested !== null) return nested;
     }
     return null;
@@ -324,15 +343,13 @@ export const runDeterministic = async (dod: DoD, deps: DeterministicDeps): Promi
     results.push(result);
   }
 
-  const allPass = results.every(r => r.ok);
+  const allPass = results.every((r) => r.ok);
 
   const reasons: string[] = allPass
     ? [`all ${checks.length} deterministic checks passed`]
-    : results
-        .filter(r => !r.ok)
-        .map(r => scrubText(r.reason ?? "check failed"));
+    : results.filter((r) => !r.ok).map((r) => scrubText(r.reason ?? "check failed"));
 
-  const evidenceParts = results.map(r => r.evidence ?? "").filter(e => e.length > 0);
+  const evidenceParts = results.map((r) => r.evidence ?? "").filter((e) => e.length > 0);
   const rawEvidence = evidenceParts.length > 0 ? evidenceParts.join("\n---\n") : undefined;
   const evidence = rawEvidence !== undefined ? scrubText(rawEvidence) : undefined;
 

@@ -5,8 +5,8 @@
 // Producer != grader is enforced structurally (GraderDispatch MUST create a FRESH session
 // each call) AND defensively here by sessionID inequality check (step 5).
 
-import type { Verdict } from "./types";
 import { scrubText } from "../guard/scrub";
+import type { Verdict } from "./types";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -30,13 +30,11 @@ export interface GraderResult {
 }
 
 /** MUST create a FRESH session each call */
-export interface GraderDispatch {
-  (req: GraderRequest): Promise<GraderResult>;
-}
+export type GraderDispatch = (req: GraderRequest) => Promise<GraderResult>;
 
 export interface CheckerDeps {
   dispatchGrader: GraderDispatch;
-  ladder?: string[];             // default ["fast","medium","heavy"]
+  ladder?: string[]; // default ["fast","medium","heavy"]
   minGraderTier?: string | null; // optional floor
 }
 
@@ -58,7 +56,7 @@ export const tierRank = (tier: string, ladder: string[]): number => {
 
 export const atLeastProducerTier = (
   producerTier: string,
-  opts?: { ladder?: string[]; minGraderTier?: string | null }
+  opts?: { ladder?: string[]; minGraderTier?: string | null },
 ): string => {
   const ladder = opts?.ladder ?? ["fast", "medium", "heavy"];
   let idx = tierRank(producerTier, ladder);

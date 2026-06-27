@@ -1,18 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  tierRank,
-  resolveStartTier,
-  newLadderState,
-  recordAttempt,
-  nextTierAfter,
-  buildLadderForcingMessage,
-  nextAction,
   advance,
   buildEscalatePolicy,
-  formatLadderScorecard,
+  buildLadderForcingMessage,
   type EscalatePolicy,
+  formatLadderScorecard,
   type LadderState,
   type LadderVerdict,
+  newLadderState,
+  nextAction,
+  nextTierAfter,
+  recordAttempt,
+  resolveStartTier,
+  tierRank,
 } from "../../src/escalate/ladder";
 import type { RouterConfig } from "../../src/router/config";
 
@@ -21,7 +21,7 @@ import type { RouterConfig } from "../../src/router/config";
 // ---------------------------------------------------------------------------
 
 const mulberry32 = (seed: number) => {
-  return function () {
+  return () => {
     seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -41,9 +41,7 @@ const makePolicy = (overrides: Partial<EscalatePolicy> = {}): EscalatePolicy => 
   };
 };
 
-const makeState = (
-  overrides: Partial<LadderState> = {},
-): LadderState => {
+const makeState = (overrides: Partial<LadderState> = {}): LadderState => {
   const base: LadderState = {
     currentTier: "fast",
     attemptsThisTier: 0,
@@ -266,9 +264,7 @@ describe("nextTierAfter", () => {
 describe("buildLadderForcingMessage", () => {
   it("includes header line", () => {
     const msg = buildLadderForcingMessage(["reason A"]);
-    expect(msg).toContain(
-      "[router escalation] previous attempt did not pass verification:",
-    );
+    expect(msg).toContain("[router escalation] previous attempt did not pass verification:");
   });
 
   it("includes NEXT line", () => {
@@ -1046,4 +1042,3 @@ describe("nextAction — AbortSignal guard", () => {
     }
   });
 });
-

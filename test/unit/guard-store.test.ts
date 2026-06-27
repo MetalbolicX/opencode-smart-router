@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { createGuardStore } from "../../src/guard/store";
+import { describe, expect, it } from "vitest";
 import type { GuardPolicy } from "../../src/guard/guards";
+import { createGuardStore } from "../../src/guard/store";
 
 const basePolicy: GuardPolicy = {
   budget: 10,

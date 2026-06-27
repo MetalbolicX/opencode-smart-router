@@ -13,5 +13,5 @@
 
 export * from "./config.types";
 export * from "./config-loader";
-export * from "./config-validate";
 export * from "./config-state";
+export * from "./config-validate";

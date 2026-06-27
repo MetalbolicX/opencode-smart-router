@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  formatScorecard,
-  guardBeforeCall,
   buildGuardPolicy,
+  formatScorecard,
   type GuardStoreLike,
+  guardBeforeCall,
 } from "../../src/guard/enforce";
-import { newGuardState, type GuardState, type GuardPolicy } from "../../src/guard/guards";
+import { type GuardPolicy, type GuardState, newGuardState } from "../../src/guard/guards";
 import type { RouterConfig } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import type { RouterConfig, Preset, ModeConfig } from "./config";
+import type { ModeConfig, Preset, RouterConfig } from "./config";
 
 // ---------------------------------------------------------------------------
 // Tier / mode helpers
@@ -6,12 +6,12 @@ import type { RouterConfig, Preset, ModeConfig } from "./config";
 
 export const getActiveTiers = (cfg: RouterConfig): Preset => {
   return cfg.presets[cfg.activePreset] ?? Object.values(cfg.presets)[0]!;
-}
+};
 
 export const getActiveMode = (cfg: RouterConfig): ModeConfig | undefined => {
   if (!cfg.modes || !cfg.activeMode) return undefined;
   return cfg.modes[cfg.activeMode];
-}
+};
 
 // ---------------------------------------------------------------------------
 // Fallback instructions builder
@@ -22,29 +22,25 @@ export const buildFallbackInstructions = (cfg: RouterConfig): string => {
   if (!fb) return "";
 
   const presetMap = fb.presets?.[cfg.activePreset];
-  const map =
-    presetMap && Object.keys(presetMap).length > 0 ? presetMap : fb.global;
+  const map = presetMap && Object.keys(presetMap).length > 0 ? presetMap : fb.global;
   if (!map) return "";
 
   const chains = Object.entries(map).flatMap(([provider, presetOrder]) => {
     if (!Array.isArray(presetOrder)) return [];
-    const valid = presetOrder.filter(
-      (p) => p !== cfg.activePreset && Boolean(cfg.presets[p]),
-    );
+    const valid = presetOrder.filter((p) => p !== cfg.activePreset && Boolean(cfg.presets[p]));
     return valid.length > 0 ? [`${provider}→${valid.join("→")}`] : [];
   });
 
   if (chains.length === 0) return "";
   return `Err→retry-alt-tier→fail→direct. Chain: ${chains.join(" | ")}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Cost & taxonomy builders
 // ---------------------------------------------------------------------------
 
 export const buildTaskTaxonomy = (cfg: RouterConfig): string => {
-  if (!cfg.taskPatterns || Object.keys(cfg.taskPatterns).length === 0)
-    return "";
+  if (!cfg.taskPatterns || Object.keys(cfg.taskPatterns).length === 0) return "";
   const lines = ["R:"];
   for (const [tier, patterns] of Object.entries(cfg.taskPatterns)) {
     if (Array.isArray(patterns) && patterns.length > 0) {
@@ -52,7 +48,7 @@ export const buildTaskTaxonomy = (cfg: RouterConfig): string => {
     }
   }
   return lines.join(" ");
-}
+};
 
 /**
  * Injects a multi-phase decomposition hint into the delegation protocol.
@@ -70,15 +66,13 @@ export const buildDecomposeHint = (cfg: RouterConfig): string => {
   if (entries.length < 2) return "";
 
   // Sort by costRatio ascending to find cheapest (explore) and next (execute) tiers
-  const sorted = [...entries].sort(
-    ([, a], [, b]) => (a.costRatio ?? 1) - (b.costRatio ?? 1),
-  );
+  const sorted = [...entries].sort(([, a], [, b]) => (a.costRatio ?? 1) - (b.costRatio ?? 1));
   const cheapest = sorted[0]?.[0];
   const mid = sorted[1]?.[0];
   if (!cheapest || !mid) return "";
 
   return `Multi-phase: prefer explore(@${cheapest})→execute(@${mid}) when phases are separable. Cheapest-first when practical.`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // System prompt builder
@@ -103,9 +97,7 @@ export const buildDelegationProtocol = (cfg: RouterConfig): string => {
   const taxonomy = buildTaskTaxonomy(cfg);
   const decompose = buildDecomposeHint(cfg);
 
-  const effectiveRules = mode?.overrideRules?.length
-    ? mode.overrideRules
-    : cfg.rules;
+  const effectiveRules = mode?.overrideRules?.length ? mode.overrideRules : cfg.rules;
   const rulesLine = effectiveRules.map((r, i) => `${i + 1}.${r}`).join(" ");
 
   const fallback = buildFallbackInstructions(cfg);
@@ -150,7 +142,7 @@ export const buildDelegationProtocol = (cfg: RouterConfig): string => {
     ``,
     `Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.`,
   ].join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // Claude-model adversarial prefixes
@@ -170,8 +162,8 @@ export const isClaudeModel = (modelID: string | undefined): boolean => {
   if (!modelID) return false;
   const s = modelID.toLowerCase();
   if (s.startsWith("anthropic/")) return true;
-  return /\/claude-/.test(s) || /(^|[\/\-])claude-/.test(s);
-}
+  return /\/claude-/.test(s) || /(^|[/-])claude-/.test(s);
+};
 
 /** Per-tier adversarial openers. @fast/@medium use Tom 2 (scoping); @heavy uses Tom 1 (override). */
 export const CLAUDE_TIER_PREFIX: Record<string, string> = {
@@ -238,11 +230,11 @@ export const CLAUDE_ORCHESTRATOR_PREFIX = [
 export const CLAUDE_ANTI_NARRATION = [
   "ANTI-NARRATION — do NOT write progress commentary in your response or",
   "thinking output. Forbidden phrasings include:",
-  "  - \"Still writing the X function...\"",
-  "  - \"Now I'll implement Y...\"",
-  "  - \"Let me add Z...\"",
-  "  - \"Continuing with W...\"",
-  "  - \"Going to fix V...\"",
+  '  - "Still writing the X function..."',
+  '  - "Now I\'ll implement Y..."',
+  '  - "Let me add Z..."',
+  '  - "Continuing with W..."',
+  '  - "Going to fix V..."',
   "",
   "Each of these signals planning without production. If you write one, the",
   "NEXT tokens MUST contain the actual artifact (the code, the edit, the",
@@ -268,22 +260,22 @@ export const buildDoDProtocolSection = (cfg: RouterConfig): string => {
     : "If you omit the block, a minimal DoD is auto-inferred from the task type.";
   return [
     "### Acceptance / Definition of Done (enforcement is ON)",
-    "Non-trivial delegations are independently verified before their result is accepted (producer \u2260 grader; grader \u2265 producer tier). Attach an acceptance block to your dispatch so the gate knows what \"done\" means:",
+    'Non-trivial delegations are independently verified before their result is accepted (producer \u2260 grader; grader \u2265 producer tier). Attach an acceptance block to your dispatch so the gate knows what "done" means:',
     "",
     "[acceptance]",
     "check: testsPass",
     "check: buildPasses",
     "check: fileExists path=src/foo.ts",
-    "check: run command=\"node -e ...\" expect=OK",
+    'check: run command="node -e ..." expect=OK',
     "criteria: <plain-language success condition>",
     "deliverable: <path or short description>",
     "[/acceptance]",
     "",
-    "- check kinds: testsPass | buildPasses | lintClean | fileExists path=\u2026 | schemaMatch path=\u2026 schema=\u2026 | run command=\"\u2026\" expect=\u2026",
+    '- check kinds: testsPass | buildPasses | lintClean | fileExists path=\u2026 | schemaMatch path=\u2026 schema=\u2026 | run command="\u2026" expect=\u2026',
     "- " + omitLine,
     "- A failing DoD causes the result to be rejected and retried/escalated, not silently accepted.",
   ].join("\n");
-}
+};
 
 /**
  * Assembles the full system prompt injected by the experimental.chat.system.transform hook.
@@ -303,4 +295,4 @@ export const assembleSystemPrompt = (
   return isClaudeModel(orchestratorModel)
     ? `${CLAUDE_ORCHESTRATOR_PREFIX}\n\n${CLAUDE_ANTI_NARRATION}\n\n---\n\n${delegationProtocol}${dodSection}`
     : `${delegationProtocol}${dodSection}`;
-}
+};

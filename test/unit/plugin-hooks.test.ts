@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PluginContext } from "../../src/plugin/context";
-import type { HookEventPayload, HookPayload } from "../../src/plugin/types";
-import type { RouterConfig, Preset } from "../../src/router/config";
 import {
   handleChatMessage,
   handleChatParams,
@@ -16,6 +14,8 @@ import {
   handleToolExecuteAfter,
   handleToolExecuteBefore,
 } from "../../src/plugin/hooks";
+import type { HookEventPayload, HookPayload } from "../../src/plugin/types";
+import type { Preset, RouterConfig } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------
 // Module spy for `verifyTaskAfterHook`.
@@ -219,7 +219,7 @@ const makeHarness = (opts?: {
   };
 
   return harness;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Fail-soft: every handler tolerates undefined / partial input.
@@ -228,16 +228,28 @@ const makeHarness = (opts?: {
 describe("hook handlers — fail-soft on bad input", () => {
   it("handleChatParams does not throw on undefined input", async () => {
     const { ctx } = makeHarness();
-    await expect(handleChatParams(ctx, undefined as unknown as HookPayload, {})).resolves.toBeUndefined();
-    await expect(handleChatParams(ctx, {}, undefined as unknown as HookPayload)).resolves.toBeUndefined();
-    await expect(handleChatParams(ctx, null as unknown as HookPayload, null as unknown as HookPayload)).resolves.toBeUndefined();
+    await expect(
+      handleChatParams(ctx, undefined as unknown as HookPayload, {}),
+    ).resolves.toBeUndefined();
+    await expect(
+      handleChatParams(ctx, {}, undefined as unknown as HookPayload),
+    ).resolves.toBeUndefined();
+    await expect(
+      handleChatParams(ctx, null as unknown as HookPayload, null as unknown as HookPayload),
+    ).resolves.toBeUndefined();
   });
 
   it("handleChatMessage does not throw on undefined input", async () => {
     const { ctx } = makeHarness();
-    await expect(handleChatMessage(ctx, undefined as unknown as HookPayload, {})).resolves.toBeUndefined();
-    await expect(handleChatMessage(ctx, {}, undefined as unknown as HookPayload)).resolves.toBeUndefined();
-    await expect(handleChatMessage(ctx, null as unknown as HookPayload, null as unknown as HookPayload)).resolves.toBeUndefined();
+    await expect(
+      handleChatMessage(ctx, undefined as unknown as HookPayload, {}),
+    ).resolves.toBeUndefined();
+    await expect(
+      handleChatMessage(ctx, {}, undefined as unknown as HookPayload),
+    ).resolves.toBeUndefined();
+    await expect(
+      handleChatMessage(ctx, null as unknown as HookPayload, null as unknown as HookPayload),
+    ).resolves.toBeUndefined();
   });
 
   it("handleToolExecuteBefore does not throw on undefined input", async () => {
@@ -246,7 +258,11 @@ describe("hook handlers — fail-soft on bad input", () => {
       handleToolExecuteBefore(ctx, undefined as unknown as HookPayload, {}),
     ).resolves.toBeUndefined();
     await expect(
-      handleToolExecuteBefore(ctx, { sessionID: "sid-x", tool: "read" }, undefined as unknown as HookPayload),
+      handleToolExecuteBefore(
+        ctx,
+        { sessionID: "sid-x", tool: "read" },
+        undefined as unknown as HookPayload,
+      ),
     ).resolves.toBeUndefined();
     await expect(
       handleToolExecuteBefore(ctx, null as unknown as HookPayload, null as unknown as HookPayload),
@@ -268,10 +284,14 @@ describe("hook handlers — fail-soft on bad input", () => {
 
   it("handleTextComplete does not throw on undefined/empty input", async () => {
     const { ctx } = makeHarness();
-    await expect(handleTextComplete(ctx, undefined as unknown as HookPayload, {})).resolves.toBeUndefined();
+    await expect(
+      handleTextComplete(ctx, undefined as unknown as HookPayload, {}),
+    ).resolves.toBeUndefined();
     await expect(handleTextComplete(ctx, {}, { text: "" })).resolves.toBeUndefined();
     await expect(handleTextComplete(ctx, {}, { text: "short" })).resolves.toBeUndefined();
-    await expect(handleTextComplete(ctx, null as unknown as HookPayload, null as unknown as HookPayload)).resolves.toBeUndefined();
+    await expect(
+      handleTextComplete(ctx, null as unknown as HookPayload, null as unknown as HookPayload),
+    ).resolves.toBeUndefined();
   });
 
   it("handleSessionIdle ignores events that are not session.idle", async () => {
@@ -279,10 +299,10 @@ describe("hook handlers — fail-soft on bad input", () => {
     await expect(
       handleSessionIdle(ctx, { event: { type: "session.created" } }),
     ).resolves.toBeUndefined();
+    await expect(handleSessionIdle(ctx, { event: undefined })).resolves.toBeUndefined();
     await expect(
-      handleSessionIdle(ctx, { event: undefined }),
+      handleSessionIdle(ctx, undefined as unknown as HookEventPayload),
     ).resolves.toBeUndefined();
-    await expect(handleSessionIdle(ctx, undefined as unknown as HookEventPayload)).resolves.toBeUndefined();
   });
 
   it("handleSystemTransform does not throw on partial/empty input that includes a system array", async () => {
@@ -294,9 +314,7 @@ describe("hook handlers — fail-soft on bad input", () => {
     await expect(
       handleSystemTransform(ctx, undefined as unknown as HookPayload, { system: [] }),
     ).resolves.toBeUndefined();
-    await expect(
-      handleSystemTransform(ctx, {}, { system: [] }),
-    ).resolves.toBeUndefined();
+    await expect(handleSystemTransform(ctx, {}, { system: [] })).resolves.toBeUndefined();
     await expect(
       handleSystemTransform(ctx, null as unknown as HookPayload, { system: [] }),
     ).resolves.toBeUndefined();
@@ -327,11 +345,7 @@ describe("hook handlers — bypass mode short-circuits", () => {
   it("handleToolExecuteBefore returns early when bypassed", async () => {
     const h = makeHarness();
     h.ctx.state.bypassed = true;
-    await handleToolExecuteBefore(
-      h.ctx,
-      { sessionID: "sid-A1", tool: "write" },
-      { args: {} },
-    );
+    await handleToolExecuteBefore(h.ctx, { sessionID: "sid-A1", tool: "write" }, { args: {} });
     // The store method is not consulted when bypassed.
     expect(h.guardBeforeCalls).toHaveLength(0);
   });
@@ -373,11 +387,7 @@ describe("hook handlers — order: chat.message registers before system.transfor
     const h = makeHarness();
 
     // 1) chat.message runs first — it registers the tier for sid-A1.
-    await handleChatMessage(
-      h.ctx,
-      { sessionID: "sid-A1", agent: "fast" },
-      {},
-    );
+    await handleChatMessage(h.ctx, { sessionID: "sid-A1", agent: "fast" }, {});
     expect(h.registerFromChatMessageCalls).toBe(1);
 
     // 2) system.transform then runs — it queries isSubagent(sid-A1).
@@ -394,17 +404,9 @@ describe("hook handlers — order: chat.message registers before system.transfor
 
   it("for non-subagent sessions, system.transform pushes the delegation prompt", async () => {
     const h = makeHarness();
-    await handleChatMessage(
-      h.ctx,
-      { sessionID: "sid-OTHER", agent: "fast" },
-      {},
-    );
+    await handleChatMessage(h.ctx, { sessionID: "sid-OTHER", agent: "fast" }, {});
     const out = { system: [] as string[] };
-    await handleSystemTransform(
-      h.ctx,
-      { sessionID: "sid-OTHER" },
-      out,
-    );
+    await handleSystemTransform(h.ctx, { sessionID: "sid-OTHER" }, out);
     expect(out.system.length).toBeGreaterThan(0);
   });
 });
@@ -451,11 +453,7 @@ describe("handleToolExecuteBefore — guard block throws", () => {
     // fail-soft contract: an unknown tool name on a non-subagent
     // session returns early without throwing.
     await expect(
-      handleToolExecuteBefore(
-        h.ctx,
-        { sessionID: "sid-X", tool: "read" },
-        { args: {} },
-      ),
+      handleToolExecuteBefore(h.ctx, { sessionID: "sid-X", tool: "read" }, { args: {} }),
     ).resolves.toBeUndefined();
   });
 });
@@ -586,11 +584,7 @@ describe("handleSystemTransform — bypass and subagent short-circuits", () => {
   it("injects the delegation prompt for the primary orchestrator", async () => {
     const h = makeHarness();
     const out = { system: [] as string[] };
-    await handleSystemTransform(
-      h.ctx,
-      { sessionID: "sid-NEW" },
-      out,
-    );
+    await handleSystemTransform(h.ctx, { sessionID: "sid-NEW" }, out);
     expect(out.system.length).toBeGreaterThan(0);
   });
 
@@ -620,14 +614,7 @@ describe("handleConfig — registers tier agents and router commands", () => {
     const opencodeConfig: any = {};
     await handleConfig(h.ctx, h.ctx.activeTiersAtLoad, opencodeConfig);
     expect(typeof opencodeConfig.command).toBe("object");
-    for (const name of [
-      "tiers",
-      "preset",
-      "budget",
-      "bypass",
-      "annotate-plan",
-      "router",
-    ]) {
+    for (const name of ["tiers", "preset", "budget", "bypass", "annotate-plan", "router"]) {
       expect(opencodeConfig.command[name]).toBeDefined();
       expect(typeof opencodeConfig.command[name].template).toBe("string");
       expect(typeof opencodeConfig.command[name].description).toBe("string");

@@ -8,10 +8,10 @@
  * No live models, no network.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 
 // ---------------------------------------------------------------------------
@@ -46,8 +46,7 @@ const makeCtxWithQueues = (
           if (opts?.body?.system !== undefined) {
             // GRADER call (dispatchGrader always sets body.system)
             if (counters) counters.grader++;
-            const text =
-              graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
+            const text = graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
             return { data: { parts: [{ type: "text", text }] } };
           }
           // PRODUCER call
@@ -183,9 +182,7 @@ describe("Mode A end-to-end enforcement loop", () => {
 
   it("Mode A proportional GA-6: trivial fast Option(i) task NOT verified (grader uncalled, output unchanged)", async () => {
     const counters = { grader: 0 };
-    const hooks: any = await ModelRouterPlugin(
-      makeCtxWithQueues(dir, [], [], counters) as any,
-    );
+    const hooks: any = await ModelRouterPlugin(makeCtxWithQueues(dir, [], [], counters) as any);
 
     process.env.MODEL_ROUTER_ENFORCE = "1";
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { fingerprintToolCall } from "../../src/guard/fingerprint";
 
 describe("fingerprintToolCall", () => {
@@ -15,7 +15,9 @@ describe("fingerprintToolCall", () => {
   });
 
   it("glob: uses pattern + path", () => {
-    expect(fingerprintToolCall("glob", { pattern: "**/*.ts", path: "src" })).toBe("glob:**/*.ts:src");
+    expect(fingerprintToolCall("glob", { pattern: "**/*.ts", path: "src" })).toBe(
+      "glob:**/*.ts:src",
+    );
     expect(fingerprintToolCall("glob", { pattern: "**/*.ts" })).toBe("glob:**/*.ts:");
   });
 

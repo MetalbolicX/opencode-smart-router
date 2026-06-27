@@ -1,13 +1,8 @@
+import type { PluginContext } from "../plugin/context";
 import type { RouterConfig } from "./config";
+import { resolvePresetName, saveActiveMode, saveActivePreset, saveEnforcementMode } from "./config";
 import { resolveEnforcementMode } from "./enforcement";
 import { getActiveTiers } from "./protocol";
-import {
-  resolvePresetName,
-  saveActivePreset,
-  saveActiveMode,
-  saveEnforcementMode,
-} from "./config";
-import type { PluginContext } from "../plugin/context";
 
 // ---------------------------------------------------------------------------
 // /router command output
@@ -50,7 +45,7 @@ export const buildRouterOutput = (cfg: RouterConfig, args: string): string => {
     "- `/router enforce <off|advisory|enforced>` — set hard-block enforcement (persisted)",
     "- `/tiers`, `/preset`, `/budget`, `/bypass`, `/annotate-plan`",
   ].join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // /tiers command output
@@ -58,10 +53,7 @@ export const buildRouterOutput = (cfg: RouterConfig, args: string): string => {
 
 export const buildTiersOutput = (cfg: RouterConfig): string => {
   const tiers = getActiveTiers(cfg);
-  const lines: string[] = [
-    `# Model Delegation Tiers`,
-    `Active preset: **${cfg.activePreset}**\n`,
-  ];
+  const lines: string[] = [`# Model Delegation Tiers`, `Active preset: **${cfg.activePreset}**\n`];
 
   for (const [name, tier] of Object.entries(tiers)) {
     const thinkingStr = tier.thinking
@@ -76,14 +68,14 @@ export const buildTiersOutput = (cfg: RouterConfig): string => {
   }
 
   lines.push("## Delegation Rules");
-  cfg.rules.forEach((r) => lines.push(`- ${r}`));
+  for (const r of cfg.rules) lines.push(`- ${r}`);
   lines.push(`\nDefault tier: @${cfg.defaultTier}`);
   lines.push(`\nAvailable presets: ${Object.keys(cfg.presets).join(", ")}`);
   lines.push(`Switch with: \`/preset <name>\``);
   lines.push(`Edit \`tiers.json\` to customize.`);
 
   return lines.join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // /budget command output
@@ -129,7 +121,7 @@ export const buildBudgetOutput = (cfg: RouterConfig, args: string): string => {
   }
 
   return `Unknown mode: "${requested}". Available: ${Object.keys(modes).join(", ")}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // /preset command output
@@ -173,7 +165,7 @@ export const buildPresetOutput = (cfg: RouterConfig, args: string): string => {
   }
 
   return `Unknown preset: "${requestedPreset}". Available: ${Object.keys(cfg.presets).join(", ")}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Register router commands on the opencode config object
@@ -186,11 +178,9 @@ export const buildPresetOutput = (cfg: RouterConfig, args: string): string => {
  *
  * Side-effect only — the returned void matches the original inline block.
  */
-export const registerRouterCommands = (
-  opencodeConfig: {
-    command?: Record<string, { template: string; description: string }>;
-  },
-): void => {
+export const registerRouterCommands = (opencodeConfig: {
+  command?: Record<string, { template: string; description: string }>;
+}): void => {
   opencodeConfig.command ??= {};
   opencodeConfig.command["tiers"] = {
     template: "",
@@ -202,13 +192,11 @@ export const registerRouterCommands = (
   };
   opencodeConfig.command["budget"] = {
     template: "$ARGUMENTS",
-    description:
-      "Show or switch routing mode (e.g., /budget, /budget budget, /budget quality)",
+    description: "Show or switch routing mode (e.g., /budget, /budget budget, /budget quality)",
   };
   opencodeConfig.command["bypass"] = {
     template: "$ARGUMENTS",
-    description:
-      "Toggle model-router bypass (disables delegation protocol for this session)",
+    description: "Toggle model-router bypass (disables delegation protocol for this session)",
   };
   opencodeConfig.command["annotate-plan"] = {
     template: [
@@ -238,20 +226,19 @@ export const registerRouterCommands = (
       "## Acceptance blocks (for enforcement)",
       "For each NON-TRIVIAL task, append an acceptance block immediately after the step so the router can verify the work:",
       "[acceptance]",
-      "check: <testsPass | buildPasses | lintClean | fileExists path=... | run command=\"...\" expect=...>",
+      'check: <testsPass | buildPasses | lintClean | fileExists path=... | run command="..." expect=...>',
       "criteria: <plain-language success condition, when no deterministic check applies>",
       "deliverable: <path or short description>",
       "[/acceptance]",
       "Prefer deterministic checks (testsPass/buildPasses/fileExists). Use a criteria line for design/explanatory tasks. Trivial read-only steps need no acceptance block.",
     ].join("\n"),
-    description:
-      "Annotate a plan with [tier:fast/medium/heavy] delegation tags",
+    description: "Annotate a plan with [tier:fast/medium/heavy] delegation tags",
   };
   opencodeConfig.command["router"] = {
     template: "$ARGUMENTS",
     description: "Model-router controls (e.g., /router enforce off|advisory|enforced)",
   };
-}
+};
 
 // ---------------------------------------------------------------------------
 // command.execute.before dispatch
@@ -325,4 +312,4 @@ export const handleCommandBefore = async (
       text: buildRouterOutput(cfg, input.arguments ?? ""),
     });
   }
-}
+};

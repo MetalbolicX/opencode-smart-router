@@ -1,6 +1,6 @@
 /**
  * QUICK REFERENCE: Custom Slash Commands in OpenCode Plugins
- * 
+ *
  * Source: D:\git\opencode-model-router\src\index.ts
  * Reference Documentation: COMMAND_PATTERNS.md
  */
@@ -17,23 +17,21 @@ const modelRouterPlugin = {
 
     // Basic command (no arguments)
     opencodeConfig.command["tiers"] = {
-      template: "",  // Empty string = no arguments accepted
+      template: "", // Empty string = no arguments accepted
       description: "Show model delegation tiers and rules",
     };
 
     // Command with arguments
     opencodeConfig.command["preset"] = {
-      template: "$ARGUMENTS",  // $ARGUMENTS placeholder for user input
+      template: "$ARGUMENTS", // $ARGUMENTS placeholder for user input
       description: "Show or switch model presets (e.g., /preset openai)",
     };
 
     // Multi-line template (join array with \n)
     opencodeConfig.command["annotate-plan"] = {
-      template: [
-        "Line 1 of instructions",
-        "Line 2 with $ARGUMENTS",
-        'File: "$ARGUMENTS"',
-      ].join("\n"),
+      template: ["Line 1 of instructions", "Line 2 with $ARGUMENTS", 'File: "$ARGUMENTS"'].join(
+        "\n",
+      ),
       description: "Annotate a plan with tier directives",
     };
   },
@@ -51,14 +49,14 @@ const handleCommands = {
     // output.parts       : MessagePart[]  (where to write responses)
 
     if (input.command === "preset") {
-      const args = input.arguments ?? "";  // Default to empty string
+      const args = input.arguments ?? ""; // Default to empty string
 
       // Build response
       const response = buildPresetOutput(cfg, args);
 
       // Write to output
       output.parts.push({
-        type: "text" as const,  // Always "text" for string responses
+        type: "text" as const, // Always "text" for string responses
         text: response,
       });
     }
@@ -71,7 +69,7 @@ const handleCommands = {
 
 // Lines 443-481 in src/index.ts
 function buildBudgetOutput(cfg: RouterConfig, args: string): string {
-  const requested = args.trim().toLowerCase();  // Normalize
+  const requested = args.trim().toLowerCase(); // Normalize
 
   // Empty args: show help/current state
   if (!requested) {
@@ -142,14 +140,14 @@ const systemPromptInjection = {
   "experimental.chat.system.transform": async (_input: any, output: any) => {
     // output.system is a string[] array
     try {
-      cfg = loadConfig();  // Uses cache (invalidated by /preset, /budget)
+      cfg = loadConfig(); // Uses cache (invalidated by /preset, /budget)
     } catch {
       // Gracefully use last known config on error
     }
 
     // Build and append system prompt content
     const protocolText = buildDelegationProtocol(cfg);
-    output.system.push(protocolText);  // Appends to system prompt
+    output.system.push(protocolText); // Appends to system prompt
   },
 };
 
@@ -175,7 +173,7 @@ function buildPresetOutput(cfg: RouterConfig, args: string): string {
   if (resolved) {
     saveActivePreset(resolved);
     return [
-      `Preset switched to **${resolved}**.`,  // Bold markdown
+      `Preset switched to **${resolved}**.`, // Bold markdown
       "",
       "Selection is now persisted in ~/.config/opencode/opencode-model-router.state.json.",
       "System prompt delegation rules update immediately.",
@@ -192,7 +190,7 @@ function buildPresetOutput(cfg: RouterConfig, args: string): string {
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 
 const MinimalPlugin: Plugin = async (_ctx: PluginInput) => {
-  let state = { mode: "normal" };
+  const state = { mode: "normal" };
 
   return {
     // Register command

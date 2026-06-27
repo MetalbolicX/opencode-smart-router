@@ -2,7 +2,7 @@
 // test/unit/timeout.test.ts
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { withTimeout } from "../../src/utils/timeout";
 
 describe("withTimeout", () => {
@@ -12,21 +12,21 @@ describe("withTimeout", () => {
   });
 
   it("rejects with timeout error when promise is slower than timeout", async () => {
-    await expect(
-      withTimeout(new Promise(() => {}), 10, "slow-promise"),
-    ).rejects.toThrow("slow-promise timed out after 10ms");
+    await expect(withTimeout(new Promise(() => {}), 10, "slow-promise")).rejects.toThrow(
+      "slow-promise timed out after 10ms",
+    );
   });
 
   it("includes the label in the timeout error message", async () => {
-    await expect(
-      withTimeout(new Promise(() => {}), 10, "custom-label"),
-    ).rejects.toThrow("custom-label");
+    await expect(withTimeout(new Promise(() => {}), 10, "custom-label")).rejects.toThrow(
+      "custom-label",
+    );
   });
 
   it("rejects with the original error when promise rejects before timeout", async () => {
-    await expect(
-      withTimeout(Promise.reject(new Error("original")), 1000, "test"),
-    ).rejects.toThrow("original");
+    await expect(withTimeout(Promise.reject(new Error("original")), 1000, "test")).rejects.toThrow(
+      "original",
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -48,12 +48,7 @@ describe("withTimeout", () => {
 
   it("rejects with AbortError when signal is aborted before promise settles", async () => {
     const ac = new AbortController();
-    const pending = withTimeout(
-      new Promise(() => {}),
-      10_000,
-      "long",
-      ac.signal,
-    );
+    const pending = withTimeout(new Promise(() => {}), 10_000, "long", ac.signal);
     // Abort on next microtask so the listener is in place.
     queueMicrotask(() => ac.abort());
     let caught: unknown;
@@ -83,12 +78,7 @@ describe("withTimeout", () => {
     const ac = new AbortController();
     const addSpy = vi.spyOn(ac.signal, "addEventListener");
     const removeSpy = vi.spyOn(ac.signal, "removeEventListener");
-    const result = await withTimeout(
-      Promise.resolve(42),
-      1000,
-      "test",
-      ac.signal,
-    );
+    const result = await withTimeout(Promise.resolve(42), 1000, "test", ac.signal);
     expect(result).toBe(42);
     // The signal was actually wired — a listener was added and removed.
     expect(addSpy).toHaveBeenCalledWith("abort", expect.any(Function));
@@ -145,12 +135,7 @@ describe("withTimeout", () => {
   it("does not wire a listener when an un-aborted signal is provided but the promise settles fast", async () => {
     const ac = new AbortController();
     const removeSpy = vi.spyOn(ac.signal, "removeEventListener");
-    const result = await withTimeout(
-      Promise.resolve("ok"),
-      1000,
-      "test",
-      ac.signal,
-    );
+    const result = await withTimeout(Promise.resolve("ok"), 1000, "test", ac.signal);
     expect(result).toBe("ok");
     // The fast path still adds then removes — no leak.
     expect(removeSpy).toHaveBeenCalled();
@@ -159,12 +144,7 @@ describe("withTimeout", () => {
 
   it("multiple aborts are idempotent — only one rejection surfaces", async () => {
     const ac = new AbortController();
-    const pending = withTimeout(
-      new Promise(() => {}),
-      10_000,
-      "long",
-      ac.signal,
-    );
+    const pending = withTimeout(new Promise(() => {}), 10_000, "long", ac.signal);
     ac.abort();
     ac.abort(); // second abort is a no-op
     let caught: unknown;

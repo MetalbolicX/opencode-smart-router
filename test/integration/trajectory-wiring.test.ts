@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
 import { readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 import { readMergedConfig } from "../../src/router/config-loader";
 import { getActiveTiers } from "../../src/router/protocol";
@@ -52,7 +52,10 @@ describe("trajectory wiring (Phase 0.3, record-only)", () => {
     const sid = "ses_orchestrator";
     // No chat.message registering this as a subagent → not tracked.
     const out: any = { output: "RESULT" };
-    await plugin["tool.execute.after"]({ sessionID: sid, tool: "read", args: { file_path: "a.ts" } }, out);
+    await plugin["tool.execute.after"](
+      { sessionID: sid, tool: "read", args: { file_path: "a.ts" } },
+      out,
+    );
     await plugin["event"]({ event: { type: "session.idle", properties: { sessionID: sid } } });
     expect(out.output).toBe("RESULT"); // untouched
     expect(() => readFileSync(trajFile(sid), "utf-8")).toThrow(); // no dump file
@@ -66,8 +69,14 @@ describe("trajectory wiring (Phase 0.3, record-only)", () => {
 
     await plugin["chat.message"]({ agent: "fast", sessionID: sid }, { parts: [{ text: "recon" }] });
     // one read-only call + one producing (edit) call → tool_call_count = 2, ttfa = 2
-    await plugin["tool.execute.after"]({ sessionID: sid, tool: "read", args: { file_path: "a.ts" } }, { output: "R" });
-    await plugin["tool.execute.after"]({ sessionID: sid, tool: "edit", args: { file_path: "a.ts" } }, { output: "E" });
+    await plugin["tool.execute.after"](
+      { sessionID: sid, tool: "read", args: { file_path: "a.ts" } },
+      { output: "R" },
+    );
+    await plugin["tool.execute.after"](
+      { sessionID: sid, tool: "edit", args: { file_path: "a.ts" } },
+      { output: "E" },
+    );
     await plugin["event"]({ event: { type: "session.idle", properties: { sessionID: sid } } });
 
     const content = readFileSync(trajFile(sid), "utf-8");
@@ -83,7 +92,10 @@ describe("trajectory wiring (Phase 0.3, record-only)", () => {
     const sid = "ses_no_debug";
     rmSync(trajFile(sid), { force: true });
     await plugin["chat.message"]({ agent: "fast", sessionID: sid }, { parts: [{ text: "recon" }] });
-    await plugin["tool.execute.after"]({ sessionID: sid, tool: "read", args: { file_path: "a.ts" } }, { output: "R" });
+    await plugin["tool.execute.after"](
+      { sessionID: sid, tool: "read", args: { file_path: "a.ts" } },
+      { output: "R" },
+    );
     await plugin["event"]({ event: { type: "session.idle", properties: { sessionID: sid } } });
     expect(() => readFileSync(trajFile(sid), "utf-8")).toThrow(); // no file written
   });

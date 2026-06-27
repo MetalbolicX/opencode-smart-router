@@ -9,12 +9,12 @@
  * examples).
  */
 
-import { describe, it, expect } from "vitest";
-import { validateConfig } from "../../src/router/config";
-import type { RouterConfig } from "../../src/router/config";
-import { resolveEnforcementMode } from "../../src/router/enforcement";
-import { buildGuardPolicy } from "../../src/guard/enforce";
+import { describe, expect, it } from "vitest";
 import { buildEscalatePolicy } from "../../src/escalate/ladder";
+import { buildGuardPolicy } from "../../src/guard/enforce";
+import type { RouterConfig } from "../../src/router/config";
+import { validateConfig } from "../../src/router/config";
+import { resolveEnforcementMode } from "../../src/router/enforcement";
 
 // Minimal valid base config (satisfies validateConfig) the presets attach to.
 const baseConfig = {
@@ -34,33 +34,95 @@ const PRESETS = {
   normal: {
     mode: "advisory",
     perTier: { fast: "advisory", medium: "enforced", heavy: "enforced" },
-    guard: { budget: 25, readDraftCap: 3, sameOpRetryCap: 1, blockSelfScript: true, deliverableFirst: true },
-    verify: { require: "whenDoDPresent", preferDeterministic: true, graderPolicy: "atLeastProducerTier", graderTemperature: 0 },
-    escalate: { ladder: ["fast", "medium", "heavy"], maxAttemptsPerTier: 1, maxTotalAttempts: 4, costCeiling: { base: "firstAttemptCostUnits", multiple: 4 } },
+    guard: {
+      budget: 25,
+      readDraftCap: 3,
+      sameOpRetryCap: 1,
+      blockSelfScript: true,
+      deliverableFirst: true,
+    },
+    verify: {
+      require: "whenDoDPresent",
+      preferDeterministic: true,
+      graderPolicy: "atLeastProducerTier",
+      graderTemperature: 0,
+    },
+    escalate: {
+      ladder: ["fast", "medium", "heavy"],
+      maxAttemptsPerTier: 1,
+      maxTotalAttempts: 4,
+      costCeiling: { base: "firstAttemptCostUnits", multiple: 4 },
+    },
     proportional: { trivialBypass: true },
   },
   budget: {
     mode: "advisory",
     perTier: { fast: "advisory", medium: "advisory", heavy: "enforced" },
-    guard: { budget: 15, readDraftCap: 2, sameOpRetryCap: 1, blockSelfScript: true, deliverableFirst: true },
+    guard: {
+      budget: 15,
+      readDraftCap: 2,
+      sameOpRetryCap: 1,
+      blockSelfScript: true,
+      deliverableFirst: true,
+    },
     verify: { require: "whenDoDPresent", preferDeterministic: true, graderTemperature: 0 },
-    escalate: { ladder: ["fast", "medium", "heavy"], maxAttemptsPerTier: 1, maxTotalAttempts: 3, costCeiling: { base: "firstAttemptCostUnits", multiple: 2 } },
+    escalate: {
+      ladder: ["fast", "medium", "heavy"],
+      maxAttemptsPerTier: 1,
+      maxTotalAttempts: 3,
+      costCeiling: { base: "firstAttemptCostUnits", multiple: 2 },
+    },
     proportional: { trivialBypass: true },
   },
   quality: {
     mode: "enforced",
     perTier: { fast: "enforced", medium: "enforced", heavy: "enforced" },
-    guard: { budget: 30, readDraftCap: 4, sameOpRetryCap: 1, blockSelfScript: true, deliverableFirst: true },
-    verify: { require: "always", preferDeterministic: true, graderPolicy: "atLeastProducerTier", minGraderTier: "medium", graderTemperature: 0 },
-    escalate: { ladder: ["fast", "medium", "heavy"], maxAttemptsPerTier: 1, maxTotalAttempts: 5, costCeiling: { base: "firstAttemptCostUnits", multiple: 6 } },
+    guard: {
+      budget: 30,
+      readDraftCap: 4,
+      sameOpRetryCap: 1,
+      blockSelfScript: true,
+      deliverableFirst: true,
+    },
+    verify: {
+      require: "always",
+      preferDeterministic: true,
+      graderPolicy: "atLeastProducerTier",
+      minGraderTier: "medium",
+      graderTemperature: 0,
+    },
+    escalate: {
+      ladder: ["fast", "medium", "heavy"],
+      maxAttemptsPerTier: 1,
+      maxTotalAttempts: 5,
+      costCeiling: { base: "firstAttemptCostUnits", multiple: 6 },
+    },
     proportional: { trivialBypass: true },
   },
   deep: {
     mode: "enforced",
     perTier: { medium: "enforced", heavy: "enforced" },
-    guard: { budget: 40, readDraftCap: 5, sameOpRetryCap: 1, blockSelfScript: true, deliverableFirst: true },
-    verify: { require: "always", preferDeterministic: true, graderPolicy: "atLeastProducerTier", minGraderTier: "medium", graderTemperature: 0 },
-    escalate: { floorTier: "medium", ladder: ["fast", "medium", "heavy"], maxAttemptsPerTier: 2, maxTotalAttempts: 6, costCeiling: { base: "firstAttemptCostUnits", multiple: 8 } },
+    guard: {
+      budget: 40,
+      readDraftCap: 5,
+      sameOpRetryCap: 1,
+      blockSelfScript: true,
+      deliverableFirst: true,
+    },
+    verify: {
+      require: "always",
+      preferDeterministic: true,
+      graderPolicy: "atLeastProducerTier",
+      minGraderTier: "medium",
+      graderTemperature: 0,
+    },
+    escalate: {
+      floorTier: "medium",
+      ladder: ["fast", "medium", "heavy"],
+      maxAttemptsPerTier: 2,
+      maxTotalAttempts: 6,
+      costCeiling: { base: "firstAttemptCostUnits", multiple: 8 },
+    },
     proportional: { trivialBypass: false },
   },
 } as const;

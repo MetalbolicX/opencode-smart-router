@@ -59,11 +59,7 @@
         "costRatio": 1,
         "description": "GPT-5.4 Mini Fast for fast exploration and simple tasks",
         "steps": 30,
-        "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads",
-          "Quick lookups"
-        ]
+        "whenToUse": ["Codebase exploration and search", "Simple file reads", "Quick lookups"]
       },
       "medium": {
         "model": "openai/gpt-5.5-fast",
@@ -71,12 +67,7 @@
         "costRatio": 5,
         "description": "GPT-5.5 fast default settings for implementation and standard coding",
         "steps": 50,
-        "whenToUse": [
-          "Feature implementation",
-          "Refactoring",
-          "Writing tests",
-          "Bug fixes"
-        ]
+        "whenToUse": ["Feature implementation", "Refactoring", "Writing tests", "Bug fixes"]
       },
       "heavy": {
         "model": "openai/gpt-5.5-fast",
@@ -190,12 +181,7 @@
         "costRatio": 5,
         "description": "GPT-5.5 fast default settings for implementation and standard coding",
         "steps": 50,
-        "whenToUse": [
-          "Feature implementation",
-          "Refactoring",
-          "Writing tests",
-          "Bug fixes"
-        ]
+        "whenToUse": ["Feature implementation", "Refactoring", "Writing tests", "Bug fixes"]
       },
       "heavy": {
         "model": "anthropic/claude-opus-4-8",
@@ -340,26 +326,10 @@
   },
   "fallback": {
     "global": {
-      "anthropic": [
-        "openai",
-        "google",
-        "github-copilot"
-      ],
-      "openai": [
-        "anthropic",
-        "google",
-        "github-copilot"
-      ],
-      "github-copilot": [
-        "anthropic",
-        "openai",
-        "google"
-      ],
-      "google": [
-        "openai",
-        "anthropic",
-        "github-copilot"
-      ]
+      "anthropic": ["openai", "google", "github-copilot"],
+      "openai": ["anthropic", "google", "github-copilot"],
+      "github-copilot": ["anthropic", "openai", "google"],
+      "google": ["openai", "anthropic", "github-copilot"]
     }
   },
   "rules": [

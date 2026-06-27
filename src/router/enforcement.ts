@@ -42,10 +42,7 @@ export const resolveEnforcementMode = (args: {
   const base: EnforcementMode = enf?.mode ?? "advisory";
   let mode: EnforcementMode;
 
-  if (
-    args.tier !== undefined &&
-    enf?.perTier?.[args.tier] !== undefined
-  ) {
+  if (args.tier !== undefined && enf?.perTier?.[args.tier] !== undefined) {
     mode = enf.perTier[args.tier]!;
   } else {
     mode = base;
@@ -56,4 +53,4 @@ export const resolveEnforcementMode = (args: {
   }
 
   return { mode };
-}
+};

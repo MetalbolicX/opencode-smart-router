@@ -6,14 +6,20 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export type CheckKind = "run" | "fileExists" | "schemaMatch" | "testsPass" | "buildPasses" | "lintClean";
+export type CheckKind =
+  | "run"
+  | "fileExists"
+  | "schemaMatch"
+  | "testsPass"
+  | "buildPasses"
+  | "lintClean";
 
 export interface Check {
   kind: CheckKind;
-  command?: string;   // run/testsPass/buildPasses/lintClean (optional; runner supplies a default later)
-  expect?: string;    // run: expected substring in output (optional)
-  path?: string;      // fileExists/schemaMatch
-  schema?: string;    // schemaMatch: inline JSON or a path
+  command?: string; // run/testsPass/buildPasses/lintClean (optional; runner supplies a default later)
+  expect?: string; // run: expected substring in output (optional)
+  path?: string; // fileExists/schemaMatch
+  schema?: string; // schemaMatch: inline JSON or a path
 }
 
 export type DoDKind = "deterministic" | "checker" | "none";
@@ -21,8 +27,8 @@ export type DoDSource = "explicit" | "inferred" | "annotation" | "none";
 
 export interface DoD {
   kind: DoDKind;
-  checks: Check[];        // [] when none/checker-only
-  criteria: string[];     // [] when none
+  checks: Check[]; // [] when none/checker-only
+  criteria: string[]; // [] when none
   deliverable: string | null;
   source: DoDSource;
 }
@@ -39,12 +45,15 @@ export interface InferHints {
 // ---------------------------------------------------------------------------
 
 const VALID_CHECK_KINDS: ReadonlySet<string> = new Set<string>([
-  "run", "fileExists", "schemaMatch", "testsPass", "buildPasses", "lintClean",
+  "run",
+  "fileExists",
+  "schemaMatch",
+  "testsPass",
+  "buildPasses",
+  "lintClean",
 ]);
 
-const VALID_DOD_KINDS: ReadonlySet<string> = new Set<string>([
-  "deterministic", "checker", "none",
-]);
+const VALID_DOD_KINDS: ReadonlySet<string> = new Set<string>(["deterministic", "checker", "none"]);
 
 const OPEN_TAG_RE = /^\s*\[(acceptance|dod)\]\s*$/i;
 const CLOSE_TAG_RE = /^\s*\[\/(acceptance|dod)\]\s*$/i;
@@ -89,8 +98,7 @@ export const normalizeDoD = (d: DoD): DoD => {
 const parseKvPairs = (s: string): Record<string, string> => {
   const result: Record<string, string> = {};
   const re = /(\w+)=(?:"([^"]*)"|([\S]*))/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(s)) !== null) {
+  for (let m = re.exec(s); m !== null; m = re.exec(s)) {
     const key = m[1];
     const value = m[2] !== undefined ? m[2] : (m[3] ?? "");
     result[key] = value;
@@ -239,7 +247,9 @@ export const inferDoD = (dispatchText: string, tier: string, hints: InferHints):
     hints.declaredPath.trim().length > 0
   ) {
     category = "writeFile";
-  } else if (/\b(implement|add|feature|create|build|endpoint|function|component|fix)\b/.test(lower)) {
+  } else if (
+    /\b(implement|add|feature|create|build|endpoint|function|component|fix)\b/.test(lower)
+  ) {
     category = "impl";
   } else if (/\b(test|spec|coverage)\b/.test(lower)) {
     category = "test";
@@ -277,9 +287,7 @@ export const inferDoD = (dispatchText: string, tier: string, hints: InferHints):
   if (checks.length === 0) {
     const summary = summarizeDispatch(dispatchText);
     criteria.push(
-      summary.length > 0
-        ? summary
-        : "the delegated task is completed as described in the dispatch",
+      summary.length > 0 ? summary : "the delegated task is completed as described in the dispatch",
     );
   }
 

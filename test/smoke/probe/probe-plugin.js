@@ -4,9 +4,9 @@
  * Delete after spike.
  */
 
-import { tool } from "@opencode-ai/plugin";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { tool } from "@opencode-ai/plugin";
 
 const LOG_DIR = "D:\\git\\opencode-model-router\\tmp\\probe";
 const LOG_FILE = path.join(LOG_DIR, "probe-events.log");
@@ -26,8 +26,7 @@ appendLog({ ev: "plugin_loaded", ts: Date.now() });
 const z = tool.schema;
 
 const probeEcho = tool({
-  description:
-    "Probe tool: echoes a value back. Returns the string PROBE_ECHO_OK:<value>.",
+  description: "Probe tool: echoes a value back. Returns the string PROBE_ECHO_OK:<value>.",
   args: {
     value: z.string().describe("The value to echo"),
   },
@@ -67,9 +66,7 @@ export const ProbePlugin = async () => {
       });
       if (input?.tool === "probe_block_me") {
         appendLog({ ev: "before_throw" });
-        throw new Error(
-          "PROBE_BLOCKED: before-hook aborted this call (capability A)."
-        );
+        throw new Error("PROBE_BLOCKED: before-hook aborted this call (capability A).");
       }
     },
 
@@ -94,7 +91,9 @@ export const ProbePlugin = async () => {
         if (event?.type === "session.created") {
           try {
             entry.raw = JSON.stringify(props).slice(0, 300);
-          } catch { /* best-effort */ }
+          } catch {
+            /* best-effort */
+          }
         }
         appendLog(entry);
       } catch {

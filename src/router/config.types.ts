@@ -43,9 +43,29 @@ export interface EnforcementConfig {
   mode?: "off" | "advisory" | "enforced";
   envGate?: string;
   perTier?: Record<string, "off" | "advisory" | "enforced">;
-  guard?: { readDraftCap?: number; sameOpRetryCap?: number; blockSelfScript?: boolean; deliverableFirst?: boolean; budget?: number; blockScriptWrites?: boolean };
-  verify?: { require?: "never" | "whenDoDPresent" | "always"; requireExplicitDoD?: boolean; preferDeterministic?: boolean; graderPolicy?: "atLeastProducerTier"; graderTemperature?: number; minGraderTier?: string };
-  escalate?: { floorTier?: string | null; ladder?: string[]; maxAttemptsPerTier?: number; maxTotalAttempts?: number; costCeiling?: { base?: string; multiple?: number } };
+  guard?: {
+    readDraftCap?: number;
+    sameOpRetryCap?: number;
+    blockSelfScript?: boolean;
+    deliverableFirst?: boolean;
+    budget?: number;
+    blockScriptWrites?: boolean;
+  };
+  verify?: {
+    require?: "never" | "whenDoDPresent" | "always";
+    requireExplicitDoD?: boolean;
+    preferDeterministic?: boolean;
+    graderPolicy?: "atLeastProducerTier";
+    graderTemperature?: number;
+    minGraderTier?: string;
+  };
+  escalate?: {
+    floorTier?: string | null;
+    ladder?: string[];
+    maxAttemptsPerTier?: number;
+    maxTotalAttempts?: number;
+    costCeiling?: { base?: string; multiple?: number };
+  };
   proportional?: { trivialBypass?: boolean; trivialClassifier?: string };
 }
 

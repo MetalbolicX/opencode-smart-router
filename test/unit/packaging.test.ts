@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
+import { describe, expect, it } from "vitest";
 
 // Plan C4 / R9: tests and dev-only config must NEVER ship in the npm package.
 // The package.json `files` allowlist is the mechanism; this test is the guard
@@ -12,9 +12,7 @@ describe("packaging: published tarball excludes tests and dev config (plan C4)",
       stdio: ["ignore", "pipe", "ignore"],
     });
     const parsed = JSON.parse(raw) as Array<{ files: Array<{ path: string }> }>;
-    const paths = parsed
-      .flatMap((p) => p.files.map((f) => f.path.replace(/\\/g, "/")))
-      .sort();
+    const paths = parsed.flatMap((p) => p.files.map((f) => f.path.replace(/\\/g, "/"))).sort();
 
     // MUST NOT ship tests, docs, tmp, coverage, or dev config.
     expect(paths.some((p) => p.startsWith("test/"))).toBe(false);

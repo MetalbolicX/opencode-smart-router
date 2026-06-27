@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  summarizeDispatch,
-  normalizeDoD,
-  parseAcceptanceBlock,
-  parseDoDFromDispatch,
-  parseDoDFromAnnotation,
+  type DoD,
   inferDoD,
   isCheckable,
-  type DoD,
+  normalizeDoD,
+  parseAcceptanceBlock,
+  parseDoDFromAnnotation,
+  parseDoDFromDispatch,
+  summarizeDispatch,
 } from "../../src/verify/dod";
 
 // ---------------------------------------------------------------------------
@@ -165,8 +165,7 @@ describe("normalizeDoD", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseDoDFromDispatch", () => {
-  const wrap = (inner: string, tag = "acceptance"): string =>
-    `[${tag}]\n${inner}\n[/${tag}]`;
+  const wrap = (inner: string, tag = "acceptance"): string => `[${tag}]\n${inner}\n[/${tag}]`;
 
   it("returns null when opening tag is missing", () => {
     expect(parseDoDFromDispatch("no tags here\n[/acceptance]")).toBeNull();
@@ -208,7 +207,9 @@ describe("parseDoDFromDispatch", () => {
   });
 
   it("quoted value containing spaces is parsed correctly", () => {
-    const text = wrap('check: run command="npx vitest run --reporter=verbose" expect="all tests passed"');
+    const text = wrap(
+      'check: run command="npx vitest run --reporter=verbose" expect="all tests passed"',
+    );
     const result = parseDoDFromDispatch(text);
     expect(result!.checks[0].command).toBe("npx vitest run --reporter=verbose");
     expect(result!.checks[0].expect).toBe("all tests passed");
@@ -560,9 +561,7 @@ describe("inferDoD", () => {
 
   it("checker fallback with empty dispatch => uses default message", () => {
     const result = inferDoD("", "medium", { buildCommand: null, testCommand: null });
-    expect(result.criteria[0]).toBe(
-      "the delegated task is completed as described in the dispatch",
-    );
+    expect(result.criteria[0]).toBe("the delegated task is completed as described in the dispatch");
   });
 
   it("source is always 'inferred'", () => {
@@ -693,8 +692,7 @@ describe("isCheckable", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseDoDFromDispatch — Phase 5: kind: directive matrix", () => {
-  const wrap = (inner: string, tag = "acceptance") =>
-    `[${tag}]\n${inner}\n[/${tag}]`;
+  const wrap = (inner: string, tag = "acceptance") => `[${tag}]\n${inner}\n[/${tag}]`;
 
   it("supported `kind: deterministic` with checks => kind:deterministic, checks preserved", () => {
     const r = parseDoDFromDispatch(wrap("kind: deterministic\ncheck: buildPasses command=tsc"))!;
@@ -755,9 +753,7 @@ describe("parseDoDFromDispatch — Phase 5: kind: directive matrix", () => {
     // Order matters: the parser walks lines in order. A check declared BEFORE
     // the bad kind directive would be collected; the bad kind then clears
     // everything. The end state is unambiguously non-checkable.
-    const r = parseDoDFromDispatch(
-      wrap("check: buildPasses command=tsc\nkind: foo"),
-    )!;
+    const r = parseDoDFromDispatch(wrap("check: buildPasses command=tsc\nkind: foo"))!;
     expect(r.kind).toBe("none");
     expect(r.checks).toHaveLength(0);
     expect(isCheckable(r)).toBe(false);

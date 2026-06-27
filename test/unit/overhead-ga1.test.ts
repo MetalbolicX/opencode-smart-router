@@ -1,27 +1,19 @@
-import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { validateConfig } from "../../src/router/config";
 import { assembleSystemPrompt } from "../../src/router/protocol";
 
-const cfg = validateConfig(
-  JSON.parse(readFileSync(join(process.cwd(), "tiers.json"), "utf-8")),
-);
+const cfg = validateConfig(JSON.parse(readFileSync(join(process.cwd(), "tiers.json"), "utf-8")));
 
-const MODELS: (string | undefined)[] = [
-  "anthropic/claude-sonnet-4-6",
-  "openai/gpt-5",
-  undefined,
-];
+const MODELS: (string | undefined)[] = ["anthropic/claude-sonnet-4-6", "openai/gpt-5", undefined];
 
 describe("GA-1: enforcement OFF adds zero tokens", () => {
   for (const model of MODELS) {
     const label = model ?? "undefined";
 
     it(`model=${label}: default param is byte-identical to explicit false`, () => {
-      expect(assembleSystemPrompt(cfg, model)).toBe(
-        assembleSystemPrompt(cfg, model, false),
-      );
+      expect(assembleSystemPrompt(cfg, model)).toBe(assembleSystemPrompt(cfg, model, false));
     });
 
     it(`model=${label}: off-mode output contains no DoD markers`, () => {
@@ -33,10 +25,7 @@ describe("GA-1: enforcement OFF adds zero tokens", () => {
 });
 
 describe("GA-7: enforcement ON injects a bounded DoD section", () => {
-  const ON_MODELS: string[] = [
-    "anthropic/claude-sonnet-4-6",
-    "openai/gpt-5",
-  ];
+  const ON_MODELS: string[] = ["anthropic/claude-sonnet-4-6", "openai/gpt-5"];
 
   for (const model of ON_MODELS) {
     it(`model=${model}: enforcement-on is longer and contains [acceptance]`, () => {

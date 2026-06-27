@@ -78,9 +78,7 @@ const readPart = (part: PartName): Record<string, unknown> => {
 
   const path = PART_PATHS[part];
   if (!existsSync(path)) {
-    throw new Error(
-      `build-tiers-config: missing part file "${part}" at ${path}`,
-    );
+    throw new Error(`build-tiers-config: missing part file "${part}" at ${path}`);
   }
   let raw: string;
   try {
@@ -99,9 +97,7 @@ const readPart = (part: PartName): Record<string, unknown> => {
     );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error(
-      `build-tiers-config: part "${part}" must be a JSON object`,
-    );
+    throw new Error(`build-tiers-config: part "${part}" must be a JSON object`);
   }
   partCache.set(part, parsed as Record<string, unknown>);
   return parsed as Record<string, unknown>;
@@ -156,6 +152,6 @@ const main = (): void => {
   console.log(
     `build-tiers-config: wrote ${OUTPUT_PATH} (${Object.keys(merged).length} top-level keys, ${MERGE_PLAN.length} merge steps)`,
   );
-}
+};
 
 main();

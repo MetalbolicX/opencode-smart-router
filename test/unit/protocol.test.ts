@@ -1,19 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { RouterConfig } from "../../src/router/config";
+import { validateConfig } from "../../src/router/config";
 import {
-  getActiveTiers,
-  getActiveMode,
-  buildFallbackInstructions,
-  buildTaskTaxonomy,
+  assembleSystemPrompt,
   buildDecomposeHint,
   buildDelegationProtocol,
   buildDoDProtocolSection,
+  buildFallbackInstructions,
+  buildTaskTaxonomy,
+  getActiveMode,
+  getActiveTiers,
   isClaudeModel,
-  assembleSystemPrompt,
 } from "../../src/router/protocol";
-import { validateConfig } from "../../src/router/config";
-import type { RouterConfig } from "../../src/router/config";
 
 const tier = (model: string, extra: Record<string, unknown> = {}) => {
   return { model, description: "d", whenToUse: [], ...extra };
@@ -109,11 +109,17 @@ describe("buildFallbackInstructions", () => {
     expect(buildFallbackInstructions(cfg)).toContain("x→openai");
   });
   it("returns '' when the chain map yields no valid targets", () => {
-    const cfg = { ...rich, fallback: { global: { anthropic: ["nonexistent"] } } } as unknown as RouterConfig;
+    const cfg = {
+      ...rich,
+      fallback: { global: { anthropic: ["nonexistent"] } },
+    } as unknown as RouterConfig;
     expect(buildFallbackInstructions(cfg)).toBe("");
   });
   it("skips non-array chain entries", () => {
-    const cfg = { ...rich, fallback: { global: { anthropic: "openai" } } } as unknown as RouterConfig;
+    const cfg = {
+      ...rich,
+      fallback: { global: { anthropic: "openai" } },
+    } as unknown as RouterConfig;
     expect(buildFallbackInstructions(cfg)).toBe("");
   });
 });

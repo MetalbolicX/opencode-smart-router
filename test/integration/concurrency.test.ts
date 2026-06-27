@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 
 describe("concurrency isolation", () => {
@@ -84,14 +84,10 @@ describe("concurrency isolation", () => {
     await callAfter("CC_A", "read", { file_path: "/f/a3" }); // A.cnp = 3
 
     // A's 4th read: consecutiveNonProducing(3) >= readDraftCap(3) → blocked.
-    await expect(
-      callBefore("CC_A", "read", { file_path: "/f/a4" }),
-    ).rejects.toThrow();
+    await expect(callBefore("CC_A", "read", { file_path: "/f/a4" })).rejects.toThrow();
 
     // B had only 1 read (cnp=1) — must still be allowed (proves budget is per-session).
-    await expect(
-      callBefore("CC_B", "read", { file_path: "/f/b2" }),
-    ).resolves.toBeUndefined();
+    await expect(callBefore("CC_B", "read", { file_path: "/f/b2" })).resolves.toBeUndefined();
   });
 
   it("a self-script block in one session does not affect the other", async () => {
@@ -103,9 +99,7 @@ describe("concurrency isolation", () => {
     ).rejects.toThrow();
 
     // B performs a normal read — must resolve (not affected by A's block).
-    await expect(
-      callBefore("CC_B", "read", { file_path: "/f/b1" }),
-    ).resolves.toBeUndefined();
+    await expect(callBefore("CC_B", "read", { file_path: "/f/b1" })).resolves.toBeUndefined();
   });
 
   it("each session is independently blockable on its own budget", async () => {
@@ -117,9 +111,7 @@ describe("concurrency isolation", () => {
     await callBefore("CC_A", "read", { file_path: "/f/a3" });
     await callAfter("CC_A", "read", { file_path: "/f/a3" });
     // A's 4th read is blocked.
-    await expect(
-      callBefore("CC_A", "read", { file_path: "/f/a4" }),
-    ).rejects.toThrow();
+    await expect(callBefore("CC_A", "read", { file_path: "/f/a4" })).rejects.toThrow();
 
     // Drive B: 3 reads + after-hooks → B.cnp = 3.
     await callBefore("CC_B", "read", { file_path: "/f/b1" });
@@ -129,8 +121,6 @@ describe("concurrency isolation", () => {
     await callBefore("CC_B", "read", { file_path: "/f/b3" });
     await callAfter("CC_B", "read", { file_path: "/f/b3" });
     // B's 4th read is also blocked — each session independently enforced.
-    await expect(
-      callBefore("CC_B", "read", { file_path: "/f/b4" }),
-    ).rejects.toThrow();
+    await expect(callBefore("CC_B", "read", { file_path: "/f/b4" })).rejects.toThrow();
   });
 });

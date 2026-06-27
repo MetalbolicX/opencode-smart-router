@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { detectNarration } from "../../src/guard/narration";
 
 describe("detectNarration", () => {
@@ -18,8 +18,7 @@ describe("detectNarration", () => {
   });
 
   it("detects multiple distinct patterns", () => {
-    const text =
-      "Still writing the parser. Let me create the module afterwards.";
+    const text = "Still writing the parser. Let me create the module afterwards.";
     const out = detectNarration(text);
     expect(out.length).toBeGreaterThan(1);
   });

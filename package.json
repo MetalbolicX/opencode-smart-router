@@ -12,8 +12,16 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "smoke": "cross-env RUN_OC_SMOKE=1 vitest run --config vitest.smoke.config.ts test/smoke",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "format:check": "biome format"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@11.8.0",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
@@ -47,6 +55,7 @@
     "@opencode-ai/plugin": ">=1.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
     "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.9",
     "cross-env": "^10.1.0",

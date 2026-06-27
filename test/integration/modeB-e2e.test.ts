@@ -9,10 +9,10 @@
  * No live models, no network.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 import { parseDoDFromAnnotation, parseDoDFromDispatch } from "../../src/verify/dod";
 
@@ -48,8 +48,7 @@ const makeCtxWithQueues = (
           if (opts?.body?.system !== undefined) {
             // GRADER call (dispatchGrader always sets body.system)
             if (counters) counters.grader++;
-            const text =
-              graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
+            const text = graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
             return { data: { parts: [{ type: "text", text }] } };
           }
           // PRODUCER call
@@ -117,8 +116,7 @@ describe("Mode B end-to-end (plan-annotation)", () => {
       makeCtxWithQueues(dir, producerCalls, graderQueue) as any,
     );
 
-    const acceptance =
-      "[acceptance]\ncriteria: task A is correct\n[/acceptance]";
+    const acceptance = "[acceptance]\ncriteria: task A is correct\n[/acceptance]";
 
     const result: string = await hooks.tool.delegate.execute({
       task: "task A from the plan",
@@ -147,8 +145,7 @@ describe("Mode B end-to-end (plan-annotation)", () => {
       makeCtxWithQueues(dir, producerCalls, graderQueue) as any,
     );
 
-    const acceptance =
-      "[acceptance]\ncriteria: task B is correct\n[/acceptance]";
+    const acceptance = "[acceptance]\ncriteria: task B is correct\n[/acceptance]";
 
     const result: string = await hooks.tool.delegate.execute({
       task: "task B from the plan",

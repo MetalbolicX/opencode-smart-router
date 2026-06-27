@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, isAbsolute } from "node:path";
-import { createExecSeam } from "../../src/utils/shell";
+import { isAbsolute, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFsSeam } from "../../src/utils/fs";
+import { createExecSeam } from "../../src/utils/shell";
 
 /**
  * Seam factory contract tests — Slice 2.

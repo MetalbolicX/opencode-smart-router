@@ -29,13 +29,8 @@ import { readMergedConfig } from "./config-loader";
 // ---------------------------------------------------------------------------
 
 export const statePath = (): string => {
-  return join(
-    homedir(),
-    ".config",
-    "opencode",
-    "opencode-model-router.state.json",
-  );
-}
+  return join(homedir(), ".config", "opencode", "opencode-model-router.state.json");
+};
 
 // ---------------------------------------------------------------------------
 // State persistence helpers
@@ -51,7 +46,7 @@ export const readState = (): RouterState => {
     // ignore
   }
   return {};
-}
+};
 
 /** Write state to disk atomically (merges with existing keys). */
 export const writeState = (patch: Partial<RouterState>): void => {
@@ -61,7 +56,7 @@ export const writeState = (patch: Partial<RouterState>): void => {
   const tmp = `${p}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   writeFileSync(tmp, JSON.stringify(state, null, 2) + "\n", "utf-8");
   renameSync(tmp, p);
-}
+};
 
 // ---------------------------------------------------------------------------
 // State save helpers — write user-selected state.
@@ -81,7 +76,7 @@ export const saveActivePreset = (presetName: string): void => {
 
   // Persist user-selected preset to state file only — never mutate tiers.json
   writeState({ activePreset: resolved });
-}
+};
 
 export const saveActiveMode = (modeName: string): void => {
   const cfg = readMergedConfig({ cwd: process.cwd() });
@@ -90,18 +85,15 @@ export const saveActiveMode = (modeName: string): void => {
   }
 
   writeState({ activeMode: modeName });
-}
+};
 
 export const saveEnforcementMode = (mode: "off" | "advisory" | "enforced"): void => {
   writeState({ enforcementMode: mode });
-}
+};
 
 /** Inlined mirror of `config-loader.ts → resolvePresetName()`. Kept local to
  *  avoid widening the runtime dependency surface for a single call site. */
-const resolvePresetName = (
-  cfg: RouterConfig,
-  requestedPreset: string,
-): string | undefined => {
+const resolvePresetName = (cfg: RouterConfig, requestedPreset: string): string | undefined => {
   if (cfg.presets[requestedPreset]) {
     return requestedPreset;
   }
@@ -109,7 +101,5 @@ const resolvePresetName = (
   if (!normalized) {
     return undefined;
   }
-  return Object.keys(cfg.presets).find(
-    (name) => name.toLowerCase() === normalized,
-  );
-}
+  return Object.keys(cfg.presets).find((name) => name.toLowerCase() === normalized);
+};

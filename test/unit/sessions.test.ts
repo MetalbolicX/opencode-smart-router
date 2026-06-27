@@ -1,18 +1,18 @@
-import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  parseCapDirective,
-  buildCapBanner,
-  createSessionStore,
-  classifyTrivial,
-  DEFAULT_TIER_CAPS,
-  type SubagentState,
-  type Cap,
-} from "../../src/router/sessions";
-import { validateConfig } from "../../src/router/config";
+import { describe, expect, it } from "vitest";
 import type { RouterConfig } from "../../src/router/config";
+import { validateConfig } from "../../src/router/config";
+import {
+  buildCapBanner,
+  type Cap,
+  classifyTrivial,
+  createSessionStore,
+  DEFAULT_TIER_CAPS,
+  parseCapDirective,
+  type SubagentState,
+} from "../../src/router/sessions";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,8 +65,12 @@ describe("buildCapBanner", () => {
     expect(b).toContain("⚠ CAP REACHED (8/8)");
   });
   it("adds CAP WARNING when 1–2 calls remain", () => {
-    expect(buildCapBanner(st({ cap: 8, calls: 7 }), false, undefined, "read")).toContain("1 read-only call");
-    expect(buildCapBanner(st({ cap: 8, calls: 6 }), false, undefined, "read")).toContain("2 read-only call");
+    expect(buildCapBanner(st({ cap: 8, calls: 7 }), false, undefined, "read")).toContain(
+      "1 read-only call",
+    );
+    expect(buildCapBanner(st({ cap: 8, calls: 6 }), false, undefined, "read")).toContain(
+      "2 read-only call",
+    );
   });
 });
 
@@ -87,13 +91,23 @@ describe("createSessionStore", () => {
 
   it("ignores messages whose agent is not a tier name", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "build", sessionID: "ses_a" }, dispatch("work"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "build", sessionID: "ses_a" },
+      dispatch("work"),
+      cfg,
+      tierNames,
+    );
     expect(store.isSubagent("ses_a")).toBe(false);
   });
 
   it("tracks a subagent session dispatched to a tier agent", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "fast", sessionID: "ses_b" }, dispatch("do recon"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "fast", sessionID: "ses_b" },
+      dispatch("do recon"),
+      cfg,
+      tierNames,
+    );
     expect(store.isSubagent("ses_b")).toBe(true);
   });
 
@@ -106,7 +120,12 @@ describe("createSessionStore", () => {
 
   it("appends a cap banner to read-only tool output, preserving existing text", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "fast", sessionID: "ses_c" }, dispatch("recon"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "fast", sessionID: "ses_c" },
+      dispatch("recon"),
+      cfg,
+      tierNames,
+    );
     const out: Record<string, unknown> = { output: "RESULT" };
     store.recordToolCall({ sessionID: "ses_c", tool: "read", args: { file_path: "a.ts" } }, out);
     expect(out.output).toContain("RESULT\n\n");
@@ -115,7 +134,12 @@ describe("createSessionStore", () => {
 
   it("ignores non-read-only tools (e.g. edit) for tracked sessions", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "fast", sessionID: "ses_d" }, dispatch("recon"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "fast", sessionID: "ses_d" },
+      dispatch("recon"),
+      cfg,
+      tierNames,
+    );
     const out: Record<string, unknown> = { output: "EDITED" };
     store.recordToolCall({ sessionID: "ses_d", tool: "edit", args: { file_path: "a.ts" } }, out);
     expect(out.output).toBe("EDITED");
@@ -123,7 +147,12 @@ describe("createSessionStore", () => {
 
   it("honors a CAP:N override from the dispatch text", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "fast", sessionID: "ses_e" }, dispatch("tight lookup CAP:2"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "fast", sessionID: "ses_e" },
+      dispatch("tight lookup CAP:2"),
+      cfg,
+      tierNames,
+    );
     const o1: Record<string, unknown> = {};
     store.recordToolCall({ sessionID: "ses_e", tool: "read", args: { file_path: "a.ts" } }, o1);
     expect(o1.output).toContain("[cap: 1/2]");
@@ -134,7 +163,12 @@ describe("createSessionStore", () => {
 
   it("flags a redundant identical read", () => {
     const store = createSessionStore();
-    store.registerFromChatMessage({ agent: "medium", sessionID: "ses_f" }, dispatch("recon"), cfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "medium", sessionID: "ses_f" },
+      dispatch("recon"),
+      cfg,
+      tierNames,
+    );
     const o1: Record<string, unknown> = {};
     store.recordToolCall({ sessionID: "ses_f", tool: "read", args: { file_path: "same.ts" } }, o1);
     expect(o1.output).not.toContain("REDUNDANT");
@@ -147,7 +181,12 @@ describe("createSessionStore", () => {
   it("falls back to DEFAULT_TIER_CAPS when cfg has no tierCaps", () => {
     const store = createSessionStore();
     const bareCfg = {} as unknown as RouterConfig;
-    store.registerFromChatMessage({ agent: "heavy", sessionID: "ses_g" }, dispatch("design"), bareCfg, tierNames);
+    store.registerFromChatMessage(
+      { agent: "heavy", sessionID: "ses_g" },
+      dispatch("design"),
+      bareCfg,
+      tierNames,
+    );
     const out: Record<string, unknown> = {};
     store.recordToolCall({ sessionID: "ses_g", tool: "read", args: { file_path: "a.ts" } }, out);
     expect(out.output).toContain(`/${DEFAULT_TIER_CAPS.heavy}]`);

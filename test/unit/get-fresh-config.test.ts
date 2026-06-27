@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { createPluginContext } from "../../src/plugin/context";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
+import { createPluginContext } from "../../src/plugin/context";
 import type { RouterConfig } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------
@@ -85,11 +84,9 @@ describe("PluginContext.getFreshConfig", () => {
     const ctx = createPluginContext({ directory: tmpHome } as any);
     const cached = ctx.getConfig();
 
-    const refreshSpy = vi
-      .spyOn(ctx, "refreshConfig")
-      .mockImplementation(() => {
-        throw new Error("disk read failed");
-      });
+    const refreshSpy = vi.spyOn(ctx, "refreshConfig").mockImplementation(() => {
+      throw new Error("disk read failed");
+    });
 
     let result: RouterConfig | null = null;
     expect(() => {
@@ -104,9 +101,7 @@ describe("PluginContext.getFreshConfig", () => {
   it("returns the refreshed value when refreshConfig() succeeds", () => {
     const ctx = createPluginContext({ directory: tmpHome } as any);
     const refreshed = makeBaseConfig({ activePreset: "openai" });
-    const refreshSpy = vi
-      .spyOn(ctx, "refreshConfig")
-      .mockReturnValue(refreshed);
+    const refreshSpy = vi.spyOn(ctx, "refreshConfig").mockReturnValue(refreshed);
 
     const result = ctx.getFreshConfig();
     expect(refreshSpy).toHaveBeenCalledTimes(1);
@@ -116,9 +111,7 @@ describe("PluginContext.getFreshConfig", () => {
   it("does not invoke getConfig() when refreshConfig() succeeds", () => {
     const ctx = createPluginContext({ directory: tmpHome } as any);
     const refreshed = makeBaseConfig({ activePreset: "google" });
-    const refreshSpy = vi
-      .spyOn(ctx, "refreshConfig")
-      .mockReturnValue(refreshed);
+    const refreshSpy = vi.spyOn(ctx, "refreshConfig").mockReturnValue(refreshed);
     const getConfigSpy = vi.spyOn(ctx, "getConfig");
 
     const result = ctx.getFreshConfig();

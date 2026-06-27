@@ -12,12 +12,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { isPlainObject } from "./config.types";
 import type { ConfigLayer, RouterConfig, RouterState } from "./config.types";
-import { isValidEnforcementMode } from "./enforcement";
-import { validateConfig } from "./config-validate";
+import { isPlainObject } from "./config.types";
 import { readState } from "./config-state";
+import { validateConfig } from "./config-validate";
+import { isValidEnforcementMode } from "./enforcement";
 
 // ---------------------------------------------------------------------------
 // Pure merged-config reader.
@@ -55,10 +54,7 @@ export const readMergedConfig = (opts: { cwd: string }): RouterConfig => {
   const global = readConfigLayer(layers[1]!);
   const local = readConfigLayer(layers[2]!);
 
-  const mergedManual = deepMergeConfig(
-    deepMergeConfig(bundled, global),
-    local,
-  );
+  const mergedManual = deepMergeConfig(deepMergeConfig(bundled, global), local);
   const cfg = validateConfig(mergedManual);
 
   // Runtime state overlays only its owned fields and never mutates tiers.json.
@@ -66,7 +62,7 @@ export const readMergedConfig = (opts: { cwd: string }): RouterConfig => {
   applyStateOverlay(cfg, state);
 
   return cfg;
-}
+};
 
 const getPluginRoot = (): string => {
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -77,21 +73,21 @@ const getPluginRoot = (): string => {
   const bundledRoot = join(__dirname, "..");
   if (existsSync(join(bundledRoot, "tiers.json"))) return bundledRoot;
   return sourceRoot;
-}
+};
 
 export const configPath = (): string => {
   return join(getPluginRoot(), "tiers.json");
-}
+};
 
 /** Global user-level override path (`~/.config/opencode-model-router/tiers.json`). */
 export const globalConfigPath = (): string => {
   return join(homedir(), ".config", "opencode-model-router", "tiers.json");
-}
+};
 
 /** Repo-local override path (`<cwd>/.opencode/tiers.json`). Re-evaluated per call. */
 export const localConfigPath = (): string => {
   return join(process.cwd(), ".opencode", "tiers.json");
-}
+};
 
 /**
  * Read a single manual config layer from disk.
@@ -115,9 +111,7 @@ export const readConfigLayer = (layer: ConfigLayer): Record<string, unknown> | u
       }
       return undefined;
     }
-    throw new Error(
-      `${layer.kind} layer (${layer.path}) is unreadable: ${(err as Error).message}`,
-    );
+    throw new Error(`${layer.kind} layer (${layer.path}) is unreadable: ${(err as Error).message}`);
   }
 
   let parsed: unknown;
@@ -136,7 +130,7 @@ export const readConfigLayer = (layer: ConfigLayer): Record<string, unknown> | u
   }
 
   return parsed;
-}
+};
 
 /**
  * Deep-merge two config-shaped values with these rules:
@@ -158,7 +152,7 @@ export const deepMergeConfig = (base: unknown, override: unknown): unknown => {
     return result;
   }
   return override;
-}
+};
 
 /**
  * Narrow state overlay. Writes ONLY:
@@ -183,7 +177,7 @@ export const applyStateOverlay = (cfg: RouterConfig, state: RouterState): void =
   if (state.enforcementMode && isValidEnforcementMode(state.enforcementMode)) {
     cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
   }
-}
+};
 
 export const resolvePresetName = (
   cfg: RouterConfig,
@@ -198,7 +192,5 @@ export const resolvePresetName = (
     return undefined;
   }
 
-  return Object.keys(cfg.presets).find(
-    (name) => name.toLowerCase() === normalized,
-  );
-}
+  return Object.keys(cfg.presets).find((name) => name.toLowerCase() === normalized);
+};

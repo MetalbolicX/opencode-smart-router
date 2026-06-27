@@ -42,23 +42,16 @@ export interface LadderVerdict {
 
 export const tierRank = (tier: string, ladder: string[]): number => {
   return ladder.indexOf(tier);
-}
+};
 
-export const resolveStartTier = (
-  producerTier: string,
-  policy: EscalatePolicy,
-): string => {
+export const resolveStartTier = (producerTier: string, policy: EscalatePolicy): string => {
   const pi = tierRank(producerTier, policy.ladder);
-  const fi =
-    policy.floorTier != null ? tierRank(policy.floorTier, policy.ladder) : -1;
+  const fi = policy.floorTier != null ? tierRank(policy.floorTier, policy.ladder) : -1;
   const startIdx = Math.max(pi >= 0 ? pi : 0, fi >= 0 ? fi : 0);
   return policy.ladder[startIdx] ?? producerTier;
-}
+};
 
-export const newLadderState = (
-  producerTier: string,
-  policy: EscalatePolicy,
-): LadderState => {
+export const newLadderState = (producerTier: string, policy: EscalatePolicy): LadderState => {
   return {
     currentTier: resolveStartTier(producerTier, policy),
     attemptsThisTier: 0,
@@ -67,43 +60,34 @@ export const newLadderState = (
     firstAttemptCost: null,
     cumulativeCost: 0,
   };
-}
+};
 
-export const recordAttempt = (
-  state: LadderState,
-  costUnits = 0,
-): LadderState => {
+export const recordAttempt = (state: LadderState, costUnits = 0): LadderState => {
   return {
     ...state,
     totalAttempts: state.totalAttempts + 1,
     cumulativeCost: state.cumulativeCost + costUnits,
-    firstAttemptCost:
-      state.firstAttemptCost == null ? costUnits : state.firstAttemptCost,
+    firstAttemptCost: state.firstAttemptCost == null ? costUnits : state.firstAttemptCost,
   };
-}
+};
 
-export const nextTierAfter = (
-  currentTier: string,
-  policy: EscalatePolicy,
-): string | null => {
+export const nextTierAfter = (currentTier: string, policy: EscalatePolicy): string | null => {
   const ci = tierRank(currentTier, policy.ladder);
   if (ci >= 0 && ci + 1 <= policy.ladder.length - 1) {
     return policy.ladder[ci + 1]!;
   }
   return null;
-}
+};
 
 export const buildLadderForcingMessage = (reasons: string[]): string => {
   const list =
-    reasons.length === 0
-      ? "- (no reasons provided)"
-      : reasons.map((r) => `- ${r}`).join("\n");
+    reasons.length === 0 ? "- (no reasons provided)" : reasons.map((r) => `- ${r}`).join("\n");
   return (
     `[router escalation] previous attempt did not pass verification:\n` +
     list +
     `\nNEXT: retry with these failures addressed.`
   );
-}
+};
 
 export const nextAction = (
   state: LadderState,
@@ -163,7 +147,7 @@ export const nextAction = (
     tier: next,
     forcingMessage: buildLadderForcingMessage(verdict?.reasons ?? []),
   };
-}
+};
 
 export const advance = (state: LadderState, action: LadderAction): LadderState => {
   if (action.action === "retry") {
@@ -179,7 +163,7 @@ export const advance = (state: LadderState, action: LadderAction): LadderState =
   }
   // accept / give_up — terminal, return unchanged
   return state;
-}
+};
 
 export const buildEscalatePolicy = (cfg: RouterConfig): EscalatePolicy => {
   const esc = cfg.enforcement?.escalate;
@@ -190,7 +174,7 @@ export const buildEscalatePolicy = (cfg: RouterConfig): EscalatePolicy => {
     maxTotalAttempts: esc?.maxTotalAttempts ?? 4,
     costMultiple: esc?.costCeiling?.multiple ?? 4,
   };
-}
+};
 
 /**
  * One-line, secret-free scorecard for a finished delegation (counts only).
@@ -206,7 +190,7 @@ export const formatLadderScorecard = (
     `cost=${state.cumulativeCost} | verdict=${accepted ? "PASS" : "UNMET"} | ` +
     `method=${method}]`
   );
-}
+};
 
 /** Append-only temp-file dump for a finished delegation. Writes under
  *  `<tmpdir>/opencode-model-router-trajectory/<sid>.delegate.log` (same dir
@@ -220,4 +204,4 @@ export const dumpDelegateScorecard = (
 ): void => {
   const line = formatLadderScorecard(state, accepted, method);
   writeTrajectoryLog(sid, line, "delegate");
-}
+};

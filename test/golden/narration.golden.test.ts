@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { detectNarration } from "../../src/guard/narration";
 
 describe("detectNarration golden", () => {
@@ -11,9 +11,7 @@ describe("detectNarration golden", () => {
   });
 
   it("now i'll implement the handler", () => {
-    expect(
-      detectNarration("Now I'll implement the handler and then continue"),
-    ).toMatchSnapshot();
+    expect(detectNarration("Now I'll implement the handler and then continue")).toMatchSnapshot();
   });
 
   it("let me check the file", () => {
@@ -22,9 +20,7 @@ describe("detectNarration golden", () => {
 
   it("clean technical sentence no narration", () => {
     expect(
-      detectNarration(
-        "The function takes a string and returns a boolean value.",
-      ),
+      detectNarration("The function takes a string and returns a boolean value."),
     ).toMatchSnapshot();
   });
 

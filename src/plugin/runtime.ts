@@ -18,13 +18,12 @@
 // at the boundary. No `as unknown as` remains in this file.
 // ---------------------------------------------------------------------------
 
-import { tool, type Hooks, type ToolContext } from "@opencode-ai/plugin";
+import { type Hooks, type ToolContext, tool } from "@opencode-ai/plugin";
 
 import { handleCommandBefore } from "../router/commands";
 import type { Preset } from "../router/config";
+import type { PluginContext } from "./context";
 import { executeDelegate } from "./delegate";
-import type { DelegateArgs } from "./types";
-import type { HookEventPayload, HookPayload } from "./types";
 import {
   handleChatMessage,
   handleChatParams,
@@ -35,7 +34,7 @@ import {
   handleToolExecuteAfter,
   handleToolExecuteBefore,
 } from "./hooks";
-import type { PluginContext } from "./context";
+import type { DelegateArgs, HookEventPayload, HookPayload } from "./types";
 
 const DELEGATE_DESCRIPTION =
   "Delegate a task to a tier subagent (fast | medium | heavy). The subagent's result is INDEPENDENTLY VERIFIED (deterministic checks, or an independent grader at >= the producer tier in a fresh session) before it is returned. Returns an accepted result on PASS, or an honest 'unmet' status on FAIL — never a self-reported completion. Optionally pass an [acceptance]...[/acceptance] block to define the Definition of Done.";
@@ -62,21 +61,14 @@ type TextCompleteInput = Parameters<NonNullable<Hooks["experimental.text.complet
 type TextCompleteOutput = Parameters<NonNullable<Hooks["experimental.text.complete"]>>[1];
 type EventInput = Parameters<NonNullable<Hooks["event"]>>[0];
 type ConfigInput = Parameters<NonNullable<Hooks["config"]>>[0];
-type SystemTransformInput = Parameters<
-  NonNullable<Hooks["experimental.chat.system.transform"]>
->[0];
+type SystemTransformInput = Parameters<NonNullable<Hooks["experimental.chat.system.transform"]>>[0];
 type SystemTransformOutput = Parameters<
   NonNullable<Hooks["experimental.chat.system.transform"]>
 >[1];
-type CommandExecuteBeforeInput = Parameters<
-  NonNullable<Hooks["command.execute.before"]>
->[0];
-type CommandExecuteBeforeOutput = Parameters<
-  NonNullable<Hooks["command.execute.before"]>
->[1];
+type CommandExecuteBeforeInput = Parameters<NonNullable<Hooks["command.execute.before"]>>[0];
+type CommandExecuteBeforeOutput = Parameters<NonNullable<Hooks["command.execute.before"]>>[1];
 
-const toHookPayload = <T extends object>(v: T): HookPayload =>
-  v as Record<string, unknown>;
+const toHookPayload = <T extends object>(v: T): HookPayload => v as Record<string, unknown>;
 const toEventPayload = (v: object): HookEventPayload =>
   v as { event?: { type?: string; properties?: unknown } };
 
@@ -97,15 +89,11 @@ export const assembleRuntimeHooks = (
             delegate: tool({
               description: DELEGATE_DESCRIPTION,
               args: {
-                task: tool.schema
-                  .string()
-                  .describe("The task for the subagent to perform."),
+                task: tool.schema.string().describe("The task for the subagent to perform."),
                 tier: tool.schema
                   .string()
                   .optional()
-                  .describe(
-                    "fast | medium | heavy. Defaults to the router default tier.",
-                  ),
+                  .describe("fast | medium | heavy. Defaults to the router default tier."),
                 acceptance: tool.schema
                   .string()
                   .optional()
@@ -127,26 +115,18 @@ export const assembleRuntimeHooks = (
     "chat.message": (input: ChatMessageInput, output: ChatMessageOutput) =>
       handleChatMessage(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "tool.execute.before": (
-      input: ToolExecuteBeforeInput,
-      output: ToolExecuteBeforeOutput,
-    ) => handleToolExecuteBefore(ctx, toHookPayload(input), toHookPayload(output)),
+    "tool.execute.before": (input: ToolExecuteBeforeInput, output: ToolExecuteBeforeOutput) =>
+      handleToolExecuteBefore(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "tool.execute.after": (
-      input: ToolExecuteAfterInput,
-      output: ToolExecuteAfterOutput,
-    ) => handleToolExecuteAfter(ctx, toHookPayload(input), toHookPayload(output)),
+    "tool.execute.after": (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput) =>
+      handleToolExecuteAfter(ctx, toHookPayload(input), toHookPayload(output)),
 
-    "experimental.text.complete": (
-      input: TextCompleteInput,
-      output: TextCompleteOutput,
-    ) => handleTextComplete(ctx, toHookPayload(input), toHookPayload(output)),
+    "experimental.text.complete": (input: TextCompleteInput, output: TextCompleteOutput) =>
+      handleTextComplete(ctx, toHookPayload(input), toHookPayload(output)),
 
-    event: (payload: EventInput) =>
-      handleSessionIdle(ctx, toEventPayload(payload)),
+    event: (payload: EventInput) => handleSessionIdle(ctx, toEventPayload(payload)),
 
-    config: (opencodeConfig: ConfigInput) =>
-      handleConfig(ctx, activeTiersAtLoad, opencodeConfig),
+    config: (opencodeConfig: ConfigInput) => handleConfig(ctx, activeTiersAtLoad, opencodeConfig),
 
     "experimental.chat.system.transform": (
       input: SystemTransformInput,
@@ -156,10 +136,11 @@ export const assembleRuntimeHooks = (
     "command.execute.before": (
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput,
-    ) => handleCommandBefore(
-      ctx,
-      { command: input.command, arguments: input.arguments ?? "" },
-      output,
-    ),
+    ) =>
+      handleCommandBefore(
+        ctx,
+        { command: input.command, arguments: input.arguments ?? "" },
+        output,
+      ),
   };
-}
+};

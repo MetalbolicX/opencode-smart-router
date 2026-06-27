@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Loader-export contract test.
@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
 // ---------------------------------------------------------------------------
 
 describe("loader-export contract", () => {
-  it("runtime exports of src/index are exactly [\"default\"]", async () => {
+  it('runtime exports of src/index are exactly ["default"]', async () => {
     // ESM Module Namespace Object: keys reflect runtime exports only,
     // not type-only re-exports (which compile to nothing).
     const mod = await import("../../src/index");
@@ -71,14 +71,7 @@ describe("loader-export contract", () => {
 
     // Router commands: all six must be present after config() runs.
     expect(typeof opencodeConfig.command).toBe("object");
-    for (const name of [
-      "tiers",
-      "preset",
-      "budget",
-      "bypass",
-      "annotate-plan",
-      "router",
-    ]) {
+    for (const name of ["tiers", "preset", "budget", "bypass", "annotate-plan", "router"]) {
       expect(opencodeConfig.command[name]).toBeDefined();
       expect(typeof opencodeConfig.command[name].template).toBe("string");
       expect(typeof opencodeConfig.command[name].description).toBe("string");

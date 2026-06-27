@@ -1,5 +1,5 @@
+import type { GuardPolicy, GuardState } from "./guards";
 import { newGuardState } from "./guards";
-import type { GuardState, GuardPolicy } from "./guards";
 
 /**
  * Per-plugin-instance store of guard state, keyed by sessionID. Mirrors the

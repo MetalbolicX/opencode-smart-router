@@ -18,11 +18,11 @@
 //      tier order (activePreset, activeMode, tierCaps, tierPrompts,
 //      presets, taskPatterns, modes, fallback, rules, defaultTier).
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
 const TIERS_DIR = join(REPO_ROOT, "config", "tiers");
@@ -91,10 +91,9 @@ afterAll(() => {
 
 const runAssembler = (): { stdout: string; stderr: string } => {
   return {
-    stdout: execFileSync("node", [
-      "--experimental-strip-types",
-      ASSEMBLER_PATH,
-    ], { encoding: "utf-8" }),
+    stdout: execFileSync("node", ["--experimental-strip-types", ASSEMBLER_PATH], {
+      encoding: "utf-8",
+    }),
     stderr: "",
   };
 };
@@ -153,7 +152,10 @@ describe("tiers assembly — assembler invocation", () => {
     const assembled = JSON.parse(readFileSync(ASSEMBLED_PATH, "utf-8")) as Record<string, unknown>;
     for (const part of PARTS) {
       for (const key of part.expectedKeys) {
-        expect(assembled[key], `key "${key}" from ${part.label} missing in assembled output`).toBeDefined();
+        expect(
+          assembled[key],
+          `key "${key}" from ${part.label} missing in assembled output`,
+        ).toBeDefined();
       }
     }
   });

@@ -12,15 +12,6 @@
 // behavior byte-for-byte.
 // ---------------------------------------------------------------------------
 
-import { scrubText } from "../guard/scrub";
-import { accept } from "../verify/gate";
-import {
-  buildAcceptedSuffix,
-  buildDelegationDoD,
-  buildForcingNote,
-  buildGateDeps,
-  tierModel,
-} from "../verify/dispatch";
 import {
   advance,
   buildEscalatePolicy,
@@ -29,15 +20,20 @@ import {
   nextAction,
   recordAttempt,
 } from "../escalate/ladder";
+import { scrubText } from "../guard/scrub";
 import type { Preset } from "../router/config";
 import { getActiveTiers } from "../router/protocol";
 import { withTimeout } from "../utils/timeout";
+import {
+  buildAcceptedSuffix,
+  buildDelegationDoD,
+  buildForcingNote,
+  buildGateDeps,
+  tierModel,
+} from "../verify/dispatch";
+import { accept } from "../verify/gate";
 import type { PluginContext } from "./context";
-import type {
-  DelegateArgs,
-  SessionCreateResult,
-  SessionPromptResult,
-} from "./types";
+import type { DelegateArgs, SessionCreateResult, SessionPromptResult } from "./types";
 import { extractPromptText, extractSessionId } from "./types";
 
 /** Re-exported for IDE/test consumers — canonical shape lives in `./types`. */
@@ -99,10 +95,7 @@ export const executeDelegate = async (
 
     // Independent safety net: even a policy bug cannot loop unbounded.
     const safetyMax =
-      Math.max(
-        policy.maxTotalAttempts,
-        policy.ladder.length * (policy.maxAttemptsPerTier + 1),
-      ) + 2;
+      Math.max(policy.maxTotalAttempts, policy.ladder.length * (policy.maxAttemptsPerTier + 1)) + 2;
     let safety = 0;
 
     let producerText = "";
@@ -123,9 +116,7 @@ export const executeDelegate = async (
         );
       }
       const tier = state.currentTier;
-      const taskText = forcing
-        ? `${scrubText(forcing)}\n\n${args.task}`
-        : args.task;
+      const taskText = forcing ? `${scrubText(forcing)}\n\n${args.task}` : args.task;
 
       let created: SessionCreateResult;
       try {
@@ -249,9 +240,7 @@ export const executeDelegate = async (
         }
 
         const costRatio =
-          typeof tiersForCost?.[tier]?.costRatio === "number"
-            ? tiersForCost[tier].costRatio
-            : 1;
+          typeof tiersForCost?.[tier]?.costRatio === "number" ? tiersForCost[tier].costRatio : 1;
         state = recordAttempt(state, costRatio);
 
         const action = nextAction(
@@ -264,12 +253,7 @@ export const executeDelegate = async (
         if (action.action === "accept") {
           // Accept still wins on the very last attempt even if the user
           // cancelled mid-prompt — the producer's verified text is real.
-          dumpDelegateScorecard(
-            producerSid,
-            state,
-            true,
-            gateRes.verdict.method,
-          );
+          dumpDelegateScorecard(producerSid, state, true, gateRes.verdict.method);
           return producerText + buildAcceptedSuffix(gateRes.verdict.method);
         }
         if (action.action === "give_up") {
@@ -279,12 +263,7 @@ export const executeDelegate = async (
           if (action.reason === "aborted") {
             return "";
           }
-          dumpDelegateScorecard(
-            producerSid,
-            state,
-            false,
-            gateRes.verdict.method,
-          );
+          dumpDelegateScorecard(producerSid, state, false, gateRes.verdict.method);
           const note = scrubText(buildForcingNote(gateRes.verdict.reasons));
           return (
             `[router status: unmet] The delegated result was not accepted after ` +
@@ -318,4 +297,4 @@ export const executeDelegate = async (
     const reason = err instanceof Error ? err.message : String(err);
     return `[router] delegate failed (fail-closed): the delegation or verification could not complete (${reason}).`;
   }
-}
+};

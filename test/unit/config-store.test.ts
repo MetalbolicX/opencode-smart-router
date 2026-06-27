@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { createConfigStore } from "../../src/router/config-store";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readMergedConfig } from "../../src/router/config-loader";
+import { createConfigStore } from "../../src/router/config-store";
 
 // ---------------------------------------------------------------------------
 // Per-instance ConfigStore contract tests.

@@ -1,17 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  newGuardState,
-  isSelfScript,
   classify,
   evaluateGuards,
-  updateState,
-  recordBlock,
   forcingMessage,
-  trajectoryMetrics,
-  observationOk,
-  type GuardPolicy,
   type GuardCall,
+  type GuardPolicy,
   type GuardState,
+  isSelfScript,
+  newGuardState,
+  observationOk,
+  recordBlock,
+  trajectoryMetrics,
+  updateState,
 } from "../../src/guard/guards";
 
 // ---------------------------------------------------------------------------
@@ -49,12 +49,7 @@ describe("classify", () => {
     expect(classify({ tool }, policy)).toBe(expected);
   });
 
-  it.each([
-    ["grep"],
-    ["read"],
-    ["glob"],
-    ["ls"],
-  ])("tool=%s => read", (tool) => {
+  it.each([["grep"], ["read"], ["glob"], ["ls"]])("tool=%s => read", (tool) => {
     expect(classify({ tool }, policy)).toBe("read");
   });
 
@@ -84,9 +79,9 @@ describe("classify", () => {
   });
 
   it("bash with node -e '...' => self_script", () => {
-    expect(
-      classify({ tool: "bash", args: { command: "node -e 'console.log(1)'" } }, policy),
-    ).toBe("self_script");
+    expect(classify({ tool: "bash", args: { command: "node -e 'console.log(1)'" } }, policy)).toBe(
+      "self_script",
+    );
   });
 });
 
@@ -123,25 +118,27 @@ describe("isSelfScript", () => {
   });
 
   it("bash 'bash -c 'rm'' => true (BASH_C_RE)", () => {
-    expect(isSelfScript({ tool: "bash", args: { command: "bash -c 'rm -rf /tmp/x'" } }, policy)).toBe(true);
+    expect(
+      isSelfScript({ tool: "bash", args: { command: "bash -c 'rm -rf /tmp/x'" } }, policy),
+    ).toBe(true);
   });
 
   it("heredoc => true (HEREDOC_RE)", () => {
-    expect(
-      isSelfScript({ tool: "bash", args: { command: "cat <<EOF\nhello\nEOF" } }, policy),
-    ).toBe(true);
+    expect(isSelfScript({ tool: "bash", args: { command: "cat <<EOF\nhello\nEOF" } }, policy)).toBe(
+      true,
+    );
   });
 
   it("redirect to script => true (REDIRECT_SCRIPT_RE)", () => {
-    expect(
-      isSelfScript({ tool: "bash", args: { command: "echo hello > foo.sh" } }, policy),
-    ).toBe(true);
+    expect(isSelfScript({ tool: "bash", args: { command: "echo hello > foo.sh" } }, policy)).toBe(
+      true,
+    );
   });
 
   it("inline node -c => true (INLINE_SCRIPT_RE)", () => {
-    expect(
-      isSelfScript({ tool: "bash", args: { command: "node -c script.js" } }, policy),
-    ).toBe(true);
+    expect(isSelfScript({ tool: "bash", args: { command: "node -c script.js" } }, policy)).toBe(
+      true,
+    );
   });
 
   it("bash with empty command => false", () => {
@@ -179,7 +176,9 @@ describe("isSelfScript", () => {
     // The spec says test "bash   -c" (multi-space) still matches via \s+.
     // But the provided BASH_C_RE constant is /\bbash\s+-c\b/i which has \s+ (one or more).
     // Let me recheck: /\bbash\s+-c\b/i — yes, \s+ = one or more spaces. So multi-space works.
-    expect(isSelfScript({ tool: "bash", args: { command: "bash   -c 'echo hi'" } }, policy)).toBe(true);
+    expect(isSelfScript({ tool: "bash", args: { command: "bash   -c 'echo hi'" } }, policy)).toBe(
+      true,
+    );
   });
 
   it("args via 'cmd' key (alternate key)", () => {
@@ -236,17 +235,17 @@ describe("evaluateGuards", () => {
   it("self_script denied (guard anti_self_script)", () => {
     const p = makePolicy({ deliverableSignal: "write:output.txt", blockScriptWrites: true });
     const state = makeState(p);
-    const d = evaluateGuards(
-      state,
-      { tool: "write", args: { filePath: "run.sh" } },
-      p,
-    );
+    const d = evaluateGuards(state, { tool: "write", args: { filePath: "run.sh" } }, p);
     expect(d.allow).toBe(false);
     expect(d.guard).toBe("anti_self_script");
   });
 
   it("self_script with blockSelfScript:false => NOT denied by clause 2 (treated as mutation)", () => {
-    const p = makePolicy({ blockSelfScript: false, blockScriptWrites: true, deliverableSignal: null });
+    const p = makePolicy({
+      blockSelfScript: false,
+      blockScriptWrites: true,
+      deliverableSignal: null,
+    });
     const state = makeState(p);
     const d = evaluateGuards(state, { tool: "write", args: { filePath: "run.sh" } }, p);
     expect(d.allow).toBe(true);
@@ -339,13 +338,14 @@ describe("evaluateGuards", () => {
   });
 
   it("clause precedence: self_script + toolCallCount>=budget => anti_self_script (clause 2 before 3)", () => {
-    const p = makePolicy({ budget: 5, blockSelfScript: true, blockScriptWrites: true, deliverableSignal: null });
+    const p = makePolicy({
+      budget: 5,
+      blockSelfScript: true,
+      blockScriptWrites: true,
+      deliverableSignal: null,
+    });
     const state = makeState(p, { toolCallCount: 5, budget: 5 });
-    const d = evaluateGuards(
-      state,
-      { tool: "write", args: { filePath: "run.sh" } },
-      p,
-    );
+    const d = evaluateGuards(state, { tool: "write", args: { filePath: "run.sh" } }, p);
     expect(d.allow).toBe(false);
     expect(d.guard).toBe("anti_self_script");
   });
@@ -367,7 +367,11 @@ describe("evaluateGuards", () => {
   });
 
   it("blockScriptWrites:true write x.sh => evaluateGuards deny anti_self_script", () => {
-    const p = makePolicy({ blockSelfScript: true, blockScriptWrites: true, deliverableSignal: null });
+    const p = makePolicy({
+      blockSelfScript: true,
+      blockScriptWrites: true,
+      deliverableSignal: null,
+    });
     const state = makeState(p);
     const d = evaluateGuards(state, { tool: "write", args: { filePath: "x.sh" } }, p);
     expect(d.allow).toBe(false);
@@ -496,7 +500,11 @@ describe("recordBlock", () => {
 describe("forcingMessage", () => {
   it("with signal not executed => contains 'deliverable=NOT RUN' and 'run the deliverable'", () => {
     const p = makePolicy({ deliverableSignal: "write:output.ts" });
-    const s = makeState(p, { deliverableExecuted: false, toolCallCount: 3, consecutiveNonProducing: 2 });
+    const s = makeState(p, {
+      deliverableExecuted: false,
+      toolCallCount: 3,
+      consecutiveNonProducing: 2,
+    });
     const msg = forcingMessage(s, p);
     expect(msg).toContain("deliverable=NOT RUN");
     expect(msg).toContain("run the deliverable");
@@ -553,7 +561,7 @@ describe("trajectoryMetrics", () => {
 // ---------------------------------------------------------------------------
 
 const mulberry32 = (seed: number) => {
-  return function () {
+  return () => {
     seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -574,7 +582,10 @@ describe("property-based: invariants over random sequences", () => {
       case "read":
         return { tool, args: { filePath: file } };
       case "grep":
-        return { tool, args: { pattern: `pat${Math.floor(rng() * 3)}`, path: `dir${Math.floor(rng() * 2)}` } };
+        return {
+          tool,
+          args: { pattern: `pat${Math.floor(rng() * 3)}`, path: `dir${Math.floor(rng() * 2)}` },
+        };
       case "glob":
         return { tool, args: { pattern: `**/*.ts`, path: `dir${Math.floor(rng() * 2)}` } };
       case "ls":

@@ -1,15 +1,15 @@
 const KEYVALUE_RE =
-  /(\b(?:api[_-]?key|apikey|secret|token|password|passwd|pwd|authorization)\b\s*[:=]\s*)['"]?[A-Za-z0-9._\-]{6,}['"]?/gi;
+  /(\b(?:api[_-]?key|apikey|secret|token|password|passwd|pwd|authorization)\b\s*[:=]\s*)['"]?[A-Za-z0-9._-]{6,}['"]?/gi;
 
 const TOKEN_PATTERNS: RegExp[] = [
-  /\bsk-ant-[A-Za-z0-9_\-]{16,}/g,        // Anthropic
-  /\bsk-[A-Za-z0-9_\-]{20,}/g,            // OpenAI-style
-  /\bgh[posru]_[A-Za-z0-9]{20,}/g,        // GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_)
-  /\bAKIA[0-9A-Z]{16}\b/g,                // AWS access key id
-  /\bAIza[0-9A-Za-z_\-]{20,}/g,           // Google API key
-  /\bxox[baprs]-[A-Za-z0-9\-]{10,}/g,     // Slack
-  /\beyJ[A-Za-z0-9._\-]{20,}/g,           // JWT (header starts eyJ)
-  /\bBearer\s+[A-Za-z0-9._\-]+/gi,        // bearer tokens
+  /\bsk-ant-[A-Za-z0-9_-]{16,}/g, // Anthropic
+  /\bsk-[A-Za-z0-9_-]{20,}/g, // OpenAI-style
+  /\bgh[posru]_[A-Za-z0-9]{20,}/g, // GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_)
+  /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
+  /\bAIza[0-9A-Za-z_-]{20,}/g, // Google API key
+  /\bxox[baprs]-[A-Za-z0-9-]{10,}/g, // Slack
+  /\beyJ[A-Za-z0-9._-]{20,}/g, // JWT (header starts eyJ)
+  /\bBearer\s+[A-Za-z0-9._-]+/gi, // bearer tokens
 ];
 
 /**

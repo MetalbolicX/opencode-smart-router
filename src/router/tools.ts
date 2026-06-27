@@ -25,20 +25,10 @@
 // ---------------------------------------------------------------------------
 
 /** Tools that count against the read-only cap and never mutate the workspace. */
-export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
-  "grep",
-  "read",
-  "glob",
-  "ls",
-]);
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(["grep", "read", "glob", "ls"]);
 
 /** Tools that produce a changed-file record (used by `extractChangedFile`). */
-export const WRITE_TOOLS: ReadonlySet<string> = new Set([
-  "write",
-  "edit",
-  "patch",
-  "multiedit",
-]);
+export const WRITE_TOOLS: ReadonlySet<string> = new Set(["write", "edit", "patch", "multiedit"]);
 
 /** Broader mutation set used by the guard's `classify` to bucket tool calls. */
 export const MUTATION_TOOLS: ReadonlySet<string> = new Set([
@@ -50,8 +40,4 @@ export const MUTATION_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /** Tools that mark the delegation as terminally complete. */
-export const FINISH_TOOLS: ReadonlySet<string> = new Set([
-  "finish",
-  "return",
-  "task_complete",
-]);
+export const FINISH_TOOLS: ReadonlySet<string> = new Set(["finish", "return", "task_complete"]);

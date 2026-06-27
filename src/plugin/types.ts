@@ -71,9 +71,7 @@ export const isTextPart = (p: unknown): p is TextPart => {
  * Lines are joined with `\n` to preserve the original behavior of the
  * inline closures in `dispatchGrader` and `executeDelegate`.
  */
-export const extractPromptText = (
-  res: SessionPromptResult | null | undefined,
-): string => {
+export const extractPromptText = (res: SessionPromptResult | null | undefined): string => {
   const parts = res?.data?.parts;
   if (!parts || parts.length === 0) return "";
   const chunks: string[] = [];

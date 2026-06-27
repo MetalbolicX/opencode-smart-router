@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, renameSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  readState,
-  saveActivePreset,
-  saveActiveMode,
-  saveEnforcementMode,
+  configPath,
   globalConfigPath,
   localConfigPath,
+  readState,
   configPath as realConfigPath,
-  configPath,
+  saveActiveMode,
+  saveActivePreset,
+  saveEnforcementMode,
 } from "../../src/router/config";
 import { readMergedConfig } from "../../src/router/config-loader";
 import { createConfigStore } from "../../src/router/config-store";

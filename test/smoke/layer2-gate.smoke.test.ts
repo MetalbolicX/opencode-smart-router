@@ -22,10 +22,11 @@
  *      → console.warn + SOFT-PASS; this is orchestrator non-compliance, not a
  *      gate regression — never a false CI failure.
  */
-import { describe, it } from "vitest";
+
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, it } from "vitest";
 
 const RUN = process.env.RUN_OC_SMOKE === "1";
 const d = RUN ? describe : describe.skip;
@@ -58,152 +59,145 @@ const TASK_PROMPT_INNER = [
  * copy the inner prompt VERBATIM so the acceptance block reaches the tool call.
  */
 const PROMPT =
-  'Dispatch a fast subagent using the Task tool. ' +
+  "Dispatch a fast subagent using the Task tool. " +
   'Use subagent_type="fast" and copy the following text VERBATIM as the prompt ' +
   "(include EVERY line including the acceptance block — do NOT modify or omit any line):\n\n" +
   TASK_PROMPT_INNER +
   "\n\nAfter the subagent returns, reply with the single word DONE.";
 
 d("layer-2 acceptance gate smoke", () => {
-  it(
-    "Option(i) verify-dispatch appends NOT ACCEPTED when DoD file is absent",
-    () => {
-      fs.mkdirSync(OUT_DIR, { recursive: true });
+  it("Option(i) verify-dispatch appends NOT ACCEPTED when DoD file is absent", () => {
+    fs.mkdirSync(OUT_DIR, { recursive: true });
 
-      // Write a temporary opencode.json at the repo root that loads this plugin
-      // by absolute path.  Path is derived from __dirname so it is portable
-      // across machines and matches how the existing guard-hardblock smoke works.
-      const configPayload = JSON.stringify(
+    // Write a temporary opencode.json at the repo root that loads this plugin
+    // by absolute path.  Path is derived from __dirname so it is portable
+    // across machines and matches how the existing guard-hardblock smoke works.
+    const configPayload = JSON.stringify(
+      {
+        $schema: "https://opencode.ai/config.json",
+        plugin: [PLUGIN_PATH],
+      },
+      null,
+      2,
+    );
+    fs.writeFileSync(TEMP_CONFIG, configPayload, "utf8");
+
+    try {
+      const start = Date.now();
+
+      const result = spawnSync(
+        "opencode",
+        [
+          "run",
+          PROMPT,
+          "--model",
+          "anthropic/claude-haiku-4-5",
+          "--format",
+          "json",
+          "--dangerously-skip-permissions",
+        ],
         {
-          $schema: "https://opencode.ai/config.json",
-          plugin: [PLUGIN_PATH],
+          cwd: REPO_ROOT,
+          env: { ...process.env, MODEL_ROUTER_ENFORCE: "1" },
+          encoding: "utf8",
+          maxBuffer: 20 * 1024 * 1024,
+          timeout: 180_000,
         },
-        null,
-        2,
       );
-      fs.writeFileSync(TEMP_CONFIG, configPayload, "utf8");
 
-      try {
-        const start = Date.now();
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      console.log(`opencode exited in ${elapsed}s, status=${result.status}`);
 
-        const result = spawnSync(
-          "opencode",
-          [
-            "run",
-            PROMPT,
-            "--model",
-            "anthropic/claude-haiku-4-5",
-            "--format",
-            "json",
-            "--dangerously-skip-permissions",
-          ],
+      const stdout = result.stdout ?? "";
+      const stderr = result.stderr ?? "";
+
+      fs.writeFileSync(
+        OUT_FILE,
+        JSON.stringify(
           {
-            cwd: REPO_ROOT,
-            env: { ...process.env, MODEL_ROUTER_ENFORCE: "1" },
-            encoding: "utf8",
-            maxBuffer: 20 * 1024 * 1024,
-            timeout: 180_000,
+            exitCode: result.status,
+            elapsed,
+            stdout,
+            stderr: stderr.slice(0, 4_000),
           },
-        );
+          null,
+          2,
+        ),
+      );
 
-        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-        console.log(`opencode exited in ${elapsed}s, status=${result.status}`);
-
-        const stdout = result.stdout ?? "";
-        const stderr = result.stderr ?? "";
-
-        fs.writeFileSync(
-          OUT_FILE,
-          JSON.stringify(
-            {
-              exitCode: result.status,
-              elapsed,
-              stdout,
-              stderr: stderr.slice(0, 4_000),
-            },
-            null,
-            2,
-          ),
-        );
-
-        // ── exit-code check ──────────────────────────────────────────────────
-        if (result.status !== 0) {
-          const excerpt = (stdout + "\n" + stderr).slice(0, 600);
-          throw new Error(
-            `opencode exited with code ${result.status}.\nExcerpt:\n${excerpt}`,
-          );
-        }
-
-        // ── detect whether a task tool call was dispatched ───────────────────
-        // Search the raw output text rather than walking a brittle JSON object
-        // path so the detection is resilient to schema changes in opencode's
-        // --format json output.
-        const lower = stdout.toLowerCase();
-        const taskDispatched =
-          lower.includes('"name":"task"') ||
-          lower.includes('"name": "task"') ||
-          lower.includes("task_result") ||
-          lower.includes("<task_result>");
-
-        if (!taskDispatched) {
-          // Orchestrator refused to dispatch a subagent — SOFT-PASS.
-          //
-          // GA-3 (Layer-2 acceptance gate) is primarily proven by the
-          // deterministic real-factory integration test:
-          //   test/integration/layer2-wiring.test.ts  (cases A, D, E)
-          // which exercises buildForcingNote / verifyDoD directly against the
-          // real factory without requiring a live orchestrator.  The live
-          // end-to-end path shape is spike-proven; a Haiku compliance refusal
-          // here is not a gate regression.
-          console.warn(
-            "[layer2-gate smoke] Orchestrator did NOT dispatch a subagent " +
-              "(no task tool call detected in captured output). " +
-              "SOFT-PASS — GA-3 deterministic coverage lives in " +
-              "test/integration/layer2-wiring.test.ts (cases A, D, E).",
-          );
-          return; // soft-pass: do not throw
-        }
-
-        // ── task was dispatched — look for the forcing note ──────────────────
-        // Option(i) verify-dispatch fires inside tool.execute.after for the
-        // built-in task tool when MODEL_ROUTER_ENFORCE=1.  When the fileExists
-        // check for __definitely_missing_artifact__.txt fails (the file does
-        // not exist), buildForcingNote() is invoked and its first line is
-        // "NOT ACCEPTED".  We search the raw text case-insensitively.
-        const notAccepted =
-          stdout.includes("NOT ACCEPTED") || lower.includes("not accepted");
-
-        if (!notAccepted) {
-          // Task was dispatched but the forcing note is absent.  This happens
-          // when the orchestrator did not copy the [acceptance] block verbatim
-          // into the task prompt (model non-compliance with the instruction).
-          // This is NOT a gate regression — SOFT-PASS to prevent false CI
-          // failures.  Hard assertion coverage remains in layer2-wiring.test.ts.
-          console.warn(
-            '[layer2-gate smoke] Task was dispatched but "NOT ACCEPTED" forcing ' +
-              "note was NOT found in captured output. " +
-              "The orchestrator likely omitted the [acceptance] block from the " +
-              "dispatched task prompt (model non-compliance). " +
-              "SOFT-PASS — not a gate regression.",
-          );
-          return; // soft-pass
-        }
-
-        // Ideal path: dispatch confirmed AND forcing note present.
-        console.log(
-          '[layer2-gate smoke] "NOT ACCEPTED" forcing note confirmed — ' +
-            "Option(i) verify-dispatch fired correctly on absent DoD artifact.",
-        );
-        console.log(`Evidence written to: ${OUT_FILE}`);
-      } finally {
-        // Always remove the temp opencode.json so the repo is left clean.
-        try {
-          fs.unlinkSync(TEMP_CONFIG);
-        } catch {
-          // Already absent or a parallel process removed it — ignore.
-        }
+      // ── exit-code check ──────────────────────────────────────────────────
+      if (result.status !== 0) {
+        const excerpt = (stdout + "\n" + stderr).slice(0, 600);
+        throw new Error(`opencode exited with code ${result.status}.\nExcerpt:\n${excerpt}`);
       }
-    },
-    185_000,
-  );
+
+      // ── detect whether a task tool call was dispatched ───────────────────
+      // Search the raw output text rather than walking a brittle JSON object
+      // path so the detection is resilient to schema changes in opencode's
+      // --format json output.
+      const lower = stdout.toLowerCase();
+      const taskDispatched =
+        lower.includes('"name":"task"') ||
+        lower.includes('"name": "task"') ||
+        lower.includes("task_result") ||
+        lower.includes("<task_result>");
+
+      if (!taskDispatched) {
+        // Orchestrator refused to dispatch a subagent — SOFT-PASS.
+        //
+        // GA-3 (Layer-2 acceptance gate) is primarily proven by the
+        // deterministic real-factory integration test:
+        //   test/integration/layer2-wiring.test.ts  (cases A, D, E)
+        // which exercises buildForcingNote / verifyDoD directly against the
+        // real factory without requiring a live orchestrator.  The live
+        // end-to-end path shape is spike-proven; a Haiku compliance refusal
+        // here is not a gate regression.
+        console.warn(
+          "[layer2-gate smoke] Orchestrator did NOT dispatch a subagent " +
+            "(no task tool call detected in captured output). " +
+            "SOFT-PASS — GA-3 deterministic coverage lives in " +
+            "test/integration/layer2-wiring.test.ts (cases A, D, E).",
+        );
+        return; // soft-pass: do not throw
+      }
+
+      // ── task was dispatched — look for the forcing note ──────────────────
+      // Option(i) verify-dispatch fires inside tool.execute.after for the
+      // built-in task tool when MODEL_ROUTER_ENFORCE=1.  When the fileExists
+      // check for __definitely_missing_artifact__.txt fails (the file does
+      // not exist), buildForcingNote() is invoked and its first line is
+      // "NOT ACCEPTED".  We search the raw text case-insensitively.
+      const notAccepted = stdout.includes("NOT ACCEPTED") || lower.includes("not accepted");
+
+      if (!notAccepted) {
+        // Task was dispatched but the forcing note is absent.  This happens
+        // when the orchestrator did not copy the [acceptance] block verbatim
+        // into the task prompt (model non-compliance with the instruction).
+        // This is NOT a gate regression — SOFT-PASS to prevent false CI
+        // failures.  Hard assertion coverage remains in layer2-wiring.test.ts.
+        console.warn(
+          '[layer2-gate smoke] Task was dispatched but "NOT ACCEPTED" forcing ' +
+            "note was NOT found in captured output. " +
+            "The orchestrator likely omitted the [acceptance] block from the " +
+            "dispatched task prompt (model non-compliance). " +
+            "SOFT-PASS — not a gate regression.",
+        );
+        return; // soft-pass
+      }
+
+      // Ideal path: dispatch confirmed AND forcing note present.
+      console.log(
+        '[layer2-gate smoke] "NOT ACCEPTED" forcing note confirmed — ' +
+          "Option(i) verify-dispatch fired correctly on absent DoD artifact.",
+      );
+      console.log(`Evidence written to: ${OUT_FILE}`);
+    } finally {
+      // Always remove the temp opencode.json so the repo is left clean.
+      try {
+        fs.unlinkSync(TEMP_CONFIG);
+      } catch {
+        // Already absent or a parallel process removed it — ignore.
+      }
+    }
+  }, 185_000);
 });

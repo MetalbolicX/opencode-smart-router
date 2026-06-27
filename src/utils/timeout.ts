@@ -34,14 +34,10 @@ export const withTimeout = async <T>(
   const race = Promise.race([
     promise,
     new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`${label} timed out after ${ms}ms`)),
-        ms,
-      );
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
 
       if (signal) {
-        abortListener = () =>
-          reject(new DOMException("aborted", "AbortError"));
+        abortListener = () => reject(new DOMException("aborted", "AbortError"));
         signal.addEventListener("abort", abortListener);
       }
     }),

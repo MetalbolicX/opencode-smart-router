@@ -1,10 +1,5 @@
-import { describe, it, expect } from "vitest";
-import {
-  READ_ONLY_TOOLS,
-  WRITE_TOOLS,
-  FINISH_TOOLS,
-  MUTATION_TOOLS,
-} from "../../src/router/tools";
+import { describe, expect, it } from "vitest";
+import { FINISH_TOOLS, MUTATION_TOOLS, READ_ONLY_TOOLS, WRITE_TOOLS } from "../../src/router/tools";
 
 // ---------------------------------------------------------------------------
 // Shared tool classification sets (src/router/tools.ts).
@@ -23,30 +18,15 @@ describe("src/router/tools.ts", () => {
   });
 
   it("WRITE_TOOLS contains write, edit, patch, multiedit", () => {
-    expect([...WRITE_TOOLS].sort()).toEqual([
-      "edit",
-      "multiedit",
-      "patch",
-      "write",
-    ]);
+    expect([...WRITE_TOOLS].sort()).toEqual(["edit", "multiedit", "patch", "write"]);
   });
 
   it("MUTATION_TOOLS contains write, edit, patch, bash, multiedit", () => {
-    expect([...MUTATION_TOOLS].sort()).toEqual([
-      "bash",
-      "edit",
-      "multiedit",
-      "patch",
-      "write",
-    ]);
+    expect([...MUTATION_TOOLS].sort()).toEqual(["bash", "edit", "multiedit", "patch", "write"]);
   });
 
   it("FINISH_TOOLS contains finish, return, task_complete", () => {
-    expect([...FINISH_TOOLS].sort()).toEqual([
-      "finish",
-      "return",
-      "task_complete",
-    ]);
+    expect([...FINISH_TOOLS].sort()).toEqual(["finish", "return", "task_complete"]);
   });
 
   it("READ_ONLY_TOOLS and MUTATION_TOOLS are disjoint", () => {

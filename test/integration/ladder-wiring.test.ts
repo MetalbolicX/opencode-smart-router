@@ -7,10 +7,10 @@
  * No live models, no network.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 
 // ---------------------------------------------------------------------------
@@ -42,8 +42,7 @@ const makeCtxWithQueues = (
         prompt: async (opts: any) => {
           if (opts?.body?.system !== undefined) {
             // GRADER call (dispatchGrader always sets body.system)
-            const text =
-              graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
+            const text = graderQueue.shift() ?? '{"pass":true,"reasons":[]}';
             return { data: { parts: [{ type: "text", text }] } };
           }
           // PRODUCER call
@@ -69,8 +68,7 @@ describe("Layer-3 escalation ladder wiring", () => {
   let savedHome: string | undefined;
   let savedUserProfile: string | undefined;
 
-  const acceptance =
-    "[acceptance]\ncriteria: the result is correct\n[/acceptance]";
+  const acceptance = "[acceptance]\ncriteria: the result is correct\n[/acceptance]";
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "ml3-"));
@@ -108,10 +106,7 @@ describe("Layer-3 escalation ladder wiring", () => {
 
   it("CASE A: retry-same-tier -> PASS", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
-    const graderQueue = [
-      '{"pass":false,"reasons":["nope"]}',
-      '{"pass":true,"reasons":[]}',
-    ];
+    const graderQueue = ['{"pass":false,"reasons":["nope"]}', '{"pass":true,"reasons":[]}'];
 
     const hooks: any = await ModelRouterPlugin(
       makeCtxWithQueues(dir, producerCalls, graderQueue) as any,
@@ -165,9 +160,7 @@ describe("Layer-3 escalation ladder wiring", () => {
   it("CASE C: give_up after maxTotalAttempts", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
     // Provide more than enough failures to ensure the queue never runs dry.
-    const graderQueue = Array<string>(6).fill(
-      '{"pass":false,"reasons":["bad"]}',
-    );
+    const graderQueue = Array<string>(6).fill('{"pass":false,"reasons":["bad"]}');
 
     const hooks: any = await ModelRouterPlugin(
       makeCtxWithQueues(dir, producerCalls, graderQueue) as any,

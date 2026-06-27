@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { executeDelegate } from "../../src/plugin/delegate";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
+import { executeDelegate } from "../../src/plugin/delegate";
 import type { RouterConfig } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------
@@ -25,9 +24,8 @@ import type { RouterConfig } from "../../src/router/config";
 // without driving the real checker/deterministic pipeline.
 const acceptMock = vi.fn();
 vi.mock("../../src/verify/gate", async () => {
-  const actual = await vi.importActual<typeof import("../../src/verify/gate")>(
-    "../../src/verify/gate",
-  );
+  const actual =
+    await vi.importActual<typeof import("../../src/verify/gate")>("../../src/verify/gate");
   return { ...actual, accept: (...args: unknown[]) => acceptMock(...args) };
 });
 
@@ -159,8 +157,7 @@ const makeCtx = (opts: {
             ? opts.promptImpl
             : async (req: any) => {
                 const id = req?.path?.id ?? "?";
-                const text =
-                  req?.body?.parts?.[0]?.text ?? "(no text)";
+                const text = req?.body?.parts?.[0]?.text ?? "(no text)";
                 const last = sessions.find((s) => s.sessionID === id);
                 if (last) last.promptText = text;
                 return { data: { parts: [{ type: "text", text: "I did it." }] } };
@@ -229,7 +226,7 @@ const makeCtx = (opts: {
   };
 
   return { ctx, sessions, counters };
-}
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -803,9 +800,11 @@ describe("executeDelegate — parentSessionID propagation", () => {
 
     expect(out).toContain("[router status: unmet]");
     expect(createCalls.length).toBeGreaterThan(0);
-    expect(createCalls.every((req) => {
-      return JSON.stringify(req) === JSON.stringify({ body: { parentID: "parent-sid-fail" } });
-    })).toBe(true);
+    expect(
+      createCalls.every((req) => {
+        return JSON.stringify(req) === JSON.stringify({ body: { parentID: "parent-sid-fail" } });
+      }),
+    ).toBe(true);
   });
 });
 
@@ -919,12 +918,7 @@ describe("executeDelegate — AbortSignal forwarding (PR 2)", () => {
         return { data: { id: "sess_1" } };
       },
     });
-    await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(createCalls).toHaveLength(1);
     expect((createCalls[0] as { signal?: AbortSignal }).signal).toBe(ac.signal);
   });
@@ -945,12 +939,7 @@ describe("executeDelegate — AbortSignal forwarding (PR 2)", () => {
         };
       },
     });
-    await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(promptCalls).toHaveLength(1);
     expect((promptCalls[0] as { signal?: AbortSignal }).signal).toBe(ac.signal);
   });
@@ -995,12 +984,7 @@ describe("executeDelegate — abort before loop starts (top-of-loop check)", () 
         return { data: { parts: [{ type: "text", text: "should not run" }] } };
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
     expect(createCalls).toHaveLength(0);
     expect(promptCalls).toHaveLength(0);
@@ -1037,12 +1021,7 @@ describe("executeDelegate — abort between create and prompt (post-create check
         },
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
     // The producer session created just before the abort MUST be cleaned up.
     expect(unregisterCalls).toContain("sess_aborted_between");
@@ -1075,12 +1054,7 @@ describe("executeDelegate — abort during session.prompt", () => {
         },
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
     expect(unregisterCalls).toContain("sess_prompt_aborted");
     expect(clearCalls).toContain("sess_prompt_aborted");
@@ -1096,12 +1070,7 @@ describe("executeDelegate — abort during session.prompt", () => {
         throw new DOMException("aborted", "AbortError");
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
     expect(acceptMock).not.toHaveBeenCalled();
   });
@@ -1123,12 +1092,7 @@ describe("executeDelegate — abort during session.prompt", () => {
         throw new Error("transport boom");
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     // Not aborted, so the ladder runs normally and produces an unmet status.
     expect(ac.signal.aborted).toBe(false);
     expect(out).toContain("[router status: unmet]");
@@ -1156,12 +1120,7 @@ describe("executeDelegate — abort during ladder eval (post-abort give_up short
         data: { parts: [{ type: "text", text: "attempt done" }] },
       }),
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
     expect(out).not.toContain("[router status:");
     expect(out).not.toContain("[router] delegate failed");
@@ -1189,12 +1148,7 @@ describe("executeDelegate — post-completion abort is a no-op", () => {
         return res;
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(promptResolved).toBe(true);
     // The accepted verdict wins; the late abort cannot rewrite the result.
     expect(out).toContain("[router ✓ accepted: deterministic]");
@@ -1222,12 +1176,7 @@ describe("executeDelegate — multiple aborts are idempotent", () => {
         throw new DOMException("aborted", "AbortError");
       },
     });
-    const out = await executeDelegate(
-      ctx,
-      { task: "say hi", tier: "fast" },
-      undefined,
-      ac.signal,
-    );
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" }, undefined, ac.signal);
     expect(out).toBe("");
   });
 });
@@ -1332,12 +1281,11 @@ describe("executeDelegate — runtime forwards context.abort to executeDelegate"
   // call site.
   it("runtime.ts delegate tool handler forwards context.abort", async () => {
     const src = await import("node:fs").then((fs) =>
-      fs.readFileSync(
-        new URL("../../src/plugin/runtime.ts", import.meta.url),
-        "utf8",
-      ),
+      fs.readFileSync(new URL("../../src/plugin/runtime.ts", import.meta.url), "utf8"),
     );
-    expect(src).toMatch(/executeDelegate\(\s*ctx,\s*args,\s*context\.sessionID,\s*context\.abort\s*\)/);
+    expect(src).toMatch(
+      /executeDelegate\(\s*ctx,\s*args,\s*context\.sessionID,\s*context\.abort\s*\)/,
+    );
   });
 
   it("executeDelegate signature accepts an optional 4th AbortSignal parameter", async () => {
@@ -1355,4 +1303,3 @@ describe("executeDelegate — runtime forwards context.abort to executeDelegate"
     // proof for the call site.
   });
 });
-

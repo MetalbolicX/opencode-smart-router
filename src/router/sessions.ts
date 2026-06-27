@@ -1,6 +1,6 @@
-import type { RouterConfig } from "./config";
 import { fingerprintToolCall } from "../guard/fingerprint";
 import { isTextPart } from "../plugin/types";
+import type { RouterConfig } from "./config";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,7 +40,7 @@ export const parseCapDirective = (text: string): Cap | null => {
   if (raw === "none") return "none";
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Dispatch text extractor (internal)
@@ -68,7 +68,7 @@ const extractDispatchText = (output: unknown): string => {
     if (typeof content === "string") chunks.push(content);
   }
   return chunks.join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // Cap banner builder
@@ -98,14 +98,12 @@ export const buildCapBanner = (
         `[⚠ CAP REACHED (${state.calls}/${state.cap}): your NEXT response MUST be a return — do NOT make another read-only call. Start the response with DONE:, NEED MORE:, NEED CONTEXT:, SCOPE GROWTH:, or ESCALATE:.]`,
       );
     } else if (remaining <= 2) {
-      lines.push(
-        `[⚠ CAP WARNING: ${remaining} read-only call(s) remaining before forced return]`,
-      );
+      lines.push(`[⚠ CAP WARNING: ${remaining} read-only call(s) remaining before forced return]`);
     }
   }
 
   return lines.join("\n");
-}
+};
 
 // ---------------------------------------------------------------------------
 // Read-only tools set (used by the session store)
@@ -121,7 +119,7 @@ export const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
 /** Normalise a taskPattern keyword to a lowercase stem for substring matching. */
 const normTaskKw = (kw: string): string => {
   return kw.toLowerCase().split("(")[0]!.split("/")[0]!.trim();
-}
+};
 
 /**
  * Classify a dispatch as "trivial" AT DISPATCH TIME (m2): conservative,
@@ -138,10 +136,7 @@ export const classifyTrivial = (
   if (tier !== "fast") return false;
   const text = (dispatchText || "").toLowerCase();
   if (!text.trim()) return false;
-  const disqualifiers = [
-    ...(cfg.taskPatterns?.medium ?? []),
-    ...(cfg.taskPatterns?.heavy ?? []),
-  ];
+  const disqualifiers = [...(cfg.taskPatterns?.medium ?? []), ...(cfg.taskPatterns?.heavy ?? [])];
   for (const kw of disqualifiers) {
     const n = normTaskKw(kw);
     if (n.length >= 3 && text.includes(n)) return false;
@@ -152,7 +147,7 @@ export const classifyTrivial = (
     if (n.length >= 3 && text.includes(n)) return true;
   }
   return false;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Session store factory
@@ -226,8 +221,7 @@ export const createSessionStore = () => {
         const tierName = input.agent;
         const dispatchText = extractDispatchText(output);
         const override = parseCapDirective(dispatchText);
-        const baseline =
-          cfg.tierCaps?.[tierName] ?? DEFAULT_TIER_CAPS[tierName] ?? 5;
+        const baseline = cfg.tierCaps?.[tierName] ?? DEFAULT_TIER_CAPS[tierName] ?? 5;
         const cap: Cap = override ?? baseline;
         subagentCapState.set(input.sessionID, {
           tierName,
@@ -263,9 +257,8 @@ export const createSessionStore = () => {
 
       const banner = buildCapBanner(state, isRedundant, previousCall, input.tool);
 
-      const existing =
-        typeof outputRef.output === "string" ? outputRef.output : "";
+      const existing = typeof outputRef.output === "string" ? outputRef.output : "";
       outputRef.output = existing ? `${existing}\n\n${banner}` : banner;
     },
   };
-}
+};

@@ -19,9 +19,10 @@ export interface ExecResult {
   timedOut?: boolean;
 }
 
-export interface ExecSeam {
-  (command: string, opts?: { cwd?: string; timeoutMs?: number }): Promise<ExecResult>;
-}
+export type ExecSeam = (
+  command: string,
+  opts?: { cwd?: string; timeoutMs?: number },
+) => Promise<ExecResult>;
 
 export interface FsSeam {
   fileExists(path: string): Promise<boolean>;

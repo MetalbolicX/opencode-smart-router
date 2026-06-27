@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { scrubText } from "../../src/guard/scrub";
-import { buildForcingNote } from "../../src/verify/dispatch";
-import { buildGradingPrompt } from "../../src/verify/checker";
+import { describe, expect, it } from "vitest";
 import { formatScorecard } from "../../src/guard/enforce";
 import type { GuardState } from "../../src/guard/guards";
+import { scrubText } from "../../src/guard/scrub";
+import { buildGradingPrompt } from "../../src/verify/checker";
+import { buildForcingNote } from "../../src/verify/dispatch";
 
 // ---------------------------------------------------------------------------
 // Secret fixtures — shapes scrubText is known to redact (verified against
@@ -49,10 +49,7 @@ describe("security scrub sweep", () => {
 
   it("forcing note is scrubbed before emission", () => {
     const note = scrubText(
-      buildForcingNote([
-        `failed: ${SECRETS.anthropic}`,
-        `token leak ${SECRETS.kv}`,
-      ]),
+      buildForcingNote([`failed: ${SECRETS.anthropic}`, `token leak ${SECRETS.kv}`]),
     );
     assertScrubbed(note);
   });

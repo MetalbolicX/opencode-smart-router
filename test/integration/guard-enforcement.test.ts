@@ -1,10 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { DEFAULT_GUARD_BUDGET, guardAfterCall, guardBeforeCall } from "../../src/guard/enforce";
 import { createGuardStore } from "../../src/guard/store";
-import {
-  guardBeforeCall,
-  guardAfterCall,
-  DEFAULT_GUARD_BUDGET,
-} from "../../src/guard/enforce";
 import type { RouterConfig } from "../../src/router/config";
 
 describe("guard-enforcement integration", () => {
@@ -17,17 +13,49 @@ describe("guard-enforcement integration", () => {
     const readArgs = { file_path: "a.ts" };
 
     // First read
-    const r1 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: readArgs, store, env });
+    const r1 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: readArgs,
+      store,
+      env,
+    });
     expect(r1.block).toBe(false);
     const out1 = { output: "original" };
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: readArgs, output: out1, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: readArgs,
+      output: out1,
+      store,
+    });
     expect(out1.output).toBe("original");
 
     // Second read (would trigger redundant_read in enforced mode)
-    const r2 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: readArgs, store, env });
+    const r2 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: readArgs,
+      store,
+      env,
+    });
     expect(r2.block).toBe(false);
     const out2 = { output: "original2" };
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: readArgs, output: out2, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: readArgs,
+      output: out2,
+      store,
+    });
     expect(out2.output).toBe("original2");
 
     // Guard state was never created in off mode
@@ -105,12 +133,36 @@ describe("guard-enforcement integration", () => {
     const args = { file_path: "a.ts" };
 
     // First read: allowed + after
-    const r1 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, store, env });
+    const r1 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      store,
+      env,
+    });
     expect(r1.block).toBe(false);
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, output: { output: "contents" }, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      output: { output: "contents" },
+      store,
+    });
 
     // Second identical read: blocked
-    const r2 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, store, env });
+    const r2 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      store,
+      env,
+    });
     expect(r2.block).toBe(true);
     expect(r2.guard).toBe("redundant_read");
   });
@@ -124,13 +176,37 @@ describe("guard-enforcement integration", () => {
 
     for (const f of ["a.ts", "b.ts", "c.ts"]) {
       const a = { file_path: f };
-      const r = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: a, store, env });
+      const r = guardBeforeCall({
+        cfg,
+        tier: null,
+        sessionID: sid,
+        tool: "read",
+        toolArgs: a,
+        store,
+        env,
+      });
       expect(r.block).toBe(false);
-      guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: a, output: { output: "ok" }, store });
+      guardAfterCall({
+        cfg,
+        tier: null,
+        sessionID: sid,
+        tool: "read",
+        toolArgs: a,
+        output: { output: "ok" },
+        store,
+      });
     }
 
     // 4th distinct read hits the read_budget clause
-    const r4 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: { file_path: "d.ts" }, store, env });
+    const r4 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: { file_path: "d.ts" },
+      store,
+      env,
+    });
     expect(r4.block).toBe(true);
     expect(r4.guard).toBe("read_budget");
   });
@@ -138,18 +214,44 @@ describe("guard-enforcement integration", () => {
   // 7: ENFORCED budget ceiling: budget=2, two writes then third call blocked
   it("7: ENFORCED budget ceiling (budget=2) — 3rd call blocked with iteration_cap", () => {
     const store = createGuardStore();
-    const cfg = { enforcement: { mode: "enforced", guard: { budget: 2 } } } as unknown as RouterConfig;
+    const cfg = {
+      enforcement: { mode: "enforced", guard: { budget: 2 } },
+    } as unknown as RouterConfig;
     const env: Record<string, string | undefined> = {};
     const sid = "s7";
 
     for (const f of ["out.json", "out2.json"]) {
       const a = { filePath: f };
-      const r = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: a, store, env });
+      const r = guardBeforeCall({
+        cfg,
+        tier: null,
+        sessionID: sid,
+        tool: "write",
+        toolArgs: a,
+        store,
+        env,
+      });
       expect(r.block).toBe(false);
-      guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: a, output: { output: "ok" }, store });
+      guardAfterCall({
+        cfg,
+        tier: null,
+        sessionID: sid,
+        tool: "write",
+        toolArgs: a,
+        output: { output: "ok" },
+        store,
+      });
     }
 
-    const r3 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out3.json" }, store, env });
+    const r3 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out3.json" },
+      store,
+      env,
+    });
     expect(r3.block).toBe(true);
     expect(r3.guard).toBe("iteration_cap");
   });
@@ -163,18 +265,50 @@ describe("guard-enforcement integration", () => {
     const args = { file_path: "a.ts" };
 
     // First read: allowed + after
-    const r1 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, store, env });
+    const r1 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      store,
+      env,
+    });
     expect(r1.block).toBe(false);
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, output: { output: "first contents" }, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      output: { output: "first contents" },
+      store,
+    });
 
     // Second identical read: advisory never blocks
-    const r2 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, store, env });
+    const r2 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      store,
+      env,
+    });
     expect(r2.block).toBe(false);
     expect(r2.guard).toBe("redundant_read");
 
     // Simulate execution, then after-hook appends banner
     const out2 = { output: "second contents" };
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "read", toolArgs: args, output: out2, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "read",
+      toolArgs: args,
+      output: out2,
+      store,
+    });
     expect(String(out2.output)).toContain("GUARD:redundant_read");
   });
 
@@ -198,30 +332,88 @@ describe("guard-enforcement integration", () => {
   // 10: guardAfterCall ok=false when output starts with "Error"; toolCallCount still advances
   it("10: guardAfterCall ok=false on error output; budget still advances", () => {
     const store = createGuardStore();
-    const cfg = { enforcement: { mode: "enforced", guard: { budget: 3 } } } as unknown as RouterConfig;
+    const cfg = {
+      enforcement: { mode: "enforced", guard: { budget: 3 } },
+    } as unknown as RouterConfig;
     const env: Record<string, string | undefined> = {};
     const sid = "s10";
 
     // Write 1: error output => ok:false, but toolCallCount still increments to 1
-    const r1 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out.json" }, store, env });
+    const r1 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out.json" },
+      store,
+      env,
+    });
     expect(r1.block).toBe(false);
     const out1 = { output: "Error: boom" };
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out.json" }, output: out1, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out.json" },
+      output: out1,
+      store,
+    });
     // No pending note in enforced mode; output is unchanged
     expect(out1.output).toBe("Error: boom");
 
     // Write 2: toolCallCount=1 < 3 => allowed
-    const r2 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out2.json" }, store, env });
+    const r2 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out2.json" },
+      store,
+      env,
+    });
     expect(r2.block).toBe(false);
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out2.json" }, output: { output: "ok" }, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out2.json" },
+      output: { output: "ok" },
+      store,
+    });
 
     // Write 3: toolCallCount=2 < 3 => allowed
-    const r3 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out3.json" }, store, env });
+    const r3 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out3.json" },
+      store,
+      env,
+    });
     expect(r3.block).toBe(false);
-    guardAfterCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out3.json" }, output: { output: "ok" }, store });
+    guardAfterCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out3.json" },
+      output: { output: "ok" },
+      store,
+    });
 
     // Write 4: toolCallCount=3 >= budget=3 => iteration_cap (proves write 1 was counted)
-    const r4 = guardBeforeCall({ cfg, tier: null, sessionID: sid, tool: "write", toolArgs: { filePath: "out4.json" }, store, env });
+    const r4 = guardBeforeCall({
+      cfg,
+      tier: null,
+      sessionID: sid,
+      tool: "write",
+      toolArgs: { filePath: "out4.json" },
+      store,
+      env,
+    });
     expect(r4.block).toBe(true);
     expect(r4.guard).toBe("iteration_cap");
   });

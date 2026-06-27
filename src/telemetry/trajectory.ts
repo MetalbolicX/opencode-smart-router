@@ -36,10 +36,7 @@ export interface TrajectoryState {
   costUnits: number;
 }
 
-export const createTrajectory = (
-  sessionID: string,
-  tier?: string | null,
-): TrajectoryState => {
+export const createTrajectory = (sessionID: string, tier?: string | null): TrajectoryState => {
   return {
     sessionID,
     tier: tier ?? null,
@@ -63,10 +60,7 @@ export const createTrajectory = (
   };
 };
 
-export const recordToolEvent = (
-  state: TrajectoryState,
-  event: TrajectoryToolEvent,
-): void => {
+export const recordToolEvent = (state: TrajectoryState, event: TrajectoryToolEvent): void => {
   state.toolCallCount += 1;
 
   if (event.blocked) {
@@ -105,13 +99,8 @@ export const setStopReason = (state: TrajectoryState, reason: string): void => {
   }
 };
 
-export const trajectoryMetrics = (
-  state: TrajectoryState,
-): Record<string, unknown> => {
-  const readExecRatio =
-    state.execCount === 0
-      ? state.readCount
-      : state.readCount / state.execCount;
+export const trajectoryMetrics = (state: TrajectoryState): Record<string, unknown> => {
+  const readExecRatio = state.execCount === 0 ? state.readCount : state.readCount / state.execCount;
 
   return {
     ttfa: state.ttfa,

@@ -25,11 +25,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   if (typeof obj.activePreset !== "string" || !obj.activePreset) {
     throw new Error("tiers.json: 'activePreset' must be a non-empty string");
   }
-  if (
-    typeof obj.presets !== "object" ||
-    obj.presets === null ||
-    Array.isArray(obj.presets)
-  ) {
+  if (typeof obj.presets !== "object" || obj.presets === null || Array.isArray(obj.presets)) {
     throw new Error("tiers.json: 'presets' must be a non-null object");
   }
   if (Object.keys(obj.presets).length === 0) {
@@ -38,35 +34,23 @@ export const validateConfig = (raw: unknown): RouterConfig => {
 
   const presets = obj.presets as Record<string, unknown>;
   for (const [presetName, preset] of Object.entries(presets)) {
-    if (
-      typeof preset !== "object" ||
-      preset === null ||
-      Array.isArray(preset)
-    ) {
+    if (typeof preset !== "object" || preset === null || Array.isArray(preset)) {
       throw new Error(`tiers.json: preset '${presetName}' must be an object`);
     }
     const tiers = preset as Record<string, unknown>;
     for (const [tierName, tier] of Object.entries(tiers)) {
       if (typeof tier !== "object" || tier === null) {
-        throw new Error(
-          `tiers.json: tier '${presetName}.${tierName}' must be an object`,
-        );
+        throw new Error(`tiers.json: tier '${presetName}.${tierName}' must be an object`);
       }
       const t = tier as Record<string, unknown>;
       if (typeof t.model !== "string" || !t.model) {
-        throw new Error(
-          `tiers.json: '${presetName}.${tierName}.model' must be a non-empty string`,
-        );
+        throw new Error(`tiers.json: '${presetName}.${tierName}.model' must be a non-empty string`);
       }
       if (typeof t.description !== "string") {
-        throw new Error(
-          `tiers.json: '${presetName}.${tierName}.description' must be a string`,
-        );
+        throw new Error(`tiers.json: '${presetName}.${tierName}.description' must be a string`);
       }
       if (!Array.isArray(t.whenToUse)) {
-        throw new Error(
-          `tiers.json: '${presetName}.${tierName}.whenToUse' must be an array`,
-        );
+        throw new Error(`tiers.json: '${presetName}.${tierName}.whenToUse' must be an array`);
       }
     }
   }
@@ -80,11 +64,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
 
   // Validate modes if present
   if (obj.modes !== undefined) {
-    if (
-      typeof obj.modes !== "object" ||
-      obj.modes === null ||
-      Array.isArray(obj.modes)
-    ) {
+    if (typeof obj.modes !== "object" || obj.modes === null || Array.isArray(obj.modes)) {
       throw new Error("tiers.json: 'modes' must be an object");
     }
     const modes = obj.modes as Record<string, unknown>;
@@ -94,33 +74,23 @@ export const validateConfig = (raw: unknown): RouterConfig => {
       }
       const m = mode as Record<string, unknown>;
       if (typeof m.defaultTier !== "string") {
-        throw new Error(
-          `tiers.json: mode '${modeName}.defaultTier' must be a string`,
-        );
+        throw new Error(`tiers.json: mode '${modeName}.defaultTier' must be a string`);
       }
       if (typeof m.description !== "string") {
-        throw new Error(
-          `tiers.json: mode '${modeName}.description' must be a string`,
-        );
+        throw new Error(`tiers.json: mode '${modeName}.description' must be a string`);
       }
     }
   }
 
   // Validate tierCaps if present
   if (obj.tierCaps !== undefined) {
-    if (
-      typeof obj.tierCaps !== "object" ||
-      obj.tierCaps === null ||
-      Array.isArray(obj.tierCaps)
-    ) {
+    if (typeof obj.tierCaps !== "object" || obj.tierCaps === null || Array.isArray(obj.tierCaps)) {
       throw new Error("tiers.json: 'tierCaps' must be an object");
     }
     const tc = obj.tierCaps as Record<string, unknown>;
     for (const [tierName, cap] of Object.entries(tc)) {
       if (typeof cap !== "number" || !Number.isFinite(cap) || cap < 1) {
-        throw new Error(
-          `tiers.json: tierCaps.'${tierName}' must be a positive integer`,
-        );
+        throw new Error(`tiers.json: tierCaps.'${tierName}' must be a positive integer`);
       }
     }
   }
@@ -137,9 +107,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
     const tp = obj.tierPrompts as Record<string, unknown>;
     for (const [tierName, prompt] of Object.entries(tp)) {
       if (typeof prompt !== "string") {
-        throw new Error(
-          `tiers.json: tierPrompts.'${tierName}' must be a string`,
-        );
+        throw new Error(`tiers.json: tierPrompts.'${tierName}' must be a string`);
       }
     }
   }
@@ -156,9 +124,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
     const tp = obj.taskPatterns as Record<string, unknown>;
     for (const [tierName, patterns] of Object.entries(tp)) {
       if (!Array.isArray(patterns)) {
-        throw new Error(
-          `tiers.json: taskPatterns.'${tierName}' must be an array of strings`,
-        );
+        throw new Error(`tiers.json: taskPatterns.'${tierName}' must be an array of strings`);
       }
     }
   }
@@ -175,9 +141,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
     const enforcement = obj.enforcement as Record<string, unknown>;
     if (enforcement.mode !== undefined) {
       if (!["off", "advisory", "enforced"].includes(enforcement.mode as string)) {
-        throw new Error(
-          "tiers.json: enforcement.mode must be one of off|advisory|enforced",
-        );
+        throw new Error("tiers.json: enforcement.mode must be one of off|advisory|enforced");
       }
     }
     if (
@@ -186,10 +150,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
       enforcement.verify !== null
     ) {
       const verify = enforcement.verify as Record<string, unknown>;
-      if (
-        verify.graderPolicy !== undefined &&
-        verify.graderPolicy !== "atLeastProducerTier"
-      ) {
+      if (verify.graderPolicy !== undefined && verify.graderPolicy !== "atLeastProducerTier") {
         throw new Error(
           'tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"',
         );
@@ -221,10 +182,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
       ) {
         const costCeiling = escalate.costCeiling as Record<string, unknown>;
         if (costCeiling.multiple !== undefined) {
-          if (
-            typeof costCeiling.multiple !== "number" ||
-            costCeiling.multiple <= 0
-          ) {
+          if (typeof costCeiling.multiple !== "number" || costCeiling.multiple <= 0) {
             throw new Error(
               "tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0",
             );
@@ -236,9 +194,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
           !Array.isArray(escalate.ladder) ||
           !escalate.ladder.every((s: unknown) => typeof s === "string")
         ) {
-          throw new Error(
-            "tiers.json: enforcement.escalate.ladder must be an array of strings",
-          );
+          throw new Error("tiers.json: enforcement.escalate.ladder must be an array of strings");
         }
       }
       if (escalate.maxAttemptsPerTier !== undefined) {
@@ -268,9 +224,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
         escalate.floorTier !== null &&
         typeof escalate.floorTier !== "string"
       ) {
-        throw new Error(
-          "tiers.json: enforcement.escalate.floorTier must be a string or null",
-        );
+        throw new Error("tiers.json: enforcement.escalate.floorTier must be a string or null");
       }
     }
     if (
@@ -312,7 +266,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   }
 
   return raw as RouterConfig;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Enforcement helpers
@@ -323,4 +277,4 @@ export const normalizeEnforcement = (
   e: EnforcementConfig | undefined,
 ): { mode: "off" | "advisory" | "enforced" } => {
   return { mode: e?.mode ?? "advisory" };
-}
+};

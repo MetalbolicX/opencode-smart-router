@@ -1,15 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  tierRank,
+  type ArtefactView,
   atLeastProducerTier,
   buildGradingPrompt,
-  parseGraderVerdict,
-  runChecker,
-  type ArtefactView,
-  type CheckerInput,
   type CheckerDeps,
+  type CheckerInput,
   type GraderRequest,
   type GraderResult,
+  parseGraderVerdict,
+  runChecker,
+  tierRank,
 } from "../../src/verify/checker";
 
 // ---------------------------------------------------------------------------
@@ -19,14 +19,14 @@ import {
 const makeArtefact = (
   finalReturnText = "done",
   changedFiles: { path: string; status: string }[] = [],
-  declaredOutputs: string[] = []
+  declaredOutputs: string[] = [],
 ): ArtefactView => ({ finalReturnText, changedFiles, declaredOutputs });
 
 const makeInput = (
   criteria: string[],
   artefact: ArtefactView = makeArtefact(),
   producerTier = "fast",
-  producerSessionID = "producer-session-1"
+  producerSessionID = "producer-session-1",
 ): CheckerInput => ({ criteria, artefact, producerTier, producerSessionID });
 
 const GRADER_SESSION = "grader-session-99";
@@ -147,9 +147,7 @@ describe("buildGradingPrompt", () => {
 
   it("scrubs secrets from file paths", () => {
     const secret = "sk-ant-AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH";
-    const artefact = makeArtefact("done", [
-      { path: `token=${secret}`, status: "M" },
-    ]);
+    const artefact = makeArtefact("done", [{ path: `token=${secret}`, status: "M" }]);
     const { prompt } = buildGradingPrompt(makeInput(["c"], artefact));
     expect(prompt).not.toContain(secret);
   });
@@ -180,9 +178,10 @@ describe("parseGraderVerdict", () => {
   });
 
   it("parses valid JSON pass:false with reasons", () => {
-    expect(
-      parseGraderVerdict('{"pass":false,"reasons":["criterion 2 unmet"]}')
-    ).toEqual({ pass: false, reasons: ["criterion 2 unmet"] });
+    expect(parseGraderVerdict('{"pass":false,"reasons":["criterion 2 unmet"]}')).toEqual({
+      pass: false,
+      reasons: ["criterion 2 unmet"],
+    });
   });
 
   it("parses fenced ```json block", () => {
@@ -245,7 +244,7 @@ describe("runChecker", () => {
     const deps: CheckerDeps = { dispatchGrader: spy };
     const result = await runChecker(
       makeInput(["do something"], makeArtefact(), "fast", "producer-session-1"),
-      deps
+      deps,
     );
     expect(result.pass).toBe(true);
     expect(result.method).toBe("checker");
@@ -256,7 +255,7 @@ describe("runChecker", () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(
         GRADER_SESSION,
-        '{"pass":false,"reasons":["criterion 2 unmet"]}'
+        '{"pass":false,"reasons":["criterion 2 unmet"]}',
       ),
     };
     const result = await runChecker(makeInput(["c1", "c2"]), deps);
@@ -298,10 +297,7 @@ describe("runChecker", () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(sharedSession, '{"pass":true,"reasons":[]}'),
     };
-    const result = await runChecker(
-      makeInput(["c1"], makeArtefact(), "fast", sharedSession),
-      deps
-    );
+    const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", sharedSession), deps);
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("not independent");
@@ -399,7 +395,7 @@ describe("runChecker secret scrubbing", () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(
         GRADER_SESSION,
-        `{"pass":false,"reasons":["leaked ${secret} in output"]}`
+        `{"pass":false,"reasons":["leaked ${secret} in output"]}`,
       ),
     };
     const result = await runChecker(makeInput(["c1"]), deps);
@@ -426,7 +422,8 @@ describe("runChecker secret scrubbing", () => {
 // ---------------------------------------------------------------------------
 
 describe("anti-rubber-stamp calibration", () => {
-  const skeptical = (reasons: string[]) =>
+  const skeptical =
+    (reasons: string[]) =>
     async (_req: GraderRequest): Promise<GraderResult> => ({
       sessionID: GRADER_SESSION,
       text: JSON.stringify({ pass: false, reasons }),
@@ -436,20 +433,17 @@ describe("anti-rubber-stamp calibration", () => {
     const result = await runChecker(
       makeInput(
         ["All tests must pass with test output shown in artefact"],
-        makeArtefact("All tests pass.", [], [])
+        makeArtefact("All tests pass.", [], []),
       ),
-      { dispatchGrader: skeptical(["No test output in artefact; cannot verify"]) }
+      { dispatchGrader: skeptical(["No test output in artefact; cannot verify"]) },
     );
     expect(result.pass).toBe(false);
   });
 
   it("case 2: claims 'file created' but changedFiles empty => FAIL", async () => {
     const result = await runChecker(
-      makeInput(
-        ["File src/new.ts must be created"],
-        makeArtefact("I created src/new.ts.", [], [])
-      ),
-      { dispatchGrader: skeptical(["changedFiles is empty; no file creation evidence"]) }
+      makeInput(["File src/new.ts must be created"], makeArtefact("I created src/new.ts.", [], [])),
+      { dispatchGrader: skeptical(["changedFiles is empty; no file creation evidence"]) },
     );
     expect(result.pass).toBe(false);
   });
@@ -458,9 +452,9 @@ describe("anti-rubber-stamp calibration", () => {
     const result = await runChecker(
       makeInput(
         ["Build must pass with zero errors shown in output"],
-        makeArtefact("Build is clean.", [], [])
+        makeArtefact("Build is clean.", [], []),
       ),
-      { dispatchGrader: skeptical(["No build output; cannot verify build passes"]) }
+      { dispatchGrader: skeptical(["No build output; cannot verify build passes"]) },
     );
     expect(result.pass).toBe(false);
   });
@@ -469,9 +463,9 @@ describe("anti-rubber-stamp calibration", () => {
     const result = await runChecker(
       makeInput(
         ["Refactoring must be reflected in changedFiles"],
-        makeArtefact("Refactoring complete!", [], [])
+        makeArtefact("Refactoring complete!", [], []),
       ),
-      { dispatchGrader: skeptical(["No changed files listed; refactoring unverifiable"]) }
+      { dispatchGrader: skeptical(["No changed files listed; refactoring unverifiable"]) },
     );
     expect(result.pass).toBe(false);
   });
@@ -480,9 +474,9 @@ describe("anti-rubber-stamp calibration", () => {
     const result = await runChecker(
       makeInput(
         ["Linter must show 0 errors and 0 warnings in artefact"],
-        makeArtefact("Linter passed.", [], [])
+        makeArtefact("Linter passed.", [], []),
       ),
-      { dispatchGrader: skeptical(["Linter output absent; cannot verify 0 warnings"]) }
+      { dispatchGrader: skeptical(["Linter output absent; cannot verify 0 warnings"]) },
     );
     expect(result.pass).toBe(false);
   });
@@ -491,9 +485,9 @@ describe("anti-rubber-stamp calibration", () => {
     const result = await runChecker(
       makeInput(
         ["API documentation file must appear in changedFiles or declaredOutputs"],
-        makeArtefact("API is fully documented.", [], [])
+        makeArtefact("API is fully documented.", [], []),
       ),
-      { dispatchGrader: skeptical(["No docs file in changedFiles or declaredOutputs"]) }
+      { dispatchGrader: skeptical(["No docs file in changedFiles or declaredOutputs"]) },
     );
     expect(result.pass).toBe(false);
   });
@@ -505,8 +499,8 @@ describe("anti-rubber-stamp calibration", () => {
         makeArtefact(
           "52 tests pass.\nErrors: 0",
           [{ path: "src/feature.ts", status: "A" }],
-          ["src/feature.ts"]
-        )
+          ["src/feature.ts"],
+        ),
       ),
       {
         dispatchGrader: async () => ({
@@ -519,7 +513,7 @@ describe("anti-rubber-stamp calibration", () => {
             ],
           }),
         }),
-      }
+      },
     );
     expect(result.pass).toBe(true);
     expect(result.method).toBe("checker");
@@ -551,24 +545,21 @@ describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
   });
 
   it("PASS: grader returns pass:true, independent session => accept", async () => {
-    const result = await runChecker(
-      makeInput(["criterion A"], makeArtefact(), "fast", "prod-1"),
-      {
-        dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":["met"]}'),
-      },
-    );
+    const result = await runChecker(makeInput(["criterion A"], makeArtefact(), "fast", "prod-1"), {
+      dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":["met"]}'),
+    });
     expect(result.pass).toBe(true);
     expect(result.method).toBe("checker");
     expect(result.skipped).toBeFalsy();
   });
 
   it("FAIL: grader returns pass:false => reject with reason surfaced", async () => {
-    const result = await runChecker(
-      makeInput(["criterion A"]),
-      {
-        dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":false,"reasons":["criterion A unmet"]}'),
-      },
-    );
+    const result = await runChecker(makeInput(["criterion A"]), {
+      dispatchGrader: fakeDispatch(
+        GRADER_SESSION,
+        '{"pass":false,"reasons":["criterion A unmet"]}',
+      ),
+    });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons).toContain("criterion A unmet");
@@ -576,47 +567,37 @@ describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
   });
 
   it("FAIL: grader text is unparseable => reject with 'could not parse' reason", async () => {
-    const result = await runChecker(
-      makeInput(["criterion A"]),
-      {
-        dispatchGrader: fakeDispatch(GRADER_SESSION, "totally not json"),
-      },
-    );
+    const result = await runChecker(makeInput(["criterion A"]), {
+      dispatchGrader: fakeDispatch(GRADER_SESSION, "totally not json"),
+    });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("could not parse grader verdict");
   });
 
   it("FAIL: grader shares producer sessionID => reject with 'not independent'", async () => {
-    const result = await runChecker(
-      makeInput(["c1"], makeArtefact(), "fast", "shared"),
-      {
-        dispatchGrader: fakeDispatch("shared", '{"pass":true,"reasons":[]}'),
-      },
-    );
+    const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", "shared"), {
+      dispatchGrader: fakeDispatch("shared", '{"pass":true,"reasons":[]}'),
+    });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("not independent");
   });
 
   it("FAIL: grader returns empty sessionID => reject with 'not independent'", async () => {
-    const result = await runChecker(
-      makeInput(["c1"], makeArtefact(), "fast", "prod-1"),
-      {
-        dispatchGrader: fakeDispatch("", '{"pass":true,"reasons":[]}'),
-      },
-    );
+    const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", "prod-1"), {
+      dispatchGrader: fakeDispatch("", '{"pass":true,"reasons":[]}'),
+    });
     expect(result.pass).toBe(false);
     expect(result.reasons[0]).toContain("not independent");
   });
 
   it("FAIL: grader dispatch throws => reject with 'grader dispatch failed' (no throw out)", async () => {
-    const result = await runChecker(
-      makeInput(["c1"]),
-      {
-        dispatchGrader: async () => { throw new Error("network timeout"); },
+    const result = await runChecker(makeInput(["c1"]), {
+      dispatchGrader: async () => {
+        throw new Error("network timeout");
       },
-    );
+    });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("grader dispatch failed");
@@ -624,16 +605,11 @@ describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
 
   it("PASS matrix: every happy-path shape returns pass:true with method:checker", async () => {
     // Sanity sweep: a few criterion shapes that all should pass.
-    const cases = [
-      ["single criterion"],
-      ["a", "b"],
-      ["list", "of", "three", "criteria"],
-    ];
+    const cases = [["single criterion"], ["a", "b"], ["list", "of", "three", "criteria"]];
     for (const criteria of cases) {
-      const r = await runChecker(
-        makeInput(criteria, makeArtefact(), "fast", "prod-1"),
-        { dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":[]}') },
-      );
+      const r = await runChecker(makeInput(criteria, makeArtefact(), "fast", "prod-1"), {
+        dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":true,"reasons":[]}'),
+      });
       expect(r.pass, `criteria=${JSON.stringify(criteria)}`).toBe(true);
       expect(r.method).toBe("checker");
     }

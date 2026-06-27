@@ -16,13 +16,13 @@
  *  - PURE: all side-effecting work (exec/fs/grader dispatch) is injected via
  *    deps; this module imports no fs/network/SDK.
  */
-import type { Verdict } from "./types";
-import type { DeterministicDeps } from "./types";
+
+import type { ArtefactView, CheckerDeps } from "./checker";
+import { runChecker } from "./checker";
+import { runDeterministic } from "./deterministic";
 import type { DoD } from "./dod";
 import { isCheckable } from "./dod";
-import { runDeterministic } from "./deterministic";
-import { runChecker } from "./checker";
-import type { ArtefactView, CheckerDeps } from "./checker";
+import type { DeterministicDeps, Verdict } from "./types";
 
 /** The concrete, inspectable result of a delegation (artefact contract §3.3). */
 export interface Artefact {
@@ -84,9 +84,7 @@ const view = (artefact: Artefact): ArtefactView => {
  * anything the schema does not recognize. Unknown strings are coerced to
  * "always" so a typo can never silently disable verification.
  */
-const normalizeRequire = (
-  raw: string | undefined,
-): "never" | "whenDoDPresent" | "always" => {
+const normalizeRequire = (raw: string | undefined): "never" | "whenDoDPresent" | "always" => {
   if (raw === undefined) return "whenDoDPresent";
   if (raw === "never" || raw === "whenDoDPresent" || raw === "always") return raw;
   return "always";

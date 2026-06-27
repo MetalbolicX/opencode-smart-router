@@ -1,19 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { fingerprintToolCall } from "../../src/guard/fingerprint";
-import { buildCapBanner } from "../../src/router/sessions";
 import type { Cap } from "../../src/router/sessions";
+import { buildCapBanner } from "../../src/router/sessions";
 
 describe("fingerprintToolCall golden", () => {
   it("read with file_path", () => {
-    expect(
-      fingerprintToolCall("read", { file_path: "src/index.ts" }),
-    ).toMatchSnapshot();
+    expect(fingerprintToolCall("read", { file_path: "src/index.ts" })).toMatchSnapshot();
   });
 
   it("read with filePath", () => {
-    expect(
-      fingerprintToolCall("read", { filePath: "src/index.ts" }),
-    ).toMatchSnapshot();
+    expect(fingerprintToolCall("read", { filePath: "src/index.ts" })).toMatchSnapshot();
   });
 
   it("grep with pattern and path", () => {
@@ -23,15 +19,11 @@ describe("fingerprintToolCall golden", () => {
   });
 
   it("grep with pattern and glob", () => {
-    expect(
-      fingerprintToolCall("grep", { pattern: "export", glob: "**/*.ts" }),
-    ).toMatchSnapshot();
+    expect(fingerprintToolCall("grep", { pattern: "export", glob: "**/*.ts" })).toMatchSnapshot();
   });
 
   it("glob with pattern and path", () => {
-    expect(
-      fingerprintToolCall("glob", { pattern: "**/*.ts", path: "src/" }),
-    ).toMatchSnapshot();
+    expect(fingerprintToolCall("glob", { pattern: "**/*.ts", path: "src/" })).toMatchSnapshot();
   });
 
   it("ls with path", () => {
@@ -39,9 +31,7 @@ describe("fingerprintToolCall golden", () => {
   });
 
   it("unknown tool bash with args", () => {
-    expect(
-      fingerprintToolCall("bash", { command: "npm test" }),
-    ).toMatchSnapshot();
+    expect(fingerprintToolCall("bash", { command: "npm test" })).toMatchSnapshot();
   });
 });
 
