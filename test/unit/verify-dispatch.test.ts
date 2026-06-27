@@ -92,7 +92,8 @@ const makeCtx = (opts: {
     getConfig: async () => cfg,
     refreshConfig: async () => cfg,
     getFreshConfig: async () => cfg,
-    state: { bypassed: false },
+    dispose: async () => {},
+    state: { bypassed: false, cleanupTasks: [], shutdownStarted: false },
     sessionStore: sessionStore as any,
     trajectoryStore: {
       ensure: () => undefined,

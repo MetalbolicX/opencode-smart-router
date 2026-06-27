@@ -194,7 +194,8 @@ const makeCtx = (opts: {
         return baseConfig;
       }
     },
-    state: { bypassed: false },
+    dispose: async () => {},
+    state: { bypassed: false, cleanupTasks: [], shutdownStarted: false },
     sessionStore: {
       registerProducerSession: () => undefined,
       unregister: () => undefined,
