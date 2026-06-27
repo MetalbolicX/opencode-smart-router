@@ -168,26 +168,26 @@ const makeCtx = (opts: {
     initialConfig: baseConfig,
     activeTiersAtLoad: baseConfig.presets["default"]!,
     getConfig: opts.getConfigImpl
-      ? () => {
+      ? async () => {
           counters.getConfig++;
           return opts.getConfigImpl!();
         }
-      : () => {
+      : async () => {
           counters.getConfig++;
           return baseConfig;
         },
     refreshConfig: opts.refreshConfigImpl
-      ? () => {
+      ? async () => {
           counters.refreshConfig++;
           return opts.refreshConfigImpl!();
         }
-      : () => {
+      : async () => {
           counters.refreshConfig++;
           return baseConfig;
         },
-    getFreshConfig() {
+    async getFreshConfig() {
       try {
-        if (opts.refreshConfigImpl) return opts.refreshConfigImpl();
+        if (opts.refreshConfigImpl) return await opts.refreshConfigImpl();
         return baseConfig;
       } catch {
         if (opts.getConfigImpl) return opts.getConfigImpl();
@@ -772,7 +772,7 @@ describe("executeDelegate — parentSessionID propagation", () => {
         },
       } as any,
     };
-    const deps = buildGateDeps(wrappedCtx, "orch-sid-99");
+    const deps = await buildGateDeps(wrappedCtx, "orch-sid-99");
     // Directly call the closure to assert the parent SID is forwarded.
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);

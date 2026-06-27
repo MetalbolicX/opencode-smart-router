@@ -13,11 +13,13 @@ import type { Preset, RouterConfig, TierConfig } from "../../src/router/config";
 let tmpHome: string;
 let origHOME: string | undefined;
 let origUSERPROFILE: string | undefined;
+let origXDG_CONFIG_HOME: string | undefined;
 const savedEnvGate = process.env["MODEL_ROUTER_ENFORCE"];
 
-beforeEach(() => {
+beforeEach(async () => {
   origHOME = process.env["HOME"];
   origUSERPROFILE = process.env["USERPROFILE"];
+  origXDG_CONFIG_HOME = process.env["XDG_CONFIG_HOME"];
   tmpHome = join(
     tmpdir(),
     `oc-test-cmd-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -25,16 +27,25 @@ beforeEach(() => {
   mkdirSync(tmpHome, { recursive: true });
   process.env["HOME"] = tmpHome;
   process.env["USERPROFILE"] = tmpHome;
+  // Tests must exercise the legacy `$HOME/.config/...` fallback so they
+  // do not leak across users who have `XDG_CONFIG_HOME` set globally.
+  delete process.env["XDG_CONFIG_HOME"];
   delete process.env["MODEL_ROUTER_ENFORCE"];
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
-afterEach(() => {
+afterEach(async () => {
   if (origHOME === undefined) delete process.env["HOME"];
   else process.env["HOME"] = origHOME;
   if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
   else process.env["USERPROFILE"] = origUSERPROFILE;
+  if (origXDG_CONFIG_HOME === undefined) delete process.env["XDG_CONFIG_HOME"];
+  else process.env["XDG_CONFIG_HOME"] = origXDG_CONFIG_HOME;
   if (savedEnvGate === undefined) delete process.env["MODEL_ROUTER_ENFORCE"];
   else process.env["MODEL_ROUTER_ENFORCE"] = savedEnvGate;
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
 /** Build a minimal RouterConfig with two presets and one mode for the unit tests. */
@@ -74,52 +85,52 @@ const makeConfig = (extra: Partial<RouterConfig> = {}): RouterConfig => {
 };
 
 describe("buildRouterOutput", () => {
-  it("bare /router shows status", () => {
-    const out = buildRouterOutput(makeConfig(), "");
+  it("bare /router shows status", async () => {
+    const out = await buildRouterOutput(makeConfig(), "");
     expect(out).toContain("# Model Router");
     expect(out).toContain("Enforcement:");
     expect(out).toContain("/tiers");
     expect(out).toContain("/router enforce");
   });
 
-  it("/router with non-enforce sub shows status", () => {
-    const out = buildRouterOutput(makeConfig(), "status");
+  it("/router with non-enforce sub shows status", async () => {
+    const out = await buildRouterOutput(makeConfig(), "status");
     expect(out).toContain("# Model Router");
     expect(out).not.toContain("Usage:");
   });
 
-  it("/router enforce <valid> persists and returns description", () => {
-    const out = buildRouterOutput(makeConfig(), "enforce enforced");
+  it("/router enforce <valid> persists and returns description", async () => {
+    const out = await buildRouterOutput(makeConfig(), "enforce enforced");
     expect(out).toContain("enforced");
     expect(out).toContain("persisted");
     expect(out).toContain("Guard hard-blocks");
   });
 
-  it("/router enforce off returns off description", () => {
-    const out = buildRouterOutput(makeConfig(), "enforce off");
+  it("/router enforce off returns off description", async () => {
+    const out = await buildRouterOutput(makeConfig(), "enforce off");
     expect(out).toContain("off");
     expect(out).toContain("disabled");
   });
 
-  it("/router enforce advisory returns advisory description", () => {
-    const out = buildRouterOutput(makeConfig(), "enforce advisory");
+  it("/router enforce advisory returns advisory description", async () => {
+    const out = await buildRouterOutput(makeConfig(), "enforce advisory");
     expect(out).toContain("advisory");
     expect(out).toContain("never hard-blocks");
   });
 
-  it("/router enforce with no mode shows current + usage", () => {
-    const out = buildRouterOutput(makeConfig(), "enforce");
+  it("/router enforce with no mode shows current + usage", async () => {
+    const out = await buildRouterOutput(makeConfig(), "enforce");
     expect(out).toContain("Usage:");
     expect(out).toContain("Current enforcement mode");
   });
 
-  it("/router enforce with invalid mode shows usage", () => {
-    const out = buildRouterOutput(makeConfig(), "enforce loud");
+  it("/router enforce with invalid mode shows usage", async () => {
+    const out = await buildRouterOutput(makeConfig(), "enforce loud");
     expect(out).toContain("Usage:");
   });
 
-  it("/router enforce ignores extra whitespace in args", () => {
-    const out = buildRouterOutput(makeConfig(), "  enforce   off  ");
+  it("/router enforce ignores extra whitespace in args", async () => {
+    const out = await buildRouterOutput(makeConfig(), "  enforce   off  ");
     expect(out).toContain("off");
   });
 });
@@ -177,12 +188,12 @@ describe("buildTiersOutput", () => {
 });
 
 describe("buildBudgetOutput", () => {
-  it("returns a usage message when no modes are configured", () => {
-    const out = buildBudgetOutput(makeConfig(), "");
+  it("returns a usage message when no modes are configured", async () => {
+    const out = await buildBudgetOutput(makeConfig(), "");
     expect(out).toContain("No modes configured");
   });
 
-  it("lists available modes when called with no args", () => {
+  it("lists available modes when called with no args", async () => {
     const cfg = makeConfig({
       modes: {
         budget: { defaultTier: "fast", description: "cheap" },
@@ -190,24 +201,24 @@ describe("buildBudgetOutput", () => {
       },
       activeMode: "quality",
     });
-    const out = buildBudgetOutput(cfg, "");
+    const out = await buildBudgetOutput(cfg, "");
     expect(out).toContain("Routing Modes");
     expect(out).toContain("**budget**");
     expect(out).toContain("**quality** <- active");
   });
 
-  it("returns the 'Unknown mode' message for an unknown mode", () => {
+  it("returns the 'Unknown mode' message for an unknown mode", async () => {
     const cfg = makeConfig({
       modes: {
         budget: { defaultTier: "fast", description: "cheap" },
       },
     });
-    const out = buildBudgetOutput(cfg, "unknown-mode");
+    const out = await buildBudgetOutput(cfg, "unknown-mode");
     expect(out).toContain("Unknown mode");
     expect(out).toContain("unknown-mode");
   });
 
-  it("switches mode when called with a valid mode name", () => {
+  it("switches mode when called with a valid mode name", async () => {
     // We can't easily inject modes into loadConfig() (which reads from tiers.json).
     // But we can validate the "valid name" path produces a switch message IF the
     // config has that mode. Default tiers.json does not have modes, so for
@@ -222,12 +233,12 @@ describe("buildBudgetOutput", () => {
         budget: { defaultTier: "fast", description: "cheap" },
       },
     });
-    const out = buildBudgetOutput(cfg, "budget");
+    const out = await buildBudgetOutput(cfg, "budget");
     expect(out).toContain("Routing mode switched to");
     expect(out).toContain("budget");
   });
 
-  it("renders overrideRules when a mode has them", () => {
+  it("renders overrideRules when a mode has them", async () => {
     const cfg = makeConfig({
       modes: {
         quality: {
@@ -237,7 +248,7 @@ describe("buildBudgetOutput", () => {
         },
       },
     });
-    const out = buildBudgetOutput(cfg, "quality");
+    const out = await buildBudgetOutput(cfg, "quality");
     expect(out).toContain("Active rules:");
     expect(out).toContain("- rule-a");
     expect(out).toContain("- rule-b");
@@ -245,35 +256,35 @@ describe("buildBudgetOutput", () => {
 });
 
 describe("buildPresetOutput", () => {
-  it("lists available presets when called with no args", () => {
-    const out = buildPresetOutput(makeConfig(), "");
+  it("lists available presets when called with no args", async () => {
+    const out = await buildPresetOutput(makeConfig(), "");
     expect(out).toContain("Available Presets");
     expect(out).toContain("**anthropic** <- active");
     expect(out).toContain("**openai**");
   });
 
-  it("lists each tier with the model name (last segment after slash)", () => {
-    const out = buildPresetOutput(makeConfig(), "");
+  it("lists each tier with the model name (last segment after slash)", async () => {
+    const out = await buildPresetOutput(makeConfig(), "");
     expect(out).toContain("fast: claude-haiku-4-5");
     expect(out).toContain("medium: claude-sonnet-4-6");
   });
 
-  it("returns the 'Unknown preset' message for an unknown preset", () => {
-    const out = buildPresetOutput(makeConfig(), "nonexistent");
+  it("returns the 'Unknown preset' message for an unknown preset", async () => {
+    const out = await buildPresetOutput(makeConfig(), "nonexistent");
     expect(out).toContain("Unknown preset");
     expect(out).toContain("nonexistent");
   });
 
-  it("switches preset when called with a valid name", () => {
+  it("switches preset when called with a valid name", async () => {
     const cfg = makeConfig();
-    const out = buildPresetOutput(cfg, "openai");
+    const out = await buildPresetOutput(cfg, "openai");
     expect(out).toContain("Preset switched to");
     expect(out).toContain("openai");
   });
 
-  it("resolves preset name case-insensitively", () => {
+  it("resolves preset name case-insensitively", async () => {
     const cfg = makeConfig();
-    const out = buildPresetOutput(cfg, "Anthropic");
+    const out = await buildPresetOutput(cfg, "Anthropic");
     expect(out).toContain("Preset switched to");
     expect(out).toContain("anthropic");
   });

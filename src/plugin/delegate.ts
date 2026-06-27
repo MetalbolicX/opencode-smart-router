@@ -74,11 +74,11 @@ export const executeDelegate = async (
   signal?: AbortSignal,
 ): Promise<string> => {
   try {
-    let activeCfg = ctx.getConfig();
+    let activeCfg = await ctx.getConfig();
     try {
-      activeCfg = ctx.refreshConfig();
+      activeCfg = await ctx.refreshConfig();
     } catch {
-      activeCfg = ctx.getConfig();
+      activeCfg = await ctx.getConfig();
     }
     const initialTier =
       typeof args.tier === "string" && args.tier.trim()
@@ -224,7 +224,7 @@ export const executeDelegate = async (
           gateRes = await accept(
             { dod, trivial: false, mode: "modeA" },
             artefact,
-            buildGateDeps(ctx, parentSessionID),
+            await buildGateDeps(ctx, parentSessionID),
           );
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);

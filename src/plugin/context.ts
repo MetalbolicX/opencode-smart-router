@@ -7,15 +7,25 @@
 // slices (verify dispatch, scorecard dump, registration) can move into
 // their own modules while reading identical state.
 //
-// createPluginContext() constructs the stores lazily from PluginInput and
-// returns the fully-wired context. The factory never throws — the inner
-// store factories are all safe to call with no arguments.
+// PR3b changes:
+//   - `createPluginContext()` is now `async` because the config loader's
+//     disk reads use `node:fs/promises` end-to-end. The initial snapshot
+//     `initialConfig` is captured via `await store.read()`.
+//   - `getConfig()`, `refreshConfig()`, and `getFreshConfig()` now return
+//     `Promise<RouterConfig>`. `getFreshConfig()` retains its fail-soft
+//     semantics: it tries a forced refresh and falls back to the cached
+//     value on read failure so a transient disk hiccup never crashes a
+//     real session.
 //
-// PR1 of the core-refactor-plan swaps the legacy module-level `loadConfig()`
-// singleton for a per-instance `ConfigStore` (see `../router/config-store.ts`):
-// - `getConfig()`    → `store.read()`   — returns the cached value or re-reads.
-// - `refreshConfig()`→ `store.refresh()`— forces a re-read and replaces the cache.
-// One instance's refresh no longer mutates another instance's cached result.
+// PR1 of the core-refactor-plan swapped the legacy module-level
+// `loadConfig()` singleton for a per-instance `ConfigStore` (see
+// `../router/config-store.ts`):
+//   - `getConfig()`     → `store.read()`     — returns the cached value
+//                                            or re-reads.
+//   - `refreshConfig()` → `store.refresh()`  — forces a re-read and
+//                                            replaces the cache.
+// One instance's refresh no longer mutates another instance's cached
+// result.
 // ---------------------------------------------------------------------------
 
 import type { PluginInput } from "@opencode-ai/plugin";
@@ -61,15 +71,15 @@ export interface PluginContext {
 
   /** Return the current cached config (may be the initial snapshot, or whatever
    *  /preset / /budget / /router last wrote + re-read). */
-  getConfig(): RouterConfig;
+  getConfig(): Promise<RouterConfig>;
 
   /** Force a fresh read from disk and replace the cached value. */
-  refreshConfig(): RouterConfig;
+  refreshConfig(): Promise<RouterConfig>;
 
   /** Read the latest config: try a forced refresh, fall back to the cached
    *  value on read failure. Replaces the 7+ duplicated try/refresh/catch
    *  blocks that used to live in `commands.ts` and `hooks.ts`. */
-  getFreshConfig(): RouterConfig;
+  getFreshConfig(): Promise<RouterConfig>;
 
   /** Mutable per-plugin runtime state (bypass flag). */
   state: PluginState;
@@ -101,29 +111,41 @@ export interface PluginContext {
  * Build a fully-wired PluginContext for one plugin instance. Stores are
  * fresh per call, the config is loaded from disk once via the per-instance
  * ConfigStore, and seams are bound to the plugin's working directory.
+ *
+ * The factory is `async` because the initial `configStore.read()` uses
+ * `node:fs/promises` (PR3b). The remaining store factories are all sync.
+ *
+ * The three config methods are wired through a mutable holder so that
+ * `getFreshConfig()` can call `this.refreshConfig()` / `this.getConfig()`
+ * rather than the underlying store directly. This preserves the spy-able
+ * surface that `test/unit/get-fresh-config.test.ts` relies on, and keeps
+ * the fail-soft fallback symmetric with the pre-async implementation.
  */
-export const createPluginContext = (plugin: PluginInput): PluginContext => {
+export const createPluginContext = async (plugin: PluginInput): Promise<PluginContext> => {
   const configStore = createConfigStore({
     cwd: plugin.directory ?? process.cwd(),
   });
-  const initialConfig = configStore.read();
+  const initialConfig = await configStore.read();
   const activeTiersAtLoad = getActiveTiers(initialConfig);
 
-  return {
+  // Build the context as a literal with method-shorthand syntax so
+  // `getFreshConfig` can call `this.refreshConfig()` / `this.getConfig()`
+  // and remain spy-able via vi.spyOn(ctx, "refreshConfig").
+  const ctx: PluginContext = {
     plugin,
     initialConfig,
     activeTiersAtLoad,
-    getConfig(): RouterConfig {
+    async getConfig(): Promise<RouterConfig> {
       return configStore.read();
     },
-    refreshConfig(): RouterConfig {
+    async refreshConfig(): Promise<RouterConfig> {
       return configStore.refresh();
     },
-    getFreshConfig(): RouterConfig {
+    async getFreshConfig(this: PluginContext): Promise<RouterConfig> {
       try {
-        return this.refreshConfig();
+        return await this.refreshConfig();
       } catch {
-        return this.getConfig();
+        return await this.getConfig();
       }
     },
     state: {
@@ -140,4 +162,6 @@ export const createPluginContext = (plugin: PluginInput): PluginContext => {
       fs: createFsSeam({ directory: plugin.directory }),
     },
   };
+
+  return ctx;
 };

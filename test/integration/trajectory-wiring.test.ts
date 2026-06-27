@@ -25,7 +25,7 @@ afterEach(() => {
 describe("trajectory wiring (Phase 0.3, record-only)", () => {
   it("GA-1: emitted cap banner is byte-identical with trajectory wiring active", async () => {
     const plugin: any = await ModelRouterPlugin({} as any);
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     const tierNames = Object.keys(getActiveTiers(cfg));
     const ref = createSessionStore();
 

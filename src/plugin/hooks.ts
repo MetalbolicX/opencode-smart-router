@@ -41,7 +41,8 @@ export const handleChatParams = async (
   try {
     const sessionID = input?.sessionID as string | undefined;
     if (sessionID && ctx.graderSessions.has(sessionID)) {
-      output.temperature = ctx.getConfig().enforcement?.verify?.graderTemperature ?? 0;
+      const cfg = await ctx.getConfig();
+      output.temperature = cfg.enforcement?.verify?.graderTemperature ?? 0;
     }
   } catch {
     // best-effort: never crash a real session
@@ -64,7 +65,7 @@ export const handleChatMessage = async (
   // Re-read cfg so /preset switches take effect without restart.
   // getFreshConfig() tries a forced refresh and falls back to the cached
   // value on read failure.
-  const cfg = ctx.getFreshConfig();
+  const cfg = await ctx.getFreshConfig();
   const tierNames = Object.keys(getActiveTiers(cfg));
   ctx.sessionStore.registerFromChatMessage(
     input as { agent?: string; sessionID: string },
@@ -97,8 +98,9 @@ export const handleToolExecuteBefore = async (
   }
   let res: BeforeResult;
   try {
+    const cfg = await ctx.getConfig();
     res = guardBeforeCall({
-      cfg: ctx.getConfig(),
+      cfg,
       tier: ctx.sessionStore.getTier(sid),
       trivial: ctx.sessionStore.isTrivial(sid),
       sessionID: sid,
@@ -152,8 +154,9 @@ export const handleToolExecuteAfter = async (
       readOnly: READ_ONLY_TOOLS.has(tool),
     });
     try {
+      const cfg = await ctx.getConfig();
       guardAfterCall({
-        cfg: ctx.getConfig(),
+        cfg,
         tier: ctx.sessionStore.getTier(sid),
         sessionID: sid,
         tool,
@@ -247,7 +250,7 @@ export const handleSystemTransform = async (
   if (ctx.state.bypassed) return;
   // getFreshConfig() returns the refreshed config and falls back to the
   // cached value if the file read fails.
-  const cfg = ctx.getFreshConfig();
+  const cfg = await ctx.getFreshConfig();
 
   // Skip injection for child (subagent) sessions.
   // Child sessions are detected via session.created events with a parentID.

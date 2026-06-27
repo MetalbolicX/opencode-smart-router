@@ -11,6 +11,7 @@ describe("router-command integration", () => {
   let hooks: any;
   let savedHome: string | undefined;
   let savedUserProfile: string | undefined;
+  let savedXdgConfigHome: string | undefined;
   let testHomeDir: string;
 
   beforeEach(async () => {
@@ -19,8 +20,12 @@ describe("router-command integration", () => {
     mkdirSync(testHomeDir, { recursive: true });
     savedHome = process.env.HOME;
     savedUserProfile = process.env.USERPROFILE;
+    savedXdgConfigHome = process.env.XDG_CONFIG_HOME;
     process.env.HOME = testHomeDir;
     process.env.USERPROFILE = testHomeDir;
+    // Tests must exercise the legacy `$HOME/.config/...` fallback so they
+    // do not leak across users who have `XDG_CONFIG_HOME` set globally.
+    delete process.env.XDG_CONFIG_HOME;
     hooks = await ModelRouterPlugin({} as any);
   });
 
@@ -35,6 +40,11 @@ describe("router-command integration", () => {
     } else {
       process.env.USERPROFILE = savedUserProfile;
     }
+    if (savedXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = savedXdgConfigHome;
+    }
   });
 
   it("enforce enforced persists + reload", async () => {
@@ -46,7 +56,10 @@ describe("router-command integration", () => {
     expect(out.parts[0].text).toContain("enforced");
     expect(out.parts[0].text).toContain("persisted");
     expect(
-      resolveEnforcementMode({ config: readMergedConfig({ cwd: process.cwd() }), env: {} }).mode,
+      resolveEnforcementMode({
+        config: await readMergedConfig({ cwd: process.cwd() }),
+        env: {},
+      }).mode,
     ).toBe("enforced");
   });
 
@@ -61,7 +74,10 @@ describe("router-command integration", () => {
     await hooks["command.execute.before"]({ command: "router", arguments: "enforce off" }, out);
     expect(out.parts[0].text).toContain("off");
     expect(
-      resolveEnforcementMode({ config: readMergedConfig({ cwd: process.cwd() }), env: {} }).mode,
+      resolveEnforcementMode({
+        config: await readMergedConfig({ cwd: process.cwd() }),
+        env: {},
+      }).mode,
     ).toBe("off");
   });
 

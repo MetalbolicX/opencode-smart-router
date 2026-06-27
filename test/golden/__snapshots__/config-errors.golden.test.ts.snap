@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden — operator-facing error messages > RouterConfigError message format (kind='invalid') > RouterConfigError.invalid 1`] = `"config file at /tmp/x.json (kind=invalid): 'activePreset' must be a non-empty string"`;
+
+exports[`golden — operator-facing error messages > RouterConfigError message format (kind='malformed') > RouterConfigError.malformed 1`] = `"config file at /tmp/x.json (kind=malformed): Unexpected token } in JSON at position 4"`;
+
+exports[`golden — operator-facing error messages > RouterConfigError message format (kind='stale_refresh_failed') > RouterConfigError.stale_refresh_failed 1`] = `"config file at /tmp/x.json (kind=stale_refresh_failed): EIO: i/o error"`;
+
+exports[`golden — operator-facing error messages > RouterConfigError message format (kind='unreadable') > RouterConfigError.unreadable 1`] = `"config file at /tmp/x.json (kind=unreadable): EACCES: permission denied"`;
+
+exports[`golden — operator-facing error messages > RouterStateError message format > RouterStateError 1`] = `"router state file at /tmp/x.json is malformed: Unexpected end of JSON input"`;

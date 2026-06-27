@@ -18,12 +18,14 @@ import { createConfigStore } from "../../src/router/config-store";
 let tmpHome: string;
 let origHOME: string | undefined;
 let origUSERPROFILE: string | undefined;
+let origXDG_CONFIG_HOME: string | undefined;
 let origCwd: string;
 let tmpCwd: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   origHOME = process.env["HOME"];
   origUSERPROFILE = process.env["USERPROFILE"];
+  origXDG_CONFIG_HOME = process.env["XDG_CONFIG_HOME"];
   tmpHome = join(
     tmpdir(),
     `oc-test-cfg-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -31,95 +33,120 @@ beforeEach(() => {
   mkdirSync(tmpHome, { recursive: true });
   process.env["HOME"] = tmpHome;
   process.env["USERPROFILE"] = tmpHome;
+  // Tests must exercise the legacy `$HOME/.config/...` fallback so they
+  // do not leak across users who have `XDG_CONFIG_HOME` set globally.
+  delete process.env["XDG_CONFIG_HOME"];
 
   origCwd = process.cwd();
   tmpCwd = join(tmpHome, "cwd");
   mkdirSync(tmpCwd, { recursive: true });
   process.chdir(tmpCwd);
+
+  // Invalidate any memoized XDG-path resolution from a previous test.
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
-afterEach(() => {
+afterEach(async () => {
   if (origHOME === undefined) delete process.env["HOME"];
   else process.env["HOME"] = origHOME;
   if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
   else process.env["USERPROFILE"] = origUSERPROFILE;
+  if (origXDG_CONFIG_HOME === undefined) delete process.env["XDG_CONFIG_HOME"];
+  else process.env["XDG_CONFIG_HOME"] = origXDG_CONFIG_HOME;
   process.chdir(origCwd);
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
 describe("saveActivePreset", () => {
-  it("writes the resolved preset to state when valid", () => {
-    saveActivePreset("anthropic");
-    expect(readState().activePreset).toBe("anthropic");
+  it("writes the resolved preset to state when valid", async () => {
+    await saveActivePreset("anthropic");
+    const s = await readState();
+    expect(s.activePreset).toBe("anthropic");
   });
 
-  it("resolves case-insensitively and persists the canonical name", () => {
-    saveActivePreset("Anthropic");
-    expect(readState().activePreset).toBe("anthropic");
+  it("resolves case-insensitively and persists the canonical name", async () => {
+    await saveActivePreset("Anthropic");
+    const s = await readState();
+    expect(s.activePreset).toBe("anthropic");
   });
 
-  it("is a no-op for an unknown preset", () => {
-    saveActivePreset("nonexistent");
-    expect(readState().activePreset).toBeUndefined();
+  it("is a no-op for an unknown preset", async () => {
+    await saveActivePreset("nonexistent");
+    const s = await readState();
+    expect(s.activePreset).toBeUndefined();
   });
 
-  it("is a no-op for an empty string", () => {
-    saveActivePreset("");
-    expect(readState().activePreset).toBeUndefined();
+  it("is a no-op for an empty string", async () => {
+    await saveActivePreset("");
+    const s = await readState();
+    expect(s.activePreset).toBeUndefined();
   });
 
-  it("is a no-op for whitespace-only input", () => {
-    saveActivePreset("   ");
-    expect(readState().activePreset).toBeUndefined();
+  it("is a no-op for whitespace-only input", async () => {
+    await saveActivePreset("   ");
+    const s = await readState();
+    expect(s.activePreset).toBeUndefined();
   });
 
-  it("persisted preset is reflected on the next readMergedConfig call", () => {
-    saveActivePreset("anthropic");
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("anthropic");
+  it("persisted preset is reflected on the next readMergedConfig call", async () => {
+    await saveActivePreset("anthropic");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activePreset).toBe("anthropic");
   });
 });
 
 describe("saveActiveMode", () => {
-  it("is a no-op for an unknown mode (modes block absent in default config)", () => {
-    saveActiveMode("unknown-mode");
-    expect(readState().activeMode).toBeUndefined();
+  it("is a no-op for an unknown mode (modes block absent in default config)", async () => {
+    await saveActiveMode("unknown-mode");
+    const s = await readState();
+    expect(s.activeMode).toBeUndefined();
   });
 
-  it("is a no-op for an empty string", () => {
-    saveActiveMode("");
-    expect(readState().activeMode).toBeUndefined();
+  it("is a no-op for an empty string", async () => {
+    await saveActiveMode("");
+    const s = await readState();
+    expect(s.activeMode).toBeUndefined();
   });
 
-  it("is a no-op for whitespace-only input", () => {
-    saveActiveMode("   ");
-    expect(readState().activeMode).toBeUndefined();
+  it("is a no-op for whitespace-only input", async () => {
+    await saveActiveMode("   ");
+    const s = await readState();
+    expect(s.activeMode).toBeUndefined();
   });
 });
 
 describe("saveEnforcementMode", () => {
-  it("persists 'off' to state", () => {
-    saveEnforcementMode("off");
-    expect(readState().enforcementMode).toBe("off");
+  it("persists 'off' to state", async () => {
+    await saveEnforcementMode("off");
+    const s = await readState();
+    expect(s.enforcementMode).toBe("off");
   });
 
-  it("persists 'advisory' to state", () => {
-    saveEnforcementMode("advisory");
-    expect(readState().enforcementMode).toBe("advisory");
+  it("persists 'advisory' to state", async () => {
+    await saveEnforcementMode("advisory");
+    const s = await readState();
+    expect(s.enforcementMode).toBe("advisory");
   });
 
-  it("persists 'enforced' to state", () => {
-    saveEnforcementMode("enforced");
-    expect(readState().enforcementMode).toBe("enforced");
+  it("persists 'enforced' to state", async () => {
+    await saveEnforcementMode("enforced");
+    const s = await readState();
+    expect(s.enforcementMode).toBe("enforced");
   });
 
-  it("overwrites a previously-persisted enforcement mode", () => {
-    saveEnforcementMode("off");
-    saveEnforcementMode("enforced");
-    expect(readState().enforcementMode).toBe("enforced");
+  it("overwrites a previously-persisted enforcement mode", async () => {
+    await saveEnforcementMode("off");
+    await saveEnforcementMode("enforced");
+    const s = await readState();
+    expect(s.enforcementMode).toBe("enforced");
   });
 
-  it("does not affect the activePreset key on the state file", () => {
-    saveEnforcementMode("enforced");
-    expect(readState().activePreset).toBeUndefined();
+  it("does not affect the activePreset key on the state file", async () => {
+    await saveEnforcementMode("enforced");
+    const s = await readState();
+    expect(s.activePreset).toBeUndefined();
   });
 });
 
@@ -179,10 +206,10 @@ describe("globalConfigPath / localConfigPath", () => {
 });
 
 describe("Layered config — bundled-only (no overrides)", () => {
-  it("loads bundled defaults when global and local are absent", () => {
+  it("loads bundled defaults when global and local are absent", async () => {
     clearGlobal();
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     // Bundled tiers.json sets activePreset to "multi-provider" by default.
     expect(cfg.activePreset).toBe("multi-provider");
     expect(cfg.presets["anthropic"]).toBeDefined();
@@ -191,40 +218,40 @@ describe("Layered config — bundled-only (no overrides)", () => {
 });
 
 describe("Layered config — precedence table", () => {
-  it("global scalar overrides bundled scalar; unrelated bundled fields preserved", () => {
+  it("global scalar overrides bundled scalar; unrelated bundled fields preserved", async () => {
     stageGlobal({ activePreset: "openai" });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("openai");
     // Bundled's anthropic preset is unrelated and must survive.
     expect(cfg.presets["anthropic"]).toBeDefined();
     expect(cfg.presets["google"]).toBeDefined();
   });
 
-  it("local scalar overrides bundled scalar when global is absent", () => {
+  it("local scalar overrides bundled scalar when global is absent", async () => {
     clearGlobal();
     stageLocal({ activePreset: "github-copilot" });
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("github-copilot");
     expect(cfg.presets["anthropic"]).toBeDefined();
   });
 
-  it("local wins over global when both present", () => {
+  it("local wins over global when both present", async () => {
     stageGlobal({ activePreset: "openai" });
     stageLocal({ activePreset: "google" });
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("google");
   });
 
-  it("all three layers: local > global > bundled for the same field", () => {
+  it("all three layers: local > global > bundled for the same field", async () => {
     // Bundled has anthropic; global pushes it to openai; local pushes it to google.
     stageGlobal({ activePreset: "openai" });
     stageLocal({ activePreset: "google" });
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("google");
   });
 
-  it("array values: local array replaces bundled (no concat)", () => {
+  it("array values: local array replaces bundled (no concat)", async () => {
     clearGlobal();
     stageLocal({
       presets: {
@@ -237,12 +264,12 @@ describe("Layered config — precedence table", () => {
         },
       },
     });
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     const fast = cfg.presets["anthropic"]?.["fast"];
     expect(fast?.whenToUse).toEqual(["only-this-one"]);
   });
 
-  it("array values: global array replaces bundled", () => {
+  it("array values: global array replaces bundled", async () => {
     stageGlobal({
       presets: {
         anthropic: {
@@ -255,23 +282,23 @@ describe("Layered config — precedence table", () => {
       },
     });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     const fast = cfg.presets["anthropic"]?.["fast"];
     expect(fast?.whenToUse).toEqual(["override-1", "override-2"]);
   });
 
-  it("nested-object merge: tierPrompts keys merge across layers", () => {
+  it("nested-object merge: tierPrompts keys merge across layers", async () => {
     // Bundled has tierPrompts.fast/medium/heavy; global adds a new key.
     stageGlobal({
       tierPrompts: { extra: "global-only prompt" },
     });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.tierPrompts?.["fast"]).toBeDefined();
     expect(cfg.tierPrompts?.["extra"]).toBe("global-only prompt");
   });
 
-  it("nested-object merge: scalar override on a nested key wins, siblings preserved", () => {
+  it("nested-object merge: scalar override on a nested key wins, siblings preserved", async () => {
     stageGlobal({
       presets: {
         anthropic: {
@@ -284,7 +311,7 @@ describe("Layered config — precedence table", () => {
       },
     });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     const fast = cfg.presets["anthropic"]?.["fast"];
     expect(fast?.model).toBe("different/model");
     // Other anthropic tiers must survive the global override.
@@ -292,11 +319,11 @@ describe("Layered config — precedence table", () => {
     expect(cfg.presets["anthropic"]?.["heavy"]).toBeDefined();
   });
 
-  it("nested-object merge: object override on a nested key wins, siblings preserved", () => {
+  it("nested-object merge: object override on a nested key wins, siblings preserved", async () => {
     // Bundled has tierCaps.fast/medium/heavy; global sets tierCaps.fast = 99.
     stageGlobal({ tierCaps: { fast: 99 } });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.tierCaps?.["fast"]).toBe(99);
     expect(cfg.tierCaps?.["medium"]).toBeDefined();
     expect(cfg.tierCaps?.["heavy"]).toBeDefined();
@@ -304,73 +331,73 @@ describe("Layered config — precedence table", () => {
 });
 
 describe("Layered config — absence cases", () => {
-  it("missing global and local falls through to bundled defaults", () => {
+  it("missing global and local falls through to bundled defaults", async () => {
     clearGlobal();
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("multi-provider");
   });
 
-  it("missing global only falls through to bundled (local wins over bundled)", () => {
+  it("missing global only falls through to bundled (local wins over bundled)", async () => {
     clearGlobal();
     stageLocal({ activePreset: "openai" });
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("openai");
   });
 
-  it("missing local only falls through to bundled (global wins over bundled)", () => {
+  it("missing local only falls through to bundled (global wins over bundled)", async () => {
     stageGlobal({ activePreset: "openai" });
     clearLocal();
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("openai");
   });
 
-  it("an empty-object local override is a no-op merge", () => {
+  it("an empty-object local override is a no-op merge", async () => {
     stageGlobal({ activePreset: "openai" });
     stageLocal({});
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("openai");
     // Bundled's anthropic preset remains intact.
     expect(cfg.presets["anthropic"]).toBeDefined();
   });
 
-  it("an empty-object global override is a no-op merge", () => {
+  it("an empty-object global override is a no-op merge", async () => {
     clearGlobal();
     stageLocal({ activePreset: "google" });
     stageGlobal({});
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("google");
   });
 });
 
 describe("Layered config — error cases", () => {
-  it("throws with global path when global contains malformed JSON", () => {
+  it("throws with global path when global contains malformed JSON", async () => {
     stageGlobal("{not valid json");
     clearLocal();
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/global/);
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/malformed JSON/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/global/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/malformed JSON/);
   });
 
-  it("throws with local path when local contains malformed JSON", () => {
+  it("throws with local path when local contains malformed JSON", async () => {
     clearGlobal();
     stageLocal("{not valid json");
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/local/);
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/malformed JSON/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/local/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/malformed JSON/);
   });
 
-  it("throws when a global file is empty (empty string is not valid JSON)", () => {
+  it("throws when a global file is empty (empty string is not valid JSON)", async () => {
     stageGlobal("");
     clearLocal();
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/global/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/global/);
   });
 
-  it("throws when a local file is empty", () => {
+  it("throws when a local file is empty", async () => {
     clearGlobal();
     stageLocal("");
-    expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/local/);
+    await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/local/);
   });
 
-  it("throws when bundled layer is unreadable", () => {
+  it("throws when bundled layer is unreadable", async () => {
     // Temporarily move the bundled tiers.json out of the way so the bundled
     // read fails with ENOENT. The bundled file is restored in the finally
     // block even if the assertion throws, so other tests stay green.
@@ -378,7 +405,7 @@ describe("Layered config — error cases", () => {
     const backupPath = bundledPath + ".bak-test";
     renameSync(bundledPath, backupPath);
     try {
-      expect(() => readMergedConfig({ cwd: process.cwd() })).toThrow(/bundled/);
+      await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/bundled/);
     } finally {
       renameSync(backupPath, bundledPath);
     }
@@ -386,51 +413,57 @@ describe("Layered config — error cases", () => {
 });
 
 describe("Layered config — state overlay", () => {
-  it("state.activePreset wins over bundled defaults", () => {
+  it("state.activePreset wins over bundled defaults", async () => {
     clearGlobal();
     clearLocal();
-    saveActivePreset("openai");
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("openai");
+    await saveActivePreset("openai");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activePreset).toBe("openai");
   });
 
-  it("state.activePreset wins over global manual layer", () => {
+  it("state.activePreset wins over global manual layer", async () => {
     stageGlobal({ activePreset: "google" });
     clearLocal();
-    saveActivePreset("openai");
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("openai");
+    await saveActivePreset("openai");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activePreset).toBe("openai");
   });
 
-  it("state.activeMode wins over manual activeMode when state mode exists", () => {
+  it("state.activeMode wins over manual activeMode when state mode exists", async () => {
     clearGlobal();
     clearLocal();
     // bundled tiers.json already has modes.normal/budget/quality/deep.
-    saveActiveMode("budget");
-    expect(readMergedConfig({ cwd: process.cwd() }).activeMode).toBe("budget");
+    await saveActiveMode("budget");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activeMode).toBe("budget");
   });
 
-  it("state.activeMode is ignored when mode does not exist in cfg.modes", () => {
+  it("state.activeMode is ignored when mode does not exist in cfg.modes", async () => {
     clearGlobal();
     clearLocal();
-    saveActiveMode("not-a-real-mode");
+    await saveActiveMode("not-a-real-mode");
     // bundled activeMode is "normal" — must be preserved.
-    expect(readMergedConfig({ cwd: process.cwd() }).activeMode).toBe("normal");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activeMode).toBe("normal");
   });
 
-  it("state.enforcementMode wins; cfg.enforcement is created if missing", () => {
+  it("state.enforcementMode wins; cfg.enforcement is created if missing", async () => {
     clearGlobal();
     clearLocal();
-    saveEnforcementMode("enforced");
-    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("enforced");
+    await saveEnforcementMode("enforced");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.enforcement?.mode).toBe("enforced");
   });
 
-  it("state.enforcementMode wins over manual enforcement.mode in merged layers", () => {
+  it("state.enforcementMode wins over manual enforcement.mode in merged layers", async () => {
     stageGlobal({ enforcement: { mode: "off" } });
     clearLocal();
-    saveEnforcementMode("enforced");
-    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("enforced");
+    await saveEnforcementMode("enforced");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.enforcement?.mode).toBe("enforced");
   });
 
-  it("invalid enforcementMode in raw state file is ignored", () => {
+  it("invalid enforcementMode in raw state file is ignored", async () => {
     clearGlobal();
     clearLocal();
     // Write a raw state file with an invalid enforcement mode value.
@@ -442,10 +475,11 @@ describe("Layered config — state overlay", () => {
     );
     // The bundled config has no enforcement block, so when the persisted
     // mode is invalid, cfg.enforcement stays undefined.
-    expect(readMergedConfig({ cwd: process.cwd() }).enforcement).toBeUndefined();
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.enforcement).toBeUndefined();
   });
 
-  it("invalid enforcementMode does not wipe out a valid manual enforcement.mode", () => {
+  it("invalid enforcementMode does not wipe out a valid manual enforcement.mode", async () => {
     clearLocal();
     stageGlobal({ enforcement: { mode: "off" } });
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
@@ -455,10 +489,11 @@ describe("Layered config — state overlay", () => {
       "utf-8",
     );
     // Manual "off" should survive when the persisted mode is invalid.
-    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("off");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.enforcement?.mode).toBe("off");
   });
 
-  it("valid enforcementMode in raw state file still overrides manual config", () => {
+  it("valid enforcementMode in raw state file still overrides manual config", async () => {
     clearLocal();
     stageGlobal({ enforcement: { mode: "off" } });
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
@@ -467,17 +502,19 @@ describe("Layered config — state overlay", () => {
       JSON.stringify({ enforcementMode: "enforced" }),
       "utf-8",
     );
-    expect(readMergedConfig({ cwd: process.cwd() }).enforcement?.mode).toBe("enforced");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.enforcement?.mode).toBe("enforced");
   });
 
-  it("manual activePreset is preserved when no state is written", () => {
+  it("manual activePreset is preserved when no state is written", async () => {
     clearGlobal();
     clearLocal();
     // No saveActivePreset call — bundled default must remain.
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("multi-provider");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
+    expect(cfg.activePreset).toBe("multi-provider");
   });
 
-  it("state overlay does not leak into unrelated manual fields", () => {
+  it("state overlay does not leak into unrelated manual fields", async () => {
     stageGlobal({
       presets: {
         anthropic: {
@@ -490,8 +527,8 @@ describe("Layered config — state overlay", () => {
       },
     });
     clearLocal();
-    saveActivePreset("openai");
-    const cfg = readMergedConfig({ cwd: process.cwd() });
+    await saveActivePreset("openai");
+    const cfg = await readMergedConfig({ cwd: process.cwd() });
     expect(cfg.activePreset).toBe("openai");
     // Manual nested override must survive the state overlay.
     expect(cfg.presets["anthropic"]?.["fast"]?.whenToUse).toEqual(["only-this"]);
@@ -504,24 +541,24 @@ describe("Layered config — readMergedConfig is always fresh", () => {
   // file edits are immediately visible. These tests exercise the new
   // contract directly.
 
-  it("changing cwd is reflected on the next readMergedConfig (no manual invalidation needed)", () => {
+  it("changing cwd is reflected on the next readMergedConfig (no manual invalidation needed)", async () => {
     stageLocal({ activePreset: "openai" });
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("openai");
+    expect((await readMergedConfig({ cwd: process.cwd() })).activePreset).toBe("openai");
 
     const otherCwd = join(tmpHome, "no-local");
     mkdirSync(otherCwd, { recursive: true });
     process.chdir(otherCwd);
     // Bundled default wins because the new cwd has no local override.
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("multi-provider");
+    expect((await readMergedConfig({ cwd: process.cwd() })).activePreset).toBe("multi-provider");
   });
 
-  it("editing the local file in place IS reflected on the next read", () => {
+  it("editing the local file in place IS reflected on the next read", async () => {
     stageLocal({ activePreset: "openai" });
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("openai");
+    expect((await readMergedConfig({ cwd: process.cwd() })).activePreset).toBe("openai");
 
     // Mutate the local file on disk.
     stageLocal({ activePreset: "google" });
-    expect(readMergedConfig({ cwd: process.cwd() }).activePreset).toBe("google");
+    expect((await readMergedConfig({ cwd: process.cwd() })).activePreset).toBe("google");
   });
 });
 
@@ -546,32 +583,32 @@ describe("configPath resolution — regression for bundle path bug", () => {
 // ---------------------------------------------------------------------------
 
 describe("Per-instance ConfigStore — two-instance isolation", () => {
-  it("two stores on the same cwd share disk reads but keep independent caches", () => {
+  it("two stores on the same cwd share disk reads but keep independent caches", async () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: tmpCwd });
-    expect(storeA.read().activePreset).toBe(storeB.read().activePreset);
+    expect((await storeA.read()).activePreset).toBe((await storeB.read()).activePreset);
 
     // Stage a new local layer; only the store that refreshes sees it.
     stageLocal({ activePreset: "openai" });
-    storeA.refresh();
-    expect(storeA.read().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("multi-provider");
+    await storeA.refresh();
+    expect((await storeA.read()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("multi-provider");
   });
 
-  it("a ConfigStore's cache survives a fresh readMergedConfig call (no cross-pollination)", () => {
+  it("a ConfigStore's cache survives a fresh readMergedConfig call (no cross-pollination)", async () => {
     // After PR2 task 2.7, readMergedConfig is a pure read; it does not
     // touch any ConfigStore's cache. This was the contract the old
     // invalidateConfigCache(legacy) test asserted indirectly — now we
     // assert it directly on the public surface.
     const store = createConfigStore({ cwd: tmpCwd });
-    const before = store.read().activePreset;
-    readMergedConfig({ cwd: process.cwd() });
-    expect(store.read().activePreset).toBe(before);
+    const before = (await store.read()).activePreset;
+    await readMergedConfig({ cwd: process.cwd() });
+    expect((await store.read()).activePreset).toBe(before);
   });
 });
 
 describe("Per-instance ConfigStore — two-CWD isolation", () => {
-  it("two stores on different cwds see different local layers", () => {
+  it("two stores on different cwds see different local layers", async () => {
     const otherCwd = join(tmpHome, "other-cwd");
     mkdirSync(otherCwd, { recursive: true });
     stageLocal({ activePreset: "openai" });
@@ -585,11 +622,11 @@ describe("Per-instance ConfigStore — two-CWD isolation", () => {
 
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: otherCwd });
-    expect(storeA.read().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("google");
+    expect((await storeA.read()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("google");
   });
 
-  it("refreshing one store never invalidates the other store's resolved config", () => {
+  it("refreshing one store never invalidates the other store's resolved config", async () => {
     const otherCwd = join(tmpHome, "other-cwd");
     mkdirSync(otherCwd, { recursive: true });
     stageLocal({ activePreset: "openai" });
@@ -604,13 +641,13 @@ describe("Per-instance ConfigStore — two-CWD isolation", () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: otherCwd });
     // Snapshot both, refresh one, the other must stay frozen.
-    const beforeA = storeA.read().activePreset;
-    const beforeB = storeB.read().activePreset;
+    const beforeA = (await storeA.read()).activePreset;
+    const beforeB = (await storeB.read()).activePreset;
     expect(beforeA).toBe("openai");
     expect(beforeB).toBe("google");
 
-    storeA.refresh();
-    expect(storeA.read().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("google");
+    await storeA.refresh();
+    expect((await storeA.read()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("google");
   });
 });

@@ -220,7 +220,7 @@ export const dispatchGrader = async (
   req: { tier: string; system: string; prompt: string },
   parentSessionID?: string | null,
 ): Promise<{ sessionID: string; text: string }> => {
-  const cfg = ctx.getConfig();
+  const cfg = await ctx.getConfig();
   const created = await withTimeout(
     ctx.plugin.client.session.create(
       parentSessionID ? { body: { parentID: parentSessionID } } : {},
@@ -255,8 +255,11 @@ export const dispatchGrader = async (
 /** Assemble `GateDeps` from the live seams and config snapshot. Reads
  *  `cfg.enforcement?.verify?.require` and `cfg.enforcement?.verify?.minGraderTier`
  *  at call time so /router switches take effect on the next delegate. */
-export const buildGateDeps = (ctx: PluginContext, parentSessionID?: string | null): GateDeps => {
-  const cfg = ctx.getConfig();
+export const buildGateDeps = async (
+  ctx: PluginContext,
+  parentSessionID?: string | null,
+): Promise<GateDeps> => {
+  const cfg = await ctx.getConfig();
   return {
     deterministic: {
       exec: ctx.seams.exec,
@@ -297,7 +300,7 @@ export const verifyTaskAfterHook = async (
   const toolName = inputRec["tool"];
   if (typeof toolName !== "string") return;
   const taskArgs = asTaskToolArgs(inputRec["args"]);
-  const activeCfg = ctx.getConfig();
+  const activeCfg = await ctx.getConfig();
   let mode = "off";
   try {
     mode = resolveEnforcementMode({ config: activeCfg, env: process.env }).mode;
@@ -324,7 +327,7 @@ export const verifyTaskAfterHook = async (
     const res = await accept(
       { dod, trivial, mode: "modeA" },
       artefact,
-      buildGateDeps(ctx, parentSessionID),
+      await buildGateDeps(ctx, parentSessionID),
     );
     if (!res.accepted && !res.verdict.skipped) {
       const ladder = activeCfg.enforcement?.escalate?.ladder ?? ["fast", "medium", "heavy"];

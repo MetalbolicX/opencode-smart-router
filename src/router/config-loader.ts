@@ -1,19 +1,32 @@
 // ---------------------------------------------------------------------------
 // src/router/config-loader.ts — Layer loading, merging, and config paths.
 //
-// Pure layer IO + the deep-merge pipeline. No module-level cache here. The
-// legacy module-level `loadConfig()` singleton that lived at the bottom of
-// `src/router/config.ts` is preserved here during PR1 so existing callers
-// keep working; PR2 migrates them and then deletes it (see the "Legacy
-// singleton" section at the bottom of this file).
+// Pure layer IO + the deep-merge pipeline. No module-level cache here.
+//
+// PR3b converts every fs call to `node:fs/promises` and routes failures
+// through the typed `RouterConfigError` taxonomy from `./config-errors`.
+// Resolution order remains identical (bundled → global → local → state)
+// so the observable merged-config contract is unchanged.
+//
+// Behaviour map (per `spec/config-error-handling.md`):
+//   - Required layer (bundled) missing / unreadable / malformed →
+//     `RouterConfigError` with `kind` "unreadable" / "malformed".
+//   - Optional layer (global, local) missing → `console.warn` + undefined
+//     so the loader continues with the next layer.
+//   - Optional layer present but unreadable / malformed / invalid →
+//     `RouterConfigError` with the matching `kind`. Operators see a hard
+//     failure with the offending path instead of silently using defaults.
+//   - Bundled layer invalid (semantic violation) → "invalid".
 // ---------------------------------------------------------------------------
 
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConfigLayer, RouterConfig, RouterState } from "./config.types";
 import { isPlainObject } from "./config.types";
+import { RouterConfigError } from "./config-errors";
+import { globalConfigPath, resolveConfigPaths } from "./config-paths";
 import { resolvePresetName } from "./config-resolve";
 import { readState } from "./config-state";
 import { validateConfig } from "./config-validate";
@@ -26,21 +39,21 @@ import { isValidEnforcementMode } from "./enforcement";
 // `cwd`, deep-merges them in precedence order, validates the merged shape, and
 // overlays the persisted runtime state. No module-level cache, no shared
 // mutable state — safe to call from multiple callers concurrently.
-//
-// `createConfigStore()` in `./config-store.ts` wraps this with a per-instance
-// cache; the legacy module-level `loadConfig()` singleton below is removed
-// in PR2 task 2.7 once all callers migrate to `readMergedConfig`.
 // ---------------------------------------------------------------------------
 
 /**
- * Pure config loader: read bundled + global + local layers for `cwd`,
+ * Pure async config loader: read bundled + global + local layers for `cwd`,
  * deep-merge in precedence order, validate the merged shape, and overlay
  * the persisted runtime state.
  *
  * Layer precedence (highest → lowest): local > global > bundled.
  * State precedence (highest): persisted state file.
+ *
+ * Throws `RouterConfigError` on any I/O / parse / validation failure. A
+ * missing optional layer (global / local) does NOT throw — it warns and
+ * is treated as `undefined` so the loader continues with the next layer.
  */
-export const readMergedConfig = (opts: { cwd: string }): RouterConfig => {
+export const readMergedConfig = async (opts: { cwd: string }): Promise<RouterConfig> => {
   const layers: ConfigLayer[] = [
     { kind: "bundled", path: configPath(), required: true },
     { kind: "global", path: globalConfigPath(), required: false },
@@ -51,15 +64,15 @@ export const readMergedConfig = (opts: { cwd: string }): RouterConfig => {
     },
   ];
 
-  const bundled = readConfigLayer(layers[0]!);
-  const global = readConfigLayer(layers[1]!);
-  const local = readConfigLayer(layers[2]!);
+  const bundled = await readConfigLayer(layers[0]!);
+  const global = await readConfigLayer(layers[1]!);
+  const local = await readConfigLayer(layers[2]!);
 
   const mergedManual = deepMergeConfig(deepMergeConfig(bundled, global), local);
   const cfg = validateConfig(mergedManual);
 
   // Runtime state overlays only its owned fields and never mutates tiers.json.
-  const state = readState();
+  const state = await readState();
   applyStateOverlay(cfg, state);
 
   return cfg;
@@ -80,58 +93,105 @@ export const configPath = (): string => {
   return join(getPluginRoot(), "tiers.json");
 };
 
-/** Global user-level override path (`~/.config/opencode-model-router/tiers.json`). */
-export const globalConfigPath = (): string => {
-  return join(homedir(), ".config", "opencode-model-router", "tiers.json");
-};
+/**
+ * Re-export the XDG-aware global config path resolver. The signature is
+ * preserved (`globalConfigPath(): string`) so callers do not change; the
+ * implementation now honours `$XDG_CONFIG_HOME` before falling back to
+ * `$HOME/.config/opencode-model-router/tiers.json`.
+ */
+export { globalConfigPath };
 
 /** Repo-local override path (`<cwd>/.opencode/tiers.json`). Re-evaluated per call. */
 export const localConfigPath = (): string => {
   return join(process.cwd(), ".opencode", "tiers.json");
 };
 
+// ---------------------------------------------------------------------------
+// Per-layer IO
+// ---------------------------------------------------------------------------
+
 /**
- * Read a single manual config layer from disk.
+ * Read a single manual config layer from disk asynchronously.
  * - Returns the parsed JSON object on success.
  * - Returns `undefined` ONLY when an optional layer is missing (ENOENT).
- * - Throws a path-prefixed error for any other read or parse failure, or when
- *   a required layer is missing.
+ * - Throws `RouterConfigError` for every other failure mode (missing +
+ *   required, unreadable, malformed JSON, non-object root). The `kind`
+ *   discriminator lets the caller / startup handler choose between
+ *   warn+default (the loader never reaches this branch for optional
+ *   missing files; see `warnAndSkip` below) and fail-loud.
  *
- * Exported for `src/router/config-store.ts`; pure with respect to module state
- * (no shared mutable globals).
+ * Exported for `src/router/config-store.ts`; pure with respect to module
+ * state (no shared mutable globals).
  */
-export const readConfigLayer = (layer: ConfigLayer): Record<string, unknown> | undefined => {
+export const readConfigLayer = async (
+  layer: ConfigLayer,
+): Promise<Record<string, unknown> | undefined> => {
   let raw: string;
   try {
-    raw = readFileSync(layer.path, "utf-8");
+    raw = await readFile(layer.path, "utf-8");
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
       if (layer.required) {
-        throw new Error(`bundled config missing at ${layer.path}`);
+        // A required layer (the bundled tiers.json) being absent is an
+        // unreadable builtin, not a "missing" condition — the operator
+        // cannot recover from it by writing a config file.
+        throw new RouterConfigError(
+          "unreadable",
+          layer.path,
+          err,
+          `bundled config missing at ${layer.path}`,
+        );
       }
+      // Optional layer absent → warn + skip (do NOT throw).
+      warnAndSkip(layer, "missing");
       return undefined;
     }
-    throw new Error(`${layer.kind} layer (${layer.path}) is unreadable: ${(err as Error).message}`);
+    throw new RouterConfigError(
+      "unreadable",
+      layer.path,
+      err,
+      `${layer.kind} layer (${layer.path}) is unreadable`,
+    );
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    throw new Error(
-      `${layer.kind} layer (${layer.path}) contains malformed JSON: ${(err as Error).message}`,
+    throw new RouterConfigError(
+      "malformed",
+      layer.path,
+      err,
+      `${layer.kind} layer (${layer.path}) contains malformed JSON`,
     );
   }
 
   if (!isPlainObject(parsed)) {
-    throw new Error(
-      `${layer.kind} layer (${layer.path}) must be a JSON object, got ${parsed === null ? "null" : Array.isArray(parsed) ? "array" : typeof parsed}`,
+    const shape = parsed === null ? "null" : Array.isArray(parsed) ? "array" : typeof parsed;
+    throw new RouterConfigError(
+      "malformed",
+      layer.path,
+      new Error(`expected JSON object, got ${shape}`),
+      `${layer.kind} layer (${layer.path}) must be a JSON object, got ${shape}`,
     );
   }
 
   return parsed;
 };
+
+/**
+ * Operator-facing warning for an absent optional layer. Centralized so
+ * the format matches the golden-error-message suite (`test/golden/`).
+ */
+const warnAndSkip = (layer: ConfigLayer, _kind: "missing"): void => {
+  // eslint-disable-next-line no-console
+  console.warn(`config: optional ${layer.kind} layer not found at ${layer.path}; using defaults`);
+};
+
+// ---------------------------------------------------------------------------
+// Deep merge
+// ---------------------------------------------------------------------------
 
 /**
  * Deep-merge two config-shaped values with these rules:
@@ -154,6 +214,10 @@ export const deepMergeConfig = (base: unknown, override: unknown): unknown => {
   }
   return override;
 };
+
+// ---------------------------------------------------------------------------
+// State overlay
+// ---------------------------------------------------------------------------
 
 /**
  * Narrow state overlay. Writes ONLY:
@@ -179,3 +243,12 @@ export const applyStateOverlay = (cfg: RouterConfig, state: RouterState): void =
     cfg.enforcement = { ...(cfg.enforcement ?? {}), mode: state.enforcementMode };
   }
 };
+
+// ---------------------------------------------------------------------------
+// Test-only export: re-export `resolveConfigPaths` so tests that want to
+// inspect the resolved triple (globalConfig, statePreferred, stateLegacy)
+// can import from a single location. Production code uses the convenience
+// accessors above.
+// ---------------------------------------------------------------------------
+
+export { resolveConfigPaths };

@@ -8,13 +8,13 @@ import { getActiveTiers } from "./protocol";
 // /router command output
 // ---------------------------------------------------------------------------
 
-export const buildRouterOutput = (cfg: RouterConfig, args: string): string => {
+export const buildRouterOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
   const tokens = (args ?? "").trim().split(/\s+/).filter(Boolean);
   const sub = (tokens[0] ?? "").toLowerCase();
   if (sub === "enforce") {
     const mode = (tokens[1] ?? "").toLowerCase();
     if (mode === "off" || mode === "advisory" || mode === "enforced") {
-      saveEnforcementMode(mode);
+      await saveEnforcementMode(mode);
       const desc =
         mode === "off"
           ? "Hard-block guard disabled (default routing behaviour)."
@@ -81,7 +81,7 @@ export const buildTiersOutput = (cfg: RouterConfig): string => {
 // /budget command output
 // ---------------------------------------------------------------------------
 
-export const buildBudgetOutput = (cfg: RouterConfig, args: string): string => {
+export const buildBudgetOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
   const modes = cfg.modes;
   if (!modes || Object.keys(modes).length === 0) {
     return 'No modes configured in tiers.json. Add a "modes" section to enable budget mode.';
@@ -105,7 +105,7 @@ export const buildBudgetOutput = (cfg: RouterConfig, args: string): string => {
 
   // Switch mode
   if (modes[requested]) {
-    saveActiveMode(requested);
+    await saveActiveMode(requested);
     const mode = modes[requested];
     return [
       `Routing mode switched to **${requested}**.`,
@@ -127,7 +127,7 @@ export const buildBudgetOutput = (cfg: RouterConfig, args: string): string => {
 // /preset command output
 // ---------------------------------------------------------------------------
 
-export const buildPresetOutput = (cfg: RouterConfig, args: string): string => {
+export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
   const requestedPreset = args.trim();
 
   // No args: show available presets
@@ -147,7 +147,7 @@ export const buildPresetOutput = (cfg: RouterConfig, args: string): string => {
   // Switch preset
   const resolvedPreset = resolvePresetName(cfg, requestedPreset);
   if (resolvedPreset) {
-    saveActivePreset(resolvedPreset);
+    await saveActivePreset(resolvedPreset);
     cfg.activePreset = resolvedPreset;
     const tiers = cfg.presets[resolvedPreset]!;
     const models = Object.entries(tiers)
@@ -263,7 +263,7 @@ export const handleCommandBefore = async (
   output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
 ): Promise<void> => {
   if (input.command === "tiers") {
-    const cfg = ctx.getFreshConfig();
+    const cfg = await ctx.getFreshConfig();
     output.parts.push({
       type: "text" as const,
       text: buildTiersOutput(cfg),
@@ -271,10 +271,10 @@ export const handleCommandBefore = async (
   }
 
   if (input.command === "preset") {
-    const cfg = ctx.getFreshConfig();
+    const cfg = await ctx.getFreshConfig();
     output.parts.push({
       type: "text" as const,
-      text: buildPresetOutput(cfg, input.arguments ?? ""),
+      text: await buildPresetOutput(cfg, input.arguments ?? ""),
     });
   }
 
@@ -298,18 +298,18 @@ export const handleCommandBefore = async (
   }
 
   if (input.command === "budget") {
-    const cfg = ctx.getFreshConfig();
+    const cfg = await ctx.getFreshConfig();
     output.parts.push({
       type: "text" as const,
-      text: buildBudgetOutput(cfg, input.arguments ?? ""),
+      text: await buildBudgetOutput(cfg, input.arguments ?? ""),
     });
   }
 
   if (input.command === "router") {
-    const cfg = ctx.getFreshConfig();
+    const cfg = await ctx.getFreshConfig();
     output.parts.push({
       type: "text" as const,
-      text: buildRouterOutput(cfg, input.arguments ?? ""),
+      text: await buildRouterOutput(cfg, input.arguments ?? ""),
     });
   }
 };

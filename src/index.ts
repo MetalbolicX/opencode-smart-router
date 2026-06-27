@@ -37,7 +37,9 @@ const ModelRouterPlugin: Plugin = async (plugin: PluginInput) => {
   // Single source of truth for per-plugin runtime state: stores, seams,
   // mutex, bypass flag, config cache, and grader-session tracking. Hooks
   // read/write ctx.* instead of closing over plugin-scoped locals.
-  const ctx = createPluginContext(plugin);
+  // `createPluginContext` is async because the initial config snapshot
+  // uses `node:fs/promises` end-to-end (PR3b).
+  const ctx = await createPluginContext(plugin);
 
   const enableDelegateTool =
     ctx.initialConfig.experimental?.verifiedDelegateTool === true ||

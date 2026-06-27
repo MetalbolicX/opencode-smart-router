@@ -16,6 +16,7 @@ import { createConfigStore } from "../../src/router/config-store";
 //   - Two stores with the same cwd have independent caches: one's
 //     `refresh()` never invalidates the other's cached value.
 //
+// PR3b: read / refresh / getFresh are all async; every assertion awaits.
 // The tests stage files into a temp HOME and a temp cwd so they do not
 // interfere with the developer's real `~/.config/opencode-model-router/`.
 // ---------------------------------------------------------------------------
@@ -24,11 +25,13 @@ let tmpHome: string;
 let tmpCwd: string;
 let origHOME: string | undefined;
 let origUSERPROFILE: string | undefined;
+let origXDG_CONFIG_HOME: string | undefined;
 let origCwd: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   origHOME = process.env["HOME"];
   origUSERPROFILE = process.env["USERPROFILE"];
+  origXDG_CONFIG_HOME = process.env["XDG_CONFIG_HOME"];
   origCwd = process.cwd();
 
   tmpHome = join(
@@ -38,23 +41,33 @@ beforeEach(() => {
   mkdirSync(tmpHome, { recursive: true });
   process.env["HOME"] = tmpHome;
   process.env["USERPROFILE"] = tmpHome;
+  // Tests must exercise the legacy `$HOME/.config/...` fallback so they
+  // do not leak across users who have `XDG_CONFIG_HOME` set globally.
+  delete process.env["XDG_CONFIG_HOME"];
 
   tmpCwd = join(tmpHome, "cwd");
   mkdirSync(tmpCwd, { recursive: true });
   process.chdir(tmpCwd);
+
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
-afterEach(() => {
+afterEach(async () => {
   if (origHOME === undefined) delete process.env["HOME"];
   else process.env["HOME"] = origHOME;
   if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
   else process.env["USERPROFILE"] = origUSERPROFILE;
+  if (origXDG_CONFIG_HOME === undefined) delete process.env["XDG_CONFIG_HOME"];
+  else process.env["XDG_CONFIG_HOME"] = origXDG_CONFIG_HOME;
   process.chdir(origCwd);
   try {
     rmSync(tmpHome, { recursive: true, force: true });
   } catch {
     // ignore
   }
+  const { __resetPathsForTest } = await import("../../src/router/config-paths");
+  __resetPathsForTest();
 });
 
 const stageLocal = (cwd: string, content: Record<string, unknown>): void => {
@@ -64,67 +77,67 @@ const stageLocal = (cwd: string, content: Record<string, unknown>): void => {
 };
 
 describe("readMergedConfig", () => {
-  it("returns the bundled default preset when no global/local override is staged", () => {
-    const cfg = readMergedConfig({ cwd: tmpCwd });
+  it("returns the bundled default preset when no global/local override is staged", async () => {
+    const cfg = await readMergedConfig({ cwd: tmpCwd });
     expect(cfg.activePreset).toBe("multi-provider");
     expect(cfg.presets["anthropic"]).toBeDefined();
   });
 
-  it("honors the local layer under the supplied cwd", () => {
+  it("honors the local layer under the supplied cwd", async () => {
     stageLocal(tmpCwd, { activePreset: "openai" });
-    const cfg = readMergedConfig({ cwd: tmpCwd });
+    const cfg = await readMergedConfig({ cwd: tmpCwd });
     expect(cfg.activePreset).toBe("openai");
   });
 
-  it("a different cwd reads a different local layer (no shared cache)", () => {
+  it("a different cwd reads a different local layer (no shared cache)", async () => {
     const otherCwd = join(tmpHome, "other-cwd");
     mkdirSync(otherCwd, { recursive: true });
     stageLocal(tmpCwd, { activePreset: "openai" });
     stageLocal(otherCwd, { activePreset: "google" });
 
-    expect(readMergedConfig({ cwd: tmpCwd }).activePreset).toBe("openai");
-    expect(readMergedConfig({ cwd: otherCwd }).activePreset).toBe("google");
+    expect((await readMergedConfig({ cwd: tmpCwd })).activePreset).toBe("openai");
+    expect((await readMergedConfig({ cwd: otherCwd })).activePreset).toBe("google");
   });
 
-  it("does not throw when no local layer is present", () => {
+  it("does not throw when no local layer is present", async () => {
     const otherCwd = join(tmpHome, "no-local");
     mkdirSync(otherCwd, { recursive: true });
-    expect(() => readMergedConfig({ cwd: otherCwd })).not.toThrow();
+    await expect(readMergedConfig({ cwd: otherCwd })).resolves.toBeDefined();
   });
 });
 
 describe("createConfigStore — read/refresh/invalidate", () => {
-  it("read() returns a RouterConfig", () => {
+  it("read() returns a RouterConfig", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    const cfg = store.read();
+    const cfg = await store.read();
     expect(cfg).toBeDefined();
     expect(typeof cfg.activePreset).toBe("string");
     expect(cfg.presets).toBeDefined();
   });
 
-  it("read() is idempotent — second call returns the same cached reference", () => {
+  it("read() is idempotent — second call returns the same cached reference", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    const a = store.read();
-    const b = store.read();
+    const a = await store.read();
+    const b = await store.read();
     expect(a).toBe(b);
   });
 
-  it("refresh() returns a RouterConfig that matches the current disk state", () => {
+  it("refresh() returns a RouterConfig that matches the current disk state", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    expect(store.refresh().activePreset).toBe("multi-provider");
+    expect((await store.refresh()).activePreset).toBe("multi-provider");
     stageLocal(tmpCwd, { activePreset: "openai" });
     // Without refresh, the cached value is still the bundled default.
-    expect(store.read().activePreset).toBe("multi-provider");
+    expect((await store.read()).activePreset).toBe("multi-provider");
     // After refresh, the staged local layer wins.
-    expect(store.refresh().activePreset).toBe("openai");
+    expect((await store.refresh()).activePreset).toBe("openai");
   });
 
-  it("invalidate() clears the cache so the next read() re-loads from disk", () => {
+  it("invalidate() clears the cache so the next read() re-loads from disk", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    store.read();
+    await store.read();
     stageLocal(tmpCwd, { activePreset: "openai" });
     store.invalidate();
-    expect(store.read().activePreset).toBe("openai");
+    expect((await store.read()).activePreset).toBe("openai");
   });
 
   it("invalidate() does not throw on an empty cache", () => {
@@ -133,17 +146,25 @@ describe("createConfigStore — read/refresh/invalidate", () => {
     expect(() => store.invalidate()).not.toThrow();
   });
 
-  it("refresh() after invalidate() re-loads from disk", () => {
+  it("refresh() after invalidate() re-loads from disk", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    store.read();
+    await store.read();
     store.invalidate();
     stageLocal(tmpCwd, { activePreset: "openai" });
-    expect(store.refresh().activePreset).toBe("openai");
+    expect((await store.refresh()).activePreset).toBe("openai");
+  });
+
+  it("getFresh() forces a disk read even when the cache is populated", async () => {
+    const store = createConfigStore({ cwd: tmpCwd });
+    await store.read();
+    stageLocal(tmpCwd, { activePreset: "openai" });
+    // Cache still has the bundled default — getFresh must skip it.
+    expect((await store.getFresh()).activePreset).toBe("openai");
   });
 });
 
 describe("createConfigStore — two-instance / two-cwd isolation", () => {
-  it("two stores with different cwds see different local layers", () => {
+  it("two stores with different cwds see different local layers", async () => {
     const otherCwd = join(tmpHome, "other-cwd");
     mkdirSync(otherCwd, { recursive: true });
     stageLocal(tmpCwd, { activePreset: "openai" });
@@ -152,38 +173,38 @@ describe("createConfigStore — two-instance / two-cwd isolation", () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: otherCwd });
 
-    expect(storeA.read().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("google");
+    expect((await storeA.read()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("google");
   });
 
-  it("two stores with the same cwd have independent caches (no cross-instance invalidation)", () => {
+  it("two stores with the same cwd have independent caches (no cross-instance invalidation)", async () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: tmpCwd });
 
     // Both read the same bundled default.
-    expect(storeA.read().activePreset).toBe("multi-provider");
-    expect(storeB.read().activePreset).toBe("multi-provider");
+    expect((await storeA.read()).activePreset).toBe("multi-provider");
+    expect((await storeB.read()).activePreset).toBe("multi-provider");
 
     // Mutating A's cache (via refresh after staging a local file) does
     // NOT clear B's cached value.
     stageLocal(tmpCwd, { activePreset: "openai" });
-    storeA.refresh();
-    expect(storeA.read().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("multi-provider");
+    await storeA.refresh();
+    expect((await storeA.read()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("multi-provider");
   });
 
-  it("one store's invalidate() does not affect another store's cache", () => {
+  it("one store's invalidate() does not affect another store's cache", async () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: tmpCwd });
 
-    storeA.read();
-    storeB.read();
+    await storeA.read();
+    await storeB.read();
     storeA.invalidate();
     // B's cached value must survive A's invalidation.
-    expect(storeB.read().activePreset).toBe("multi-provider");
+    expect((await storeB.read()).activePreset).toBe("multi-provider");
   });
 
-  it("two stores on different cwds refresh independently", () => {
+  it("two stores on different cwds refresh independently", async () => {
     const otherCwd = join(tmpHome, "other-cwd");
     mkdirSync(otherCwd, { recursive: true });
     stageLocal(tmpCwd, { activePreset: "openai" });
@@ -193,8 +214,8 @@ describe("createConfigStore — two-instance / two-cwd isolation", () => {
     const storeB = createConfigStore({ cwd: otherCwd });
 
     // Refresh one store — the other is unaffected.
-    expect(storeA.refresh().activePreset).toBe("openai");
-    expect(storeB.read().activePreset).toBe("google");
+    expect((await storeA.refresh()).activePreset).toBe("openai");
+    expect((await storeB.read()).activePreset).toBe("google");
   });
 });
 
@@ -209,64 +230,64 @@ describe("createConfigStore — two-instance / two-cwd isolation", () => {
 // ---------------------------------------------------------------------------
 
 describe("createConfigStore — direct pure-store coverage", () => {
-  it("refresh() returns a value with the same activePreset when the disk state is unchanged", () => {
+  it("refresh() returns a value with the same activePreset when the disk state is unchanged", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    const a = store.refresh();
-    const b = store.refresh();
+    const a = await store.refresh();
+    const b = await store.refresh();
     // `refresh()` always re-reads disk and replaces the cache, so the
     // returned reference is fresh on each call. The merged values must
     // still be equal because nothing on disk changed between calls.
     expect(b.activePreset).toBe(a.activePreset);
   });
 
-  it("refresh() after a staged change returns a NEW reference", () => {
+  it("refresh() after a staged change returns a NEW reference", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    const a = store.refresh();
+    const a = await store.refresh();
     stageLocal(tmpCwd, { activePreset: "openai" });
-    const b = store.refresh();
+    const b = await store.refresh();
     expect(b).not.toBe(a);
     expect(b.activePreset).toBe("openai");
   });
 
-  it("read() after refresh() returns the new reference (no stale snapshot)", () => {
+  it("read() after refresh() returns the new reference (no stale snapshot)", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
-    store.read();
+    await store.read();
     stageLocal(tmpCwd, { activePreset: "openai" });
-    store.refresh();
+    await store.refresh();
     // The post-refresh read must reflect the new disk state.
-    expect(store.read().activePreset).toBe("openai");
+    expect((await store.read()).activePreset).toBe("openai");
   });
 
-  it("a read on an empty cache populates it from disk and returns the merged config", () => {
+  it("a read on an empty cache populates it from disk and returns the merged config", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
     // No read or refresh yet — the cache is empty. The next read() must
     // populate it from disk and return a valid RouterConfig.
-    const cfg = store.read();
+    const cfg = await store.read();
     expect(cfg).toBeDefined();
     expect(typeof cfg.activePreset).toBe("string");
     // A second read should now be reference-identical (cache hit).
-    expect(store.read()).toBe(cfg);
+    expect(await store.read()).toBe(cfg);
   });
 
-  it("two stores created from the same cwd see the same initial disk state", () => {
+  it("two stores created from the same cwd see the same initial disk state", async () => {
     const storeA = createConfigStore({ cwd: tmpCwd });
     const storeB = createConfigStore({ cwd: tmpCwd });
     // Both stores start cold; both reads return the bundled default.
-    expect(storeA.read().activePreset).toBe("multi-provider");
-    expect(storeB.read().activePreset).toBe("multi-provider");
+    expect((await storeA.read()).activePreset).toBe("multi-provider");
+    expect((await storeB.read()).activePreset).toBe("multi-provider");
     // The two configs are equal-by-value but separate references.
-    expect(storeA.read()).not.toBe(storeB.read());
+    expect(await storeA.read()).not.toBe(await storeB.read());
   });
 
-  it("readMergedConfig({ cwd }) is a pure read: it does not pollute the per-instance cache", () => {
+  it("readMergedConfig({ cwd }) is a pure read: it does not pollute the per-instance cache", async () => {
     // Stage a local layer, then read with the pure helper — it must NOT
     // touch any ConfigStore cache. The next store read should still see
     // the bundled default until refresh() is called.
     stageLocal(tmpCwd, { activePreset: "openai" });
-    const pureCfg = readMergedConfig({ cwd: tmpCwd });
+    const pureCfg = await readMergedConfig({ cwd: tmpCwd });
     expect(pureCfg.activePreset).toBe("openai");
 
     const store = createConfigStore({ cwd: tmpCwd });
-    expect(store.read().activePreset).toBe("openai");
+    expect((await store.read()).activePreset).toBe("openai");
   });
 });

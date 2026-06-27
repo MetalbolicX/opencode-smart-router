@@ -89,9 +89,9 @@ const makeCtx = (opts: {
     } as any,
     initialConfig: cfg,
     activeTiersAtLoad: { fast: cfg.presets.default.fast },
-    getConfig: () => cfg,
-    refreshConfig: () => cfg,
-    getFreshConfig: () => cfg,
+    getConfig: async () => cfg,
+    refreshConfig: async () => cfg,
+    getFreshConfig: async () => cfg,
     state: { bypassed: false },
     sessionStore: sessionStore as any,
     trajectoryStore: {
@@ -239,9 +239,9 @@ describe("dispatchGrader", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildGateDeps", () => {
-  it("returns a GateDeps with deterministic seams from ctx.seams and verifyMutex", () => {
+  it("returns a GateDeps with deterministic seams from ctx.seams and verifyMutex", async () => {
     const ctx = makeCtx({ directory: workDir });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
 
     expect(deps.deterministic.cwd).toBe(workDir);
     expect(deps.deterministic.exec).toBe(ctx.seams.exec);
@@ -249,7 +249,7 @@ describe("buildGateDeps", () => {
     expect(deps.deterministic.mutex).toBe(ctx.verifyMutex);
   });
 
-  it("reads enforce.verify.minGraderTier and enforce.verify.require from ctx.getConfig()", () => {
+  it("reads enforce.verify.minGraderTier and enforce.verify.require from ctx.getConfig()", async () => {
     const ctx = makeCtx({
       directory: workDir,
       cfg: {
@@ -260,7 +260,7 @@ describe("buildGateDeps", () => {
       },
     });
 
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     expect(deps.checker.minGraderTier).toBe("ultra");
     expect(deps.require).toBe("always");
     expect(deps.checker.ladder).toEqual(["fast", "medium", "heavy"]);
@@ -276,7 +276,7 @@ describe("buildGateDeps", () => {
       },
     });
 
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     const result = await deps.checker.dispatchGrader({
       tier: "fast",
       system: "system-msg",
@@ -670,34 +670,34 @@ describe("verifyTaskAfterHook — narrowed shape tolerance", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildGateDeps — Phase 5: pass-through of verify.require", () => {
-  it("passes through 'never' unchanged", () => {
+  it("passes through 'never' unchanged", async () => {
     const ctx = makeCtx({
       directory: workDir,
       cfg: { enforcement: { verify: { require: "never" } } } as any,
     });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     expect(deps.require).toBe("never");
   });
 
-  it("passes through 'whenDoDPresent' unchanged", () => {
+  it("passes through 'whenDoDPresent' unchanged", async () => {
     const ctx = makeCtx({
       directory: workDir,
       cfg: { enforcement: { verify: { require: "whenDoDPresent" } } } as any,
     });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     expect(deps.require).toBe("whenDoDPresent");
   });
 
-  it("passes through 'always' unchanged", () => {
+  it("passes through 'always' unchanged", async () => {
     const ctx = makeCtx({
       directory: workDir,
       cfg: { enforcement: { verify: { require: "always" } } } as any,
     });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     expect(deps.require).toBe("always");
   });
 
-  it("passes through an UNKNOWN value (coercion is the gate's job, not dispatcher's)", () => {
+  it("passes through an UNKNOWN value (coercion is the gate's job, not dispatcher's)", async () => {
     // Phase 5 contract: buildGateDeps is a pass-through. The gate is the
     // component that calls normalizeRequire(). A test config that bypasses
     // validateConfig can still flow here, and the gate must fail closed.
@@ -705,7 +705,7 @@ describe("buildGateDeps — Phase 5: pass-through of verify.require", () => {
       directory: workDir,
       cfg: { enforcement: { verify: { require: "sometimes" } } } as any,
     });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     expect(deps.require).toBe("sometimes");
   });
 });
@@ -851,7 +851,7 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
         return { data: { id: "grader-sid" } };
       },
     });
-    const deps = buildGateDeps(ctx, "orch-sid-99");
+    const deps = await buildGateDeps(ctx, "orch-sid-99");
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
     expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
@@ -866,7 +866,7 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
         return { data: { id: "grader-sid" } };
       },
     });
-    const deps = buildGateDeps(ctx);
+    const deps = await buildGateDeps(ctx);
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
     expect(createCalls[0]).toEqual({});
