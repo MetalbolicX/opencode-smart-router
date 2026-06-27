@@ -88,14 +88,31 @@ export const createChangedFileStore = () => {
 const TASK_RESULT_RE = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/i;
 
 /**
- * Parse the built-in `task` tool's after-hook output: the child's final return
- * is wrapped in <task_result>...</task_result> and the child session id lives in
- * output.metadata.sessionId (spike capability C).
+ * Parsed shape of the built-in `task` tool's after-hook output.
+ *
+ * - `finalReturnText`: the child's final return (extracted from
+ *   `<task_result>...</task_result>` when present, otherwise the whole output).
+ * - `childSessionID`: the producer subagent session id, taken from
+ *   `output.metadata.sessionId` (or `sessionID`).
+ * - `parentSessionID`: the orchestrator/root session id, taken from
+ *   `output.metadata.parentSessionId` (or `parentSessionID`). This is the
+ *   metadata-first source of truth for grader session parenting in the
+ *   verify-after-task path — NEVER the subagent `input.sessionID`.
  */
-export const parseTaskResult = (output: unknown): {
+export interface ParsedTaskResult {
   finalReturnText: string;
   childSessionID: string | null;
-} => {
+  parentSessionID: string | null;
+}
+
+/**
+ * Parse the built-in `task` tool's after-hook output: the child's final return
+ * is wrapped in <task_result>...</task_result> and the child session id lives in
+ * output.metadata.sessionId (spike capability C). The orchestrator/root session
+ * id, when present, lives in output.metadata.parentSessionId and is returned as
+ * `parentSessionID` (SDD change: fix-task-verifier-session-parenting).
+ */
+export const parseTaskResult = (output: unknown): ParsedTaskResult => {
   const o = (output ?? {}) as Record<string, unknown>;
   const raw = typeof o.output === "string" ? o.output : "";
   const m = raw.match(TASK_RESULT_RE);
@@ -107,7 +124,13 @@ export const parseTaskResult = (output: unknown): {
       : typeof meta.sessionID === "string"
         ? meta.sessionID
         : null;
-  return { finalReturnText, childSessionID };
+  const parentSessionID =
+    typeof meta.parentSessionId === "string"
+      ? meta.parentSessionId
+      : typeof meta.parentSessionID === "string"
+        ? meta.parentSessionID
+        : null;
+  return { finalReturnText, childSessionID, parentSessionID };
 };
 
 /**
@@ -197,7 +220,7 @@ export const buildAcceptedSuffix = (method: string): string => {
 export const dispatchGrader = async (
   ctx: PluginContext,
   req: { tier: string; system: string; prompt: string },
-  parentSessionID?: string,
+  parentSessionID?: string | null,
 ): Promise<{ sessionID: string; text: string }> => {
   const cfg = ctx.getConfig();
   const created = await withTimeout(
@@ -236,7 +259,7 @@ export const dispatchGrader = async (
  *  at call time so /router switches take effect on the next delegate. */
 export const buildGateDeps = (
   ctx: PluginContext,
-  parentSessionID?: string,
+  parentSessionID?: string | null,
 ): GateDeps => {
   const cfg = ctx.getConfig();
   return {
@@ -260,16 +283,20 @@ export const buildGateDeps = (
  *  a forcing note to `output.output` on rejection. Fail-closed: any throw is
  *  swallowed so the after-hook never crashes a real session.
  *
- *  The `_parentSessionID?` parameter is kept for API compatibility but is
- *  intentionally ignored: forwarding it caused the SDK to attempt to create
- *  child sessions of subagent sessions, which hangs the opencode runtime
- *  permanently (SDD change: fix-subagent-session-hang). Grader sessions are
- *  always created parentless. */
+ *  Parent for grader sessions is read metadata-first from
+ *  `output.metadata.parentSessionId` (or `parentSessionID`) via
+ *  `parseTaskResult` and threaded into `buildGateDeps(ctx, parentSessionID)`.
+ *  The subagent `input.sessionID` MUST NEVER be forwarded as
+ *  `parentSessionID`: passing the subagent SID caused the SDK to attempt to
+ *  create child sessions of subagent sessions, which hangs the opencode
+ *  runtime permanently (SDD change: fix-subagent-session-hang). When
+ *  metadata is absent/non-object/non-string, the hook leaves grader creation
+ *  parentless — it MUST NOT throw for that reason alone (SDD change:
+ *  fix-task-verifier-session-parenting). */
 export const verifyTaskAfterHook = async (
   ctx: PluginContext,
   input: unknown,
   output: Record<string, unknown>,
-  _parentSessionID?: string,
 ): Promise<void> => {
   const inputRec = (input ?? {}) as Record<string, unknown>;
   const toolName = inputRec["tool"];
@@ -285,7 +312,7 @@ export const verifyTaskAfterHook = async (
   const requireMode = activeCfg.enforcement?.verify?.require;
   if (!shouldVerifyTask(toolName, mode, requireMode)) return;
   try {
-    const { finalReturnText, childSessionID } = parseTaskResult(output);
+    const { finalReturnText, childSessionID, parentSessionID } = parseTaskResult(output);
     const producerTier = taskArgs?.subagent_type ?? "";
     const dod = buildDelegationDoD({
       prompt: taskArgs?.prompt,
@@ -306,7 +333,7 @@ export const verifyTaskAfterHook = async (
     const res = await accept(
       { dod, trivial, mode: "modeA" },
       artefact,
-      buildGateDeps(ctx),
+      buildGateDeps(ctx, parentSessionID),
     );
     if (!res.accepted && !res.verdict.skipped) {
       const ladder = activeCfg.enforcement?.escalate?.ladder ?? ["fast", "medium", "heavy"];

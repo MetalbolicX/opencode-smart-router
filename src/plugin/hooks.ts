@@ -165,11 +165,15 @@ export const handleToolExecuteAfter = async (
   // we observe the finished task result and append a forcing note if it is not
   // accepted; we cannot retry a task call that already finished).
   //
-  // We intentionally do NOT forward `sid` (the subagent session id) to
-  // verifyTaskAfterHook. Passing it as parentSessionID caused grader session
+  // Parent for grader sessions is read metadata-first from
+  // `output.metadata.parentSessionId` (or `parentSessionID`) inside
+  // `verifyTaskAfterHook`. We intentionally do NOT forward `sid` (the subagent
+  // session id) here. Passing it as `parentSessionID` caused grader session
   // creation to hang because the SDK cannot create child sessions of subagent
-  // sessions (SDD change: fix-subagent-session-hang). The verifier creates
-  // grader sessions parentless instead.
+  // sessions (SDD change: fix-subagent-session-hang). When the metadata field
+  // is missing or malformed, `input.sessionID` MUST NEVER be substituted as
+  // the grader parent — grader creation simply stays parentless instead
+  // (SDD change: fix-task-verifier-session-parenting).
   await verifyTaskAfterHook(ctx, input, output);
 }
 

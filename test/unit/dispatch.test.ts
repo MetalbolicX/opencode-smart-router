@@ -102,23 +102,76 @@ describe("parseTaskResult", () => {
     });
     expect(r.finalReturnText).toBe("DONE: built it");
     expect(r.childSessionID).toBe("ses_child");
+    expect(r.parentSessionID).toBe("ses_parent");
   });
   it("falls back to the whole output when no wrapper, null id when no metadata", () => {
     const r = parseTaskResult({ output: "  plain text  " });
     expect(r.finalReturnText).toBe("plain text");
     expect(r.childSessionID).toBeNull();
+    expect(r.parentSessionID).toBeNull();
   });
   it("supports the sessionID metadata spelling and is case-insensitive", () => {
     const r = parseTaskResult({
       output: "<TASK_RESULT>hi</TASK_RESULT>",
-      metadata: { sessionID: "ses_x" },
+      metadata: { sessionID: "ses_x", parentSessionID: "ses_p" },
     });
     expect(r.finalReturnText).toBe("hi");
     expect(r.childSessionID).toBe("ses_x");
+    expect(r.parentSessionID).toBe("ses_p");
   });
   it("non-string output => empty text", () => {
     expect(parseTaskResult({ output: 123 }).finalReturnText).toBe("");
     expect(parseTaskResult(undefined).finalReturnText).toBe("");
+  });
+  it("normalizes parentSessionID from the parentSessionId (camelCase) spelling", () => {
+    const r = parseTaskResult({
+      output: "<task_result>hi</task_result>",
+      metadata: { sessionId: "c", parentSessionId: "p_camel" },
+    });
+    expect(r.parentSessionID).toBe("p_camel");
+  });
+  it("normalizes parentSessionID from the parentSessionID (all-caps) spelling", () => {
+    const r = parseTaskResult({
+      output: "<task_result>hi</task_result>",
+      metadata: { sessionID: "c", parentSessionID: "p_upper" },
+    });
+    expect(r.parentSessionID).toBe("p_upper");
+  });
+  it("parentSessionID is null when metadata is absent", () => {
+    const r = parseTaskResult({ output: "<task_result>hi</task_result>" });
+    expect(r.parentSessionID).toBeNull();
+  });
+  it("parentSessionID is null when metadata is not an object", () => {
+    expect(
+      parseTaskResult({ output: "x", metadata: "not-an-object" }).parentSessionID,
+    ).toBeNull();
+    expect(
+      parseTaskResult({ output: "x", metadata: 42 }).parentSessionID,
+    ).toBeNull();
+    expect(
+      parseTaskResult({ output: "x", metadata: null }).parentSessionID,
+    ).toBeNull();
+  });
+  it("parentSessionID is null when the metadata field is missing", () => {
+    const r = parseTaskResult({
+      output: "x",
+      metadata: { sessionId: "c" },
+    });
+    expect(r.parentSessionID).toBeNull();
+  });
+  it("parentSessionID is null when the metadata field is non-string", () => {
+    expect(
+      parseTaskResult({ output: "x", metadata: { parentSessionId: 42 } })
+        .parentSessionID,
+    ).toBeNull();
+    expect(
+      parseTaskResult({ output: "x", metadata: { parentSessionID: { x: 1 } } })
+        .parentSessionID,
+    ).toBeNull();
+    expect(
+      parseTaskResult({ output: "x", metadata: { parentSessionID: null } })
+        .parentSessionID,
+    ).toBeNull();
   });
 });
 
