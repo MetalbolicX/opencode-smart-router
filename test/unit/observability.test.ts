@@ -308,17 +308,30 @@ describe("observability — convenience helpers (logEvent)", () => {
     expect(infoLines).toContain("lifecycle.startup");
     expect(infoLines).toContain("lifecycle.shutdown");
 
-    expect(warnLines).toContain("config.stale_serve");
-    expect(warnLines).toContain("routing.unmet");
-    expect(warnLines).toContain("routing.aborted");
-    expect(warnLines).toContain("verification.fail");
+    // SDD: tui-toast-verification — these four terminal-noise events were
+    // downgraded from warn to debug so the default TUI does not see raw
+    // JSON envelopes. They now flow through console.log (alongside debug
+    // and info) instead of console.warn, and operators opt in via
+    // MODEL_ROUTER_LOG_LEVEL=debug.
+    expect(infoLines).toContain("config.stale_serve");
+    expect(infoLines).toContain("routing.unmet");
+    expect(infoLines).toContain("routing.aborted");
+    expect(infoLines).toContain("verification.fail");
+
+    // Sanity: with this SDD change, the default warn sink should NOT see
+    // any of these events at the documented debug level.
+    expect(warnLines).not.toContain("config.stale_serve");
+    expect(warnLines).not.toContain("routing.unmet");
+    expect(warnLines).not.toContain("routing.aborted");
+    expect(warnLines).not.toContain("verification.fail");
   });
 
-  it("routing.nonretryable emits at warn level with the documented payload fields", () => {
-    // routing.nonretryable is the CAUSE event for non-retryable prompt
-    // failures and the pre-prompt tierModel guard failure. Fires at warn
-    // level so operators can grep for policy stops at the default warn
-    // log level without opt-in.
+  it("routing.nonretryable emits at debug level (silenced at default warn level)", () => {
+    // SDD: tui-toast-verification — routing.nonretryable was downgraded
+    // from warn to debug along with its sibling terminal events so the
+    // TUI does not bleed raw JSON at the default warn level. Operators
+    // opt in via MODEL_ROUTER_LOG_LEVEL=debug when correlating policy
+    // stops with the user-facing toast.
     delete process.env["MODEL_ROUTER_LOG_LEVEL"];
     __resetLoggerForTest();
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -328,13 +341,23 @@ describe("observability — convenience helpers (logEvent)", () => {
       tier: "fast",
       attempt: 1,
     });
-    // Default level is "warn" — warn events fire, log (info+debug) does NOT.
+    // Default level is "warn" — debug events must NOT fire.
     expect(filterLoggerLines(logSpy.mock.calls)).toHaveLength(0);
-    const warnLines = filterLoggerLines(warnSpy.mock.calls);
-    expect(warnLines).toHaveLength(1);
-    const env = extractEnvelope(warnLines[0]!);
+    expect(filterLoggerLines(warnSpy.mock.calls)).toHaveLength(0);
+
+    // Opt in to debug — now it should fire with the documented payload.
+    process.env["MODEL_ROUTER_LOG_LEVEL"] = "debug";
+    __resetLoggerForTest();
+    logEvent.routing.nonretryable({
+      reason: "model not found",
+      tier: "fast",
+      attempt: 1,
+    });
+    const lines = filterLoggerLines(logSpy.mock.calls);
+    expect(lines).toHaveLength(1);
+    const env = extractEnvelope(lines[0]!);
     expect(env["event"]).toBe("routing.nonretryable");
-    expect(env["level"]).toBe("warn");
+    expect(env["level"]).toBe("debug");
     expect(env["reason"]).toBe("model not found");
     expect(env["tier"]).toBe("fast");
     expect(env["attempt"]).toBe(1);
@@ -377,6 +400,8 @@ describe("observability — convenience helpers (logEvent)", () => {
     // Pin the event names + level routing as part of the public contract:
     // adding these to the `emits the documented event names` assertion
     // catches any future rename silently that would break operator dashboards.
+    // SDD: tui-toast-verification — both events fire at debug level after
+    // the downgrade, so they both flow through console.log.
     process.env["MODEL_ROUTER_LOG_LEVEL"] = "debug";
     __resetLoggerForTest();
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -386,8 +411,11 @@ describe("observability — convenience helpers (logEvent)", () => {
 
     const warnEvents = filterLoggerLines(warnSpy.mock.calls).map((l) => extractEnvelope(l).event);
     const logEvents = filterLoggerLines(logSpy.mock.calls).map((l) => extractEnvelope(l).event);
-    expect(warnEvents).toContain("routing.nonretryable");
+    expect(logEvents).toContain("routing.nonretryable");
     expect(logEvents).toContain("routing.retryable");
+    // And neither leaks through the warn sink at the debug level.
+    expect(warnEvents).not.toContain("routing.nonretryable");
+    expect(warnEvents).not.toContain("routing.retryable");
   });
 
   it("verification.skipped is debug-level (silenced at default warn level)", () => {

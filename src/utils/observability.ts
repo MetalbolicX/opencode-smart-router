@@ -207,8 +207,12 @@ export const logEvent = {
     refresh(payload: Omit<LogPayload, "event">): void {
       log.info({ event: "config.refresh", ...payload });
     },
+    // Downgraded from warn to debug (SDD: tui-toast-verification) so a
+    // fallback to a cached config snapshot does not bleed JSON to the TUI
+    // at the default warn level. Operators can opt in via
+    // MODEL_ROUTER_LOG_LEVEL=debug when correlating stale-served runs.
     staleServe(payload: Omit<LogPayload, "event">): void {
-      log.warn({ event: "config.stale_serve", ...payload });
+      log.debug({ event: "config.stale_serve", ...payload });
     },
   },
   // routing layer
@@ -222,19 +226,28 @@ export const logEvent = {
     accepted(payload: Omit<LogPayload, "event">): void {
       log.info({ event: "routing.accepted", ...payload });
     },
+    // Downgraded from warn to debug (SDD: tui-toast-verification) so a
+    // terminal ladder outcome does not bleed JSON to the TUI at the
+    // default warn level. The toast helper surfaces the same outcome to
+    // the user; operators can still grep for it at debug level.
     unmet(payload: Omit<LogPayload, "event">): void {
-      log.warn({ event: "routing.unmet", ...payload });
+      log.debug({ event: "routing.unmet", ...payload });
     },
+    // Downgraded from warn to debug (SDD: tui-toast-verification) so a
+    // user-cancelled delegation does not bleed JSON to the TUI. Cancels
+    // are intentionally silent on the user-facing surface.
     aborted(payload: Omit<LogPayload, "event">): void {
-      log.warn({ event: "routing.aborted", ...payload });
+      log.debug({ event: "routing.aborted", ...payload });
     },
     // Non-retryable prompt failure (e.g. billing / model-not-found / auth).
     // `nonretryable` is the CAUSE event (what stopped us from retrying);
     // `unmet` is the TERMINAL outcome event (the delegation has stopped).
-    // Fires at warn level so operators can grep for policy stops without
-    // the noise of every retryable transport blip.
+    // Downgraded from warn to debug (SDD: tui-toast-verification) along
+    // with `unmet` so the cause/terminal pair stays co-located in the log
+    // level. Operators grep for policy stops at debug level — the user-
+    // facing toast surfaces the same outcome via the TUI helper.
     nonretryable(payload: Omit<LogPayload, "event">): void {
-      log.warn({ event: "routing.nonretryable", ...payload });
+      log.debug({ event: "routing.nonretryable", ...payload });
     },
     // Retryable prompt failure (e.g. HTTP 429 rate limit, transient
     // transport error). Fires at debug level because retryable events
@@ -249,8 +262,12 @@ export const logEvent = {
     pass(payload: Omit<LogPayload, "event">): void {
       log.info({ event: "verification.pass", ...payload });
     },
+    // Downgraded from warn to debug (SDD: tui-toast-verification) so a
+    // gate rejection does not bleed JSON to the TUI at the default warn
+    // level. The forcing note and toast surface the same outcome to the
+    // user; operators opt in via MODEL_ROUTER_LOG_LEVEL=debug.
     fail(payload: Omit<LogPayload, "event">): void {
-      log.warn({ event: "verification.fail", ...payload });
+      log.debug({ event: "verification.fail", ...payload });
     },
     skipped(payload: Omit<LogPayload, "event">): void {
       log.debug({ event: "verification.skipped", ...payload });
