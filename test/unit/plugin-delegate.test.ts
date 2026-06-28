@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
 import { executeDelegate } from "../../src/plugin/delegate";
 import type { RouterConfig } from "../../src/router/config";
+import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
 
 // ---------------------------------------------------------------------------
 // Delegate-execution parity tests.
@@ -1672,5 +1673,93 @@ describe("executeDelegate — abort on the fail-fast path is silent (SDD regress
     // Cleanup must still have run on the abort branch.
     expect(unregisterCalls).toContain("sess_abort_failfast");
     expect(clearCalls).toContain("sess_abort_failfast");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SDD: fail-fast-hardening-v2 (Phase 2) — explicit guard wiring test.
+//
+// The delegate's pre-prompt tier-resolution check moved from an inline
+// `tierModel() === null` test into the shared `resolveTierModelGuard`
+// module. The tests above (`executeDelegate — tierModel() === null fails
+// fast (SDD)`) exercise the OBSERVABLE contract (visible message +
+// routing.unmet event). This test pins the explicit contract that the
+// guard module is the canonical source of truth: the unmet reason
+// emitted on the fail-closed path MUST equal the reason returned by the
+// guard, so a future change that re-introduces a parallel inline check
+// (and accidentally drifts the reason string) is caught immediately.
+//
+// Invariants under test:
+//   - The guard module exports `resolveTierModelGuard` and returns the
+//     canonical "invalid model or provider configuration" reason for
+//     any failure mode (missing tier, malformed model string, etc.).
+//   - `executeDelegate`'s visible unmet message AND the `routing.unmet`
+//     event's `reason` field are sourced from the guard's `reason`,
+//     not from a hard-coded delegate-local string.
+// ---------------------------------------------------------------------------
+
+describe("executeDelegate — explicit resolveTierModelGuard wiring (Phase 2 SDD)", () => {
+  it("the guard's reason string is the same string the delegate emits on the fail-closed path", async () => {
+    acceptMock.mockReset();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // Drive the SAME config through the guard and through executeDelegate,
+      // then assert the unmet payload uses the guard's reason verbatim.
+      const malformedCfg = {
+        activePreset: "default",
+        defaultTier: "fast",
+        presets: {
+          default: {
+            fast: {
+              // Malformed: empty model string → tierModel() returns null.
+              model: "" as unknown as string,
+              description: "fast",
+              whenToUse: [],
+              costRatio: 1,
+            },
+          },
+        },
+        rules: [],
+        enforcement: {
+          verify: { require: "always", graderTemperature: 0 },
+          escalate: {
+            ladder: ["fast", "medium", "heavy"],
+            maxAttemptsPerTier: 1,
+            maxTotalAttempts: 5,
+          },
+        },
+      } as RouterConfig;
+
+      // 1. Guard returns the canonical reason for this exact config.
+      const guardResult = resolveTierModelGuard(malformedCfg, "fast");
+      expect(guardResult.ok).toBe(false);
+      const guardReason = guardResult.reason;
+      expect(guardReason).toBe("invalid model or provider configuration");
+
+      // 2. The delegate emits the SAME reason string on the unmet path.
+      const { ctx } = makeCtx({
+        getConfigImpl: () => malformedCfg,
+        refreshConfigImpl: () => malformedCfg,
+      });
+      const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+      expect(out).toContain(guardReason);
+
+      // 3. The routing.unmet event's reason matches the guard's reason
+      //    byte-for-byte (this is what operators grep for in dashboards).
+      const lines = warnSpy.mock.calls
+        .map((c) => String(c[0] ?? ""))
+        .filter((l) => l.startsWith("[model-router] "));
+      const matched = lines.some((l) => {
+        try {
+          const env = JSON.parse(l.slice(l.indexOf("{")));
+          return env["event"] === "routing.unmet" && env["reason"] === guardReason;
+        } catch {
+          return false;
+        }
+      });
+      expect(matched).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

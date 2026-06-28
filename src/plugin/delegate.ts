@@ -27,13 +27,13 @@ import type { Preset } from "../router/config";
 import { getActiveTiers } from "../router/protocol";
 import { classifyPromptError } from "../utils/error-classify";
 import { logEvent } from "../utils/observability";
+import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { withTimeout } from "../utils/timeout";
 import {
   buildAcceptedSuffix,
   buildDelegationDoD,
   buildForcingNote,
   buildGateDeps,
-  tierModel,
 } from "../verify/dispatch";
 import { accept } from "../verify/gate";
 import type { PluginContext } from "./context";
@@ -189,26 +189,31 @@ export const executeDelegate = async (
       }
 
       try {
-        // SDD change: delegate-nonretryable-errors. Resolve the tier's model
-        // up front. A `null` result means the tier is missing or the
-        // `provider/model` string is malformed — that's a non-retryable
-        // configuration failure. Skip session.prompt entirely and fail fast
-        // with a `[router status: unmet]` message rather than feeding an
-        // empty artefact to the gate and burning retry/escalation attempts
-        // on a configuration that will never succeed. The per-attempt
-        // `finally` still runs, so the producer session is untracked.
-        const model = tierModel(activeCfg, tier);
-        if (model === null) {
+        // SDD change: delegate-nonretryable-errors (fail-fast-hardening-v2).
+        // Resolve the tier's model up front through the shared guard. A
+        // `{ ok: false }` result means the tier is missing, the
+        // `provider/model` string is malformed, or the tier's `model` field
+        // is absent — all are non-retryable configuration failures. Skip
+        // session.prompt entirely and fail fast with a `[router status:
+        // unmet]` message rather than feeding an empty artefact to the
+        // gate and burning retry/escalation attempts on a configuration
+        // that will never succeed. The per-attempt `finally` still runs,
+        // so the producer session is untracked. The guard returns the
+        // canonical reason string so the unmet payload and the visible
+        // message stay in sync across delegate + dispatch wirings.
+        const guard = resolveTierModelGuard(activeCfg, tier);
+        if (!guard.ok) {
           logEvent.routing.unmet({
-            reason: "invalid model or provider configuration",
+            reason: guard.reason,
             attempts: attemptCounter,
           });
           return (
             `[router status: unmet] delegation stopped: ` +
-            `invalid model or provider configuration ` +
+            `${guard.reason} ` +
             `(after ${attemptCounter} attempt(s) on tier ${tier}).`
           );
         }
+        const model = guard.model;
         producerText = "";
         // Provider-failover vs quality-escalation precedence (Phase 3.3):
         // Provider-failover is advisory only — a text chain injected into the orchestrator

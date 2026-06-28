@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dumpDelegateScorecard } from "../../src/escalate/ladder";
 import type { PluginContext } from "../../src/plugin/context";
 import type { RouterConfig } from "../../src/router/config";
@@ -232,6 +232,118 @@ describe("dispatchGrader", () => {
     });
 
     expect(result).toEqual({ sessionID: "", text: "" });
+  });
+
+  // -------------------------------------------------------------------------
+  // SDD fail-fast-hardening-v2 (Phase 2): shared tier-model guard.
+  //
+  // The pre-v2 dispatchGrader silently fell through `tierModel(...) ?? undefined`
+  // and called `session.prompt` with no model field — the SDK then picked a
+  // server-default model, which is exactly the bug the spec calls out. v2
+  // replaces the silent fallthrough with `resolveTierModelGuard` so an
+  // unresolved tier fails closed: empty grader result + `routing.unmet`
+  // event, no `session.prompt` call.
+  //
+  // Invariants under test:
+  //   - Unknown tier ⇒ empty `{ sessionID: "", text: "" }` result.
+  //   - `routing.unmet` is emitted (warn level) with the canonical reason
+  //     and the offending tier name.
+  //   - `session.prompt` is NEVER invoked (no SDK round-trip with an
+  //     omitted model — that's the regression we're guarding against).
+  //   - The session is removed from `ctx.graderSessions` even on the
+  //     fail-closed path (per-attempt `finally` invariant).
+  // -------------------------------------------------------------------------
+
+  it("fails closed with empty result when the tier is unknown (no prompt call)", async () => {
+    const promptCalls: unknown[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async (req: unknown) => {
+        promptCalls.push(req);
+        return { data: { parts: [{ type: "text", text: "should-not-run" }] } };
+      },
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "no-such-tier",
+      system: "sys",
+      prompt: "verify",
+    });
+
+    // Empty grader result — the gate treats this as a fail-closed verdict.
+    expect(result).toEqual({ sessionID: "", text: "" });
+    // session.prompt MUST NOT have been called. This is the core regression
+    // we're guarding against: a real prompt with a server-default model
+    // would silently answer from a model the operator never picked.
+    expect(promptCalls).toHaveLength(0);
+    // The per-attempt `finally` still runs — no leaked grader session id.
+    expect(ctx.graderSessions.has("sess_x")).toBe(false);
+  });
+
+  it("fails closed when the configured tier has a malformed model string (stale config)", async () => {
+    const promptCalls: unknown[] = [];
+    // Stale config snapshot: 'fast' is configured with model "noslash"
+    // (no `provider/model` slash). tierModel() returns null; the guard
+    // fails closed the same way it does for an unknown tier — same
+    // canonical reason, same empty grader result.
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: {
+        presets: {
+          default: {
+            fast: { model: "noslash", description: "f", whenToUse: [] },
+          },
+        },
+      } as any,
+      promptImpl: async (req: unknown) => {
+        promptCalls.push(req);
+        return { data: { parts: [{ type: "text", text: "should-not-run" }] } };
+      },
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "verify",
+    });
+
+    expect(result).toEqual({ sessionID: "", text: "" });
+    expect(promptCalls).toHaveLength(0);
+    expect(ctx.graderSessions.has("sess_x")).toBe(false);
+  });
+
+  it("emits a routing.unmet observability event with the offending tier on fail-closed", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const ctx = makeCtx({ directory: workDir });
+
+      await dispatchGrader(ctx, {
+        tier: "no-such-tier",
+        system: "sys",
+        prompt: "verify",
+      });
+
+      // routing.unmet is emitted at warn level; filter to model-router
+      // lines and look for the canonical event name + reason + tier.
+      const lines = warnSpy.mock.calls
+        .map((c) => String(c[0] ?? ""))
+        .filter((l) => l.startsWith("[model-router] "));
+      const matched = lines.some((l) => {
+        try {
+          const env = JSON.parse(l.slice(l.indexOf("{")));
+          return (
+            env["event"] === "routing.unmet" &&
+            env["reason"] === "invalid model or provider configuration" &&
+            env["tier"] === "no-such-tier"
+          );
+        } catch {
+          return false;
+        }
+      });
+      expect(matched).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

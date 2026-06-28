@@ -28,6 +28,7 @@ import { resolveEnforcementMode } from "../router/enforcement";
 import { getActiveTiers } from "../router/protocol";
 import { WRITE_TOOLS } from "../router/tools";
 import { logEvent } from "../utils/observability";
+import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { withTimeout } from "../utils/timeout";
 import type { DoD, InferHints } from "./dod";
 import { inferDoD, parseDoDFromDispatch } from "./dod";
@@ -215,7 +216,16 @@ export const buildAcceptedSuffix = (method: string): string => {
  *  tracks it in `ctx.graderSessions` so the chat.params hook can apply the
  *  grader temperature override, runs the prompt, and returns the assembled
  *  text. Failure modes (no session id, SDK throw) collapse to empty result
- *  — the gate treats grader errors as a fail-closed verdict anyway. */
+ *  — the gate treats grader errors as a fail-closed verdict anyway.
+ *
+ *  Fail-closed on invalid tier resolution (SDD change:
+ *  fail-fast-hardening-v2). If the requested tier cannot be resolved to a
+ *  configured `{ providerID, modelID }` pair, we emit `routing.unmet`,
+ *  return an empty grader result, and NEVER prompt with an omitted model
+ *  (which would let the SDK substitute a server-default model — i.e. the
+ *  grader would silently answer from a model the operator never picked).
+ *  The shared `resolveTierModelGuard` keeps the fail-closed semantics in
+ *  lock-step with `delegate.ts`'s pre-prompt guard. */
 export const dispatchGrader = async (
   ctx: PluginContext,
   req: { tier: string; system: string; prompt: string },
@@ -233,12 +243,17 @@ export const dispatchGrader = async (
   if (!sid) return { sessionID: "", text: "" };
   ctx.graderSessions.add(sid);
   try {
-    const model = tierModel(cfg, req.tier) ?? undefined;
+    const guard = resolveTierModelGuard(cfg, req.tier);
+    if (!guard.ok) {
+      logEvent.routing.unmet({ reason: guard.reason, tier: req.tier });
+      return { sessionID: "", text: "" };
+    }
+    const model = guard.model;
     const res = await withTimeout(
       ctx.plugin.client.session.prompt({
         path: { id: sid },
         body: {
-          ...(model ? { model } : {}),
+          model,
           system: req.system,
           parts: [{ type: "text", text: req.prompt }],
         },

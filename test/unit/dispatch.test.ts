@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RouterConfig } from "../../src/router/config";
+import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
 import {
   buildAcceptedSuffix,
   buildDelegationDoD,
@@ -210,6 +211,85 @@ describe("tierModel", () => {
   it("model without a usable slash => null", () => {
     expect(tierModel(cfg, "weird")).toBeNull();
     expect(tierModel(cfg, "empty")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveTierModelGuard — SDD fail-fast-hardening-v2 (Phase 2)
+//
+// The shared guard wraps `tierModel()` and converts the `null` signal into a
+// discriminated `TierModelGuardResult`. Both `delegate.ts` (producer path)
+// and `dispatch.ts` (grader path) consume this guard so the fail-closed
+// semantics stay identical across wirings.
+//
+// Invariants under test:
+//   - Known tier → { ok: true, model: { providerID, modelID } } (pass-through).
+//   - Unknown tier → { ok: false, reason: "invalid model or provider configuration" }
+//     (canonical invalid-config reason).
+//   - Stale config snapshot (tier present, model string malformed) → { ok: false }.
+//     The guard MUST NOT silently fall through to a partial `{provider, ""}`
+//     result — an empty model id is just as unusable as a missing tier.
+//   - The reason string is exactly `"invalid model or provider configuration"`
+//     so every fail-closed path produces the same operator-visible string,
+//     regardless of which caller invoked the guard.
+// ---------------------------------------------------------------------------
+
+describe("resolveTierModelGuard", () => {
+  it("passes through a known tier with a well-formed model string", () => {
+    const result = resolveTierModelGuard(cfg, "fast");
+    expect(result).toEqual({
+      ok: true,
+      model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+    });
+    expect(result.reason).toBeUndefined();
+  });
+
+  it("fails closed on an unknown tier with the canonical reason", () => {
+    const result = resolveTierModelGuard(cfg, "nope");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("invalid model or provider configuration");
+    expect(result.model).toBeUndefined();
+  });
+
+  it("fails closed when the tier exists but the model string has no slash", () => {
+    // Stale config snapshot: 'weird' is a configured tier whose model
+    // string is "noslash" — tierModel() returns null for it. The guard
+    // must surface the same canonical reason regardless of WHY tierModel
+    // returned null (missing tier vs. malformed model is irrelevant to
+    // the caller — both are configuration failures).
+    const result = resolveTierModelGuard(cfg, "weird");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("invalid model or provider configuration");
+  });
+
+  it("fails closed when the model string has a trailing slash (empty modelID)", () => {
+    // 'empty' is configured as "anthropic/" — slash at the end. tierModel
+    // rejects this because the model id would be empty.
+    const result = resolveTierModelGuard(cfg, "empty");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("invalid model or provider configuration");
+  });
+
+  it("returns the same canonical reason regardless of underlying failure mode", () => {
+    // Belt-and-braces: the reason string is part of the public contract
+    // (operator dashboards grep for it). It MUST NOT vary based on which
+    // validation step in tierModel() produced the null.
+    const reasons = ["nope", "weird", "empty"].map((t) => resolveTierModelGuard(cfg, t).reason);
+    expect(new Set(reasons).size).toBe(1);
+    expect(reasons[0]).toBe("invalid model or provider configuration");
+  });
+
+  it("is a thin wrapper — pass-through shape matches tierModel()'s output exactly", () => {
+    // The guard must NOT mutate or re-shape tierModel()'s output. If
+    // tierModel() ever adds a field, the guard surfaces it without
+    // remapping (callers depend on `providerID`/`modelID` being
+    // strings — anything else is a tierModel() regression, not a
+    // guard regression).
+    const guardResult = resolveTierModelGuard(cfg, "fast");
+    expect(guardResult.ok).toBe(true);
+    if (guardResult.ok) {
+      expect(guardResult.model).toEqual(tierModel(cfg, "fast"));
+    }
   });
 });
 
