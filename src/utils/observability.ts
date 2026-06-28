@@ -19,8 +19,8 @@
 //
 // Log levels are filtered by `MODEL_ROUTER_LOG_LEVEL`:
 //   - "debug" — every event, including verbose cache + dispatch traces
-//   - "info"  — the default; operator-visible lifecycle events
-//   - "warn"  — recoverable failures (stale-serve, abort, etc.)
+//   - "info"  — operator-visible lifecycle events (silenced by default)
+//   - "warn"  — the default; recoverable failures (stale-serve, abort, etc.)
 //   - "error" — fail-loud conditions (verify fail-closed, etc.)
 //
 // The module also exports a `child(bindings)` factory so call sites can
@@ -60,12 +60,12 @@ const BINDING_RESERVED = new Set(["ts", "level", "event"]);
 
 /** Resolve the effective log level. Precedence:
  *   1. `MODEL_ROUTER_LOG_LEVEL` env var (debug | info | warn | error).
- *   2. The default ("info") — every operator-visible event fires, debug
- *      events are silenced unless explicitly opted in. */
+ *   2. The default ("warn") — warnings and errors fire, info/debug events
+ *      are silenced unless explicitly opted in. */
 const resolveLevel = (): LogLevel => {
   const raw = process.env["MODEL_ROUTER_LOG_LEVEL"];
   if (raw === "debug" || raw === "info" || raw === "warn" || raw === "error") return raw;
-  return "info";
+  return "warn";
 };
 
 /** Decide whether `eventLevel` should be emitted under the current config. */
