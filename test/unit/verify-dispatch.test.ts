@@ -45,6 +45,12 @@ const makeCtx = (opts: {
   changedFiles?: { path: string; status: string }[];
   sessionStore?: FakeStore;
   showToastImpl?: (req: any) => Promise<any>;
+  changedFileStore?: {
+    get?: (sid: string) => any[];
+    clear?: (sid: string) => void;
+    record?: (sid: string, tool: string, args: unknown) => void;
+  };
+  guardStore?: { get?: (sid: string) => any; clear?: (sid: string) => void };
 }): PluginContext & { toastSpy?: ReturnType<typeof vi.fn> } => {
   const cfg: RouterConfig = {
     activePreset: "default",
@@ -116,11 +122,14 @@ const makeCtx = (opts: {
       recordToolEvent: () => undefined,
       dump: () => null,
     } as any,
-    guardStore: { get: () => undefined, clear: () => undefined } as any,
+    guardStore: {
+      get: opts.guardStore?.get ?? (() => undefined),
+      clear: opts.guardStore?.clear ?? (() => undefined),
+    } as any,
     changedFileStore: {
-      get: () => opts.changedFiles ?? [],
-      clear: () => undefined,
-      record: () => undefined,
+      get: opts.changedFileStore?.get ?? (() => opts.changedFiles ?? []),
+      clear: opts.changedFileStore?.clear ?? (() => undefined),
+      record: opts.changedFileStore?.record ?? (() => undefined),
     } as any,
     graderSessions: new Set<string>(),
     verifyMutex: { runExclusive: async (_k: string, fn: () => Promise<any>) => fn() } as any,
@@ -668,6 +677,232 @@ describe("verifyTaskAfterHook", () => {
     await verifyTaskAfterHook(ctx, input, output);
 
     expect(output.output).toBe(original);
+  });
+
+  // -------------------------------------------------------------------------
+  // SDD: fix-orphan-subagent-sessions (PR 2, Work Unit 2) — task hook
+  // cleanup discipline. Before this PR, the cleanup lived at the tail of
+  // the verification try block — a throw from accept(), a sync error in
+  // scratch state, or any crash inside `isTrivial` would skip the cleanup
+  // and leak the Task child across `changedFileStore`, `sessionStore`, and
+  // `guardStore` until the plugin process died.
+  //
+  // Invariants under test:
+  //   - Cleanup runs on every exit path (success, rejection, crash).
+  //   - Cleanup order matches `src/plugin/delegate.ts`:
+  //     changedFileStore.clear -> sessionStore.unregister -> guardStore.clear.
+  //   - Each store op is best-effort: a throw from one op does NOT skip
+  //     the others.
+  // -------------------------------------------------------------------------
+
+  it("clears all three stores once when a built-in task verification accepts", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    writeFileSync(join(workDir, "present.txt"), "ok");
+
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      changedFileStore: {
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
+        },
+      },
+      sessionStore: {
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt:
+          "Create the file.\n[acceptance]\ncheck: fileExists path=present.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-success" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // All three cleanup calls must have run with the parsed child SID.
+    expect(unregisterCalls).toEqual(["child-success"]);
+    expect(clearChangedCalls).toEqual(["child-success"]);
+    expect(clearGuardCalls).toEqual(["child-success"]);
+    // Each store op must run exactly once (no duplicate cleanup).
+    expect(unregisterCalls).toHaveLength(1);
+    expect(clearChangedCalls).toHaveLength(1);
+    expect(clearGuardCalls).toHaveLength(1);
+  });
+
+  it("clears all three stores once even when verification rejects", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    // Missing file -> deterministic fail -> forcing note appended.
+    // Cleanup must STILL run on a non-passing verdict.
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      changedFileStore: {
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
+        },
+      },
+      sessionStore: {
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt:
+          "Create the report.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE: report created.\n</task_result>",
+      metadata: { sessionId: "child-rejection" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // The forcing note is the visible signal of a non-passing verdict.
+    expect(output.output).toContain("NOT ACCEPTED");
+    // Cleanup ran anyway — the rejection path must still release stores.
+    expect(unregisterCalls).toEqual(["child-rejection"]);
+    expect(clearChangedCalls).toEqual(["child-rejection"]);
+    expect(clearGuardCalls).toEqual(["child-rejection"]);
+  });
+
+  it("clears all three stores when the verification body throws (crash path)", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    // Force the inner try to throw by making `isTrivial` blow up. The hook's
+    // outer catch swallows the error (fail-closed at the boundary) — but the
+    // finally block still runs and must clean up the three stores.
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      sessionStore: {
+        isTrivial: () => {
+          throw new Error("isTrivial boom");
+        },
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
+        },
+      },
+      changedFileStore: {
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "Do something.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-crash" },
+    };
+
+    // Hook must NOT throw — fail-closed at the boundary.
+    await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
+
+    // Critical invariant: cleanup ran in `finally` despite the catch path
+    // swallowing the crash. All three stores are released for the child SID.
+    expect(unregisterCalls).toEqual(["child-crash"]);
+    expect(clearChangedCalls).toEqual(["child-crash"]);
+    expect(clearGuardCalls).toEqual(["child-crash"]);
+  });
+
+  it("runs cleanup in delegate-aligned order: changedFileStore -> sessionStore -> guardStore", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    writeFileSync(join(workDir, "present.txt"), "ok");
+
+    // Collect every cleanup invocation into one ordered log so the test
+    // can assert the relative order without depending on per-store
+    // ordering.
+    const callOrder: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      changedFileStore: {
+        clear: (sid: string) => {
+          callOrder.push(`changedFileStore.clear:${sid}`);
+        },
+      },
+      sessionStore: {
+        unregister: (sid: string) => {
+          callOrder.push(`sessionStore.unregister:${sid}`);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          callOrder.push(`guardStore.clear:${sid}`);
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt:
+          "Create the file.\n[acceptance]\ncheck: fileExists path=present.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      metadata: { sessionId: "child-order" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // Exact order — matches `src/plugin/delegate.ts` per-attempt cleanup.
+    expect(callOrder).toEqual([
+      "changedFileStore.clear:child-order",
+      "sessionStore.unregister:child-order",
+      "guardStore.clear:child-order",
+    ]);
   });
 });
 

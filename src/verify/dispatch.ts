@@ -343,8 +343,17 @@ export const verifyTaskAfterHook = async (
   }
   const requireMode = activeCfg.enforcement?.verify?.require;
   if (!shouldVerifyTask(toolName, mode, requireMode)) return;
+  // Hoist the parsed childSessionID OUTSIDE the verification try block so the
+  // cleanup `finally` can always reach it. Without this, an uncaught throw
+  // inside `accept()` (or earlier) would skip the cleanup tail entirely and
+  // leak the Task child session across stores forever. Mirrors the
+  // `src/plugin/delegate.ts` per-attempt cleanup discipline (SDD change:
+  // fix-orphan-subagent-sessions).
+  let childSessionID: string | null = null;
   try {
-    const { finalReturnText, childSessionID, parentSessionID } = parseTaskResult(output);
+    const parsed = parseTaskResult(output);
+    childSessionID = parsed.childSessionID;
+    const { finalReturnText, parentSessionID } = parsed;
     const producerTier = taskArgs?.subagent_type ?? "";
     const dod = buildDelegationDoD({
       prompt: taskArgs?.prompt,
@@ -403,7 +412,6 @@ export const verifyTaskAfterHook = async (
       const existing = output["output"];
       output["output"] = typeof existing === "string" ? existing + "\n\n" + note : note;
     }
-    if (childSessionID) ctx.changedFileStore.clear(childSessionID);
   } catch (err) {
     // fail-closed: a verification error must NEVER throw out of the after-hook.
     // PR5: surface the fail-loud as a structured verification.fail event so
@@ -430,5 +438,31 @@ export const verifyTaskAfterHook = async (
       message: "Verification failed unexpectedly",
       variant: "error",
     });
+  } finally {
+    // Task child-session cleanup — ALWAYS runs (success, rejection, crash).
+    // Order mirrors `src/plugin/delegate.ts` per-attempt cleanup:
+    //   1. changedFileStore.clear — the changed-file data must remain
+    //      readable through `accept()`; now that the artefact is assembled
+    //      and scored, the per-session map is safe to drop.
+    //   2. sessionStore.unregister — release the session tracking entry
+    //      so the cap/ladder stop counting this child. Best-effort: the
+    //      `try {} catch {}` prevents a single failing op from leaking
+    //      an active entry across stores.
+    //   3. guardStore.clear — last because guards depend on session and
+    //      changed-file state; drop guard state only after the producer is
+    //      fully released.
+    if (childSessionID) {
+      ctx.changedFileStore.clear(childSessionID);
+      try {
+        ctx.sessionStore.unregister(childSessionID);
+      } catch {
+        // non-fatal
+      }
+      try {
+        ctx.guardStore.clear(childSessionID);
+      } catch {
+        // non-fatal
+      }
+    }
   }
 };
