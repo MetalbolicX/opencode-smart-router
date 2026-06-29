@@ -32,12 +32,15 @@ interface FakeStore {
   isSubagent?: (sid: string) => boolean;
   isTrivial?: (sid: string) => boolean;
   getTier?: (sid: string) => string;
+  unregister?: (sid: string) => void;
 }
 
 const makeCtx = (opts: {
   directory: string;
   createImpl?: (req: any) => Promise<any>;
   promptImpl?: (req: any) => Promise<any>;
+  deleteImpl?: (req: any) => Promise<any>;
+  abortImpl?: (req: any) => Promise<any>;
   cfg?: Partial<RouterConfig>;
   changedFiles?: { path: string; status: string }[];
   sessionStore?: FakeStore;
@@ -75,6 +78,7 @@ const makeCtx = (opts: {
     isSubagent: () => false,
     isTrivial: () => false,
     getTier: () => "fast",
+    unregister: () => undefined,
     ...(opts.sessionStore ?? {}),
   };
 
@@ -92,6 +96,8 @@ const makeCtx = (opts: {
         session: {
           create: opts.createImpl ?? (async () => ({ data: { id: "sess_x" } })),
           prompt: opts.promptImpl ?? (async () => ({ data: { parts: [] } })),
+          delete: opts.deleteImpl ?? (async () => ({ data: true })),
+          abort: opts.abortImpl ?? (async () => ({ data: true })),
         },
         tui: { showToast: showToastImpl },
       },
@@ -363,6 +369,111 @@ describe("dispatchGrader", () => {
       else process.env["MODEL_ROUTER_LOG_LEVEL"] = origLevel;
       __resetLoggerForTest();
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // SDD: fix-orphan-subagent-sessions (PR 1, Work Unit 1) — grader session
+  // lifecycle cleanup. The grader session must be aborted and deleted on
+  // every exit path so it does not leak as an orphan session in the TUI.
+  // Invariants under test:
+  //   - Successful prompt ⇒ session.abort + session.delete both called
+  //     with the grader SID, after untracking from `ctx.graderSessions`.
+  //   - When the prompt throws (simulated SDK failure), abort + delete
+  //     are still attempted on the throw path.
+  //   - When session.create times out (rejected withTimeout), abort +
+  //     delete run before the rejection propagates so the session cannot
+  //     leak even if `session.create` partially succeeded server-side.
+  //   - `session.delete` failure does NOT crash the hook — failures are
+  //     swallowed because cleanup is best-effort.
+  // -------------------------------------------------------------------------
+
+  it("aborts and deletes the grader session on successful completion", async () => {
+    const deleteCalls: string[] = [];
+    const abortCalls: string[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => ({ data: { parts: [{ type: "text", text: "ok" }] } }),
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "do it",
+    });
+
+    expect(result.sessionID).toBe("sess_x");
+    // Both SDK calls must have run with the grader SID.
+    expect(deleteCalls).toContain("sess_x");
+    expect(abortCalls).toContain("sess_x");
+    // Both must run exactly once (no duplicate cleanup).
+    expect(deleteCalls).toHaveLength(1);
+    expect(abortCalls).toHaveLength(1);
+    // Untrack happens before abort/delete — the chat.params hook observes
+    // an empty `ctx.graderSessions` set on the next event.
+    expect(ctx.graderSessions.has("sess_x")).toBe(false);
+  });
+
+  it("aborts and deletes the grader session when the prompt call throws", async () => {
+    const deleteCalls: string[] = [];
+    const abortCalls: string[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => {
+        throw new Error("prompt boom");
+      },
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    await expect(
+      dispatchGrader(ctx, { tier: "fast", system: "sys", prompt: "do it" }),
+    ).rejects.toThrow("prompt boom");
+
+    // The throw MUST NOT prevent abort + delete — the finally block runs.
+    expect(abortCalls).toContain("sess_x");
+    expect(deleteCalls).toContain("sess_x");
+  });
+
+  it("still deletes the grader session when session.abort throws (best-effort isolation)", async () => {
+    const deleteCalls: string[] = [];
+    const ctx = makeCtx({
+      directory: workDir,
+      promptImpl: async () => ({ data: { parts: [{ type: "text", text: "ok" }] } }),
+      // session.abort throws — the cleanup must isolate this failure so
+      // session.delete still runs. Otherwise a single SDK 5xx during abort
+      // would orphan the grader session in the TUI.
+      abortImpl: async () => {
+        throw new Error("abort failed");
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    const result = await dispatchGrader(ctx, {
+      tier: "fast",
+      system: "sys",
+      prompt: "do it",
+    });
+
+    expect(result.sessionID).toBe("sess_x");
+    // delete MUST still run despite the abort failure.
+    expect(deleteCalls).toContain("sess_x");
   });
 });
 

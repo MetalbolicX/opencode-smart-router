@@ -265,7 +265,24 @@ export const dispatchGrader = async (
     const text = extractPromptText(res);
     return { sessionID: sid, text };
   } finally {
+    // Grader session lifecycle: untrack → abort → delete. Each SDK call is
+    // best-effort (own try/catch) so a failure from one step does not block
+    // the next. The chat.params hook reads `ctx.graderSessions` to apply the
+    // grader temperature override; untracking first stops the temperature
+    // override before we tear the session down. Abort stops any still-running
+    // work before deletion, matching `src/plugin/delegate.ts` cleanup
+    // discipline (SDD change: fix-orphan-subagent-sessions).
     ctx.graderSessions.delete(sid);
+    try {
+      await ctx.plugin.client.session.abort({ path: { id: sid } });
+    } catch {
+      // best-effort: cleanup MUST never throw out of the finally block.
+    }
+    try {
+      await ctx.plugin.client.session.delete({ path: { id: sid } });
+    } catch {
+      // best-effort: cleanup MUST never throw out of the finally block.
+    }
   }
 };
 
