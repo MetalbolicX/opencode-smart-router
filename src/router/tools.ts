@@ -18,10 +18,8 @@
 //   use the file-write tools.
 // - `FINISH_TOOLS`: tools that mark the delegation as terminally complete.
 //
-// `READ_ONLY_TOOLS` is also re-declared in `src/router/sessions.ts` for the
-// session cap banner (intentionally preserved to avoid a churn diff in callers
-// like `src/plugin/hooks.ts`). The two definitions MUST stay byte-equal;
-// update them together.
+// `READ_ONLY_TOOLS` is the single source of truth. `src/router/sessions.ts`
+// imports it from here (previously a duplicate; consolidated to prevent drift).
 // ---------------------------------------------------------------------------
 
 /** Tools that count against the read-only cap and never mutate the workspace. */

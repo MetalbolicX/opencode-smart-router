@@ -23,7 +23,7 @@ import { registerRouterCommands } from "../router/commands";
 import type { Preset } from "../router/config";
 import { resolveEnforcementMode } from "../router/enforcement";
 import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
-import { READ_ONLY_TOOLS } from "../router/sessions";
+import { READ_ONLY_TOOLS } from "../router/tools";
 import { writeTrajectoryLog } from "../utils/log";
 import { log } from "../utils/observability";
 import { verifyTaskAfterHook } from "../verify/dispatch";

@@ -1,5 +1,6 @@
 import { fingerprintToolCall } from "../guard/fingerprint";
 import { isTextPart } from "../plugin/types";
+import { READ_ONLY_TOOLS } from "./tools";
 import type { RouterConfig } from "./config";
 
 // ---------------------------------------------------------------------------
@@ -106,11 +107,8 @@ export const buildCapBanner = (
 };
 
 // ---------------------------------------------------------------------------
-// Read-only tools set (used by the session store)
+// Read-only tools set (imported from ./tools — single source of truth)
 // ---------------------------------------------------------------------------
-
-/** Tools that count against the read-only cap. Keep narrow — editing tools should never count. */
-export const READ_ONLY_TOOLS = new Set(["grep", "read", "glob", "ls"]);
 
 // ---------------------------------------------------------------------------
 // Trivial classifier
