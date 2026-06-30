@@ -12,7 +12,7 @@ and update your row when done.
 |------|-------|----------|--------|------|------------|--------|
 | 001  | Fix resource leak and add error logging to delegate.ts | P1 | S | LOW | — | DONE |
 | 002  | Add tests for runtime.ts and agents.ts | P1 | M | LOW | — | DONE |
-| 003  | Fix config mutation side effect in commands.ts | P1 | S | LOW | — | TODO |
+| 003  | Fix config mutation side effect in commands.ts | P1 | S | LOW | — | DONE |
 | 004  | Strengthen AbortError detection in delegate.ts | P2 | S | LOW | — | DONE |
 | 005  | Eliminate duplicated READ_ONLY_TOOLS set | P2 | S | LOW | — | TODO |
 | 006  | Replace cast-heavy type narrowing with runtime guards in hooks.ts | P2 | S | LOW | — | TODO |

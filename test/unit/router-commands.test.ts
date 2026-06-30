@@ -288,4 +288,11 @@ describe("buildPresetOutput", () => {
     expect(out).toContain("Preset switched to");
     expect(out).toContain("anthropic");
   });
+
+  it("does not mutate the cfg argument after switching preset", async () => {
+    const cfg = makeConfig();
+    const before = cfg.activePreset;
+    await buildPresetOutput(cfg, "openai");
+    expect(cfg.activePreset).toBe(before);
+  });
 });

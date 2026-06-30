@@ -148,7 +148,6 @@ export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promis
   const resolvedPreset = resolvePresetName(cfg, requestedPreset);
   if (resolvedPreset) {
     await saveActivePreset(resolvedPreset);
-    cfg.activePreset = resolvedPreset;
     const tiers = cfg.presets[resolvedPreset]!;
     const models = Object.entries(tiers)
       .map(([tier, t]) => `  @${tier} -> ${t.model}`)
