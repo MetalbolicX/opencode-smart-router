@@ -19,6 +19,7 @@ and update your row when done.
 | 007  | Abort and delete Task child session to prevent TUI orphans | P1 | S | LOW | — | DONE |
 | 008  | Block nested built-in Task delegation from subagents | P1 | S | LOW | — | DONE |
 | 009  | TUI plugin to restore parent session on child deletion | P1 | M | MED | — | TODO |
+| 010  | Adaptive, provider-agnostic reasoning control | P1 | L | MED | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
@@ -28,6 +29,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **002 is independent** but benefits from landing after 001 so the delegate helper signature is stable when the runtime tests mock it.
 - **003, 005, 006 are fully independent** — any order, any branch.
 - No plan depends on another plan's *output*; the dependencies above are only about file-level merge conflict avoidance.
+- **010 is independent** of 001–009. It edits `src/router/agents.ts`, `config.types.ts`, and `commands.ts` — none overlap with the earlier bug-fix plans. Recommended as chained PRs (PR 1 = pure types/translate → PR 2 = policy/store/command/wiring → PR 3 = tier config + docs). Default `reasoningPolicy.mode` is `static` so existing behavior is unchanged until a user opts in.
 
 ## Verification commands (apply to every plan)
 

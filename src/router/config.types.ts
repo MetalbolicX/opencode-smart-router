@@ -4,6 +4,17 @@
 // Pure types and small predicates. No file IO, no module-level state.
 // ---------------------------------------------------------------------------
 
+// Re-export the canonical reasoning types from `src/reasoning/capability.ts`.
+// `capability.ts` is the canonical home (single source of truth for the
+// capability model + inference); `config.types.ts` re-exports so existing
+// `import { ReasoningCapability } from "./config"` style keeps working
+// without forcing every consumer to learn the new module path.
+export type {
+  ReasoningCapability,
+  ReasoningField,
+  ReasoningLevel,
+} from "../reasoning/capability.js";
+
 export interface ThinkingConfig {
   budgetTokens?: number;
 }
@@ -24,6 +35,13 @@ export interface TierConfig {
   steps?: number;
   prompt?: string;
   whenToUse: string[];
+  /**
+   * Optional explicit capability declaration for this tier. When present,
+   * `resolveReasoningOverride` (PR 2 of adaptive-reasoning) consults this
+   * before falling back to `inferCapability(tier)`. Leaving it absent keeps
+   * pre-Plan-010 configs working unchanged.
+   */
+  capability?: import("../reasoning/capability.js").ReasoningCapability;
 }
 
 export type Preset = Record<string, TierConfig>;
@@ -69,6 +87,23 @@ export interface EnforcementConfig {
   proportional?: { trivialBypass?: boolean; trivialClassifier?: string };
 }
 
+/**
+ * Reasoning policy mode and per-session override knobs (PR 2 of
+ * adaptive-reasoning).
+ *
+ * - `mode` defaults to `"static"` (today's behaviour preserved).
+ * - `defaultLevel` is the level applied under `manual` mode when the session
+ *   has no per-session override. Defaults to undefined (no implicit level).
+ * - `surfaceLimits` defaults to `false` — unsupported-level requests stay
+ *   silent. Set to `true` to emit a debug log + `/reasoning` advisory note
+ *   when a tier's capability cannot satisfy the requested level.
+ */
+export interface ReasoningPolicyConfig {
+  mode?: "static" | "manual" | "adaptive";
+  defaultLevel?: import("../reasoning/capability.js").ReasoningLevel;
+  surfaceLimits?: boolean;
+}
+
 export interface RouterConfig {
   activePreset: string;
   activeMode?: string;
@@ -85,6 +120,9 @@ export interface RouterConfig {
   enforcement?: EnforcementConfig;
   /** Experimental, opt-in features. Off by default. */
   experimental?: { verifiedDelegateTool?: boolean };
+  /** PR 2 of adaptive-reasoning: per-tier override + runtime patch wiring.
+   *  All fields optional → pre-change configs work unedited. */
+  reasoningPolicy?: ReasoningPolicyConfig;
 }
 
 export interface RouterState {
