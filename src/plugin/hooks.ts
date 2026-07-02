@@ -149,7 +149,17 @@ export const handleToolExecuteBefore = async (
               return;
             }
             const override = ctx.reasoningStore.getOverride(sid);
-            const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, override);
+            const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, override, {
+              // Phase 2 placeholder: real prompt/description threading from
+              // asTaskToolArgs lands in Phase 3. Empty strings are safe — the
+              // selector's keyword step is a substring match against empty
+              // haystacks and simply finds nothing, so non-trivial calls
+              // fall through to tierDefaults / defaultLevel.
+              prompt: "",
+              description: "",
+              tierName: subagentType,
+              isTrivial: ctx.sessionStore.isTrivial(sid),
+            });
             if (resolved) {
               applyReasoningPatch(agentDef, resolved);
               // Surface-only advisory: emit a debug log when the policy opted in
