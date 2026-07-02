@@ -83,11 +83,10 @@ const PARTS: readonly PartSpec[] = [
 const runAssembler = (): { stdout: string; stderr: string } => {
   const tmpPath = join(tmpdir(), `tiers-assembled-${Date.now()}.json`);
   return {
-    stdout: execFileSync(
-      "node",
-      ["--experimental-strip-types", ASSEMBLER_PATH],
-      { encoding: "utf-8", env: { ...process.env, TIERS_OUTPUT_PATH: tmpPath } },
-    ),
+    stdout: execFileSync("node", ["--experimental-strip-types", ASSEMBLER_PATH], {
+      encoding: "utf-8",
+      env: { ...process.env, TIERS_OUTPUT_PATH: tmpPath },
+    }),
     stderr: "",
   };
 };

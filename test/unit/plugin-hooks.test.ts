@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PluginContext } from "../../src/plugin/context";
-import { createReasoningStore } from "../../src/reasoning/store";
 import {
   handleChatMessage,
   handleChatParams,
@@ -16,6 +15,7 @@ import {
   handleToolExecuteBefore,
 } from "../../src/plugin/hooks";
 import type { HookEventPayload, HookPayload } from "../../src/plugin/types";
+import { createReasoningStore } from "../../src/reasoning/store";
 import type { Preset, RouterConfig } from "../../src/router/config";
 import type { TierConfig } from "../../src/router/config.types";
 

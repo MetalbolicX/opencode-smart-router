@@ -1,7 +1,7 @@
 import { fingerprintToolCall } from "../guard/fingerprint";
 import { isTextPart } from "../plugin/types";
-import { READ_ONLY_TOOLS } from "./tools";
 import type { RouterConfig } from "./config";
+import { READ_ONLY_TOOLS } from "./tools";
 
 // ---------------------------------------------------------------------------
 // Types
