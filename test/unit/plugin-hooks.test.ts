@@ -17,6 +17,7 @@ import {
 } from "../../src/plugin/hooks";
 import type { HookEventPayload, HookPayload } from "../../src/plugin/types";
 import type { Preset, RouterConfig } from "../../src/router/config";
+import type { TierConfig } from "../../src/router/config.types";
 
 // ---------------------------------------------------------------------------
 // Module spy for `verifyTaskAfterHook`.
@@ -697,5 +698,158 @@ describe("handleConfig — registers tier agents and router commands", () => {
       expect(typeof opencodeConfig.command[name].template).toBe("string");
       expect(typeof opencodeConfig.command[name].description).toBe("string");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 012 — reachable reasoning patch path (orchestrator task calls).
+//
+// Before plan 012, the reasoning patch block in handleToolExecuteBefore was
+// unreachable dead code (placed AFTER the isSubagent early-return AND the
+// task-throw guard). Plan 012 restructured the control flow so the patch
+// fires for orchestrator task calls. These tests pin the new contract:
+//
+//   - manual mode + session override + orchestrator task → patch applied
+//   - static mode + session override + orchestrator task → no-op
+//   - manual mode + no override + no defaultLevel → no-op
+//   - after-hook restores the baseline captured at handleConfig time
+//   - patch failure is best-effort (try/catch + log.warn, never throws)
+// ---------------------------------------------------------------------------
+
+describe("handleToolExecuteBefore — reasoning patch path (plan 012)", () => {
+  // Helper: build a harness with a manual/static policy + a `fast` tier that
+  // carries a binary capability (`variant: "thinking"`). Then seed the live
+  // `ctx.opencodeConfig.agent["fast"]` with a baseline shape so the patch
+  // block can mutate it.
+  const setupReasoningHarness = (
+    mode: "manual" | "static",
+    tierExtra: Partial<TierConfig> = {},
+  ) => {
+    const h = makeHarness({
+      configOverrides: {
+        reasoningPolicy: { mode },
+        presets: {
+          default: {
+            fast: {
+              model: "anthropic/claude-haiku-4-5",
+              description: "fast",
+              whenToUse: [],
+              variant: "thinking",
+              ...tierExtra,
+            } as TierConfig,
+          },
+        },
+      },
+    });
+
+    // Seed the live agent def + a captured baseline (the after-hook needs
+    // the baseline to be present in ctx.reasoningStore).
+    const baseline = {
+      model: "anthropic/claude-haiku-4-5",
+      mode: "subagent",
+      description: "fast",
+      prompt: "test prompt",
+      variant: "low", // start at a non-elevated variant so the patch is visible
+    };
+    h.ctx.opencodeConfig = { agent: { fast: { ...baseline } } };
+    h.ctx.reasoningStore.setBaseline("fast", structuredClone(baseline));
+
+    return { h, baseline };
+  };
+
+  it("manual mode + session override → patches the orchestrator task's target agent", async () => {
+    const { h, baseline } = setupReasoningHarness("manual");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await handleToolExecuteBefore(
+      h.ctx,
+      { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+      { args: { subagent_type: "fast" } },
+    );
+
+    // Patch block ran: variant must have moved from "low" to "thinking"
+    // (the binary capability's elevated value).
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]?.variant).toBe("thinking");
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).not.toEqual(baseline);
+  });
+
+  it("static mode + session override → no-op (agent def unchanged, primary regression guard)", async () => {
+    const { h, baseline } = setupReasoningHarness("static");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await handleToolExecuteBefore(
+      h.ctx,
+      { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+      { args: { subagent_type: "fast" } },
+    );
+
+    // Static mode is the primary regression guard: the override must NOT
+    // mutate the agent def even though it was set on the store.
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("manual mode + no override + no defaultLevel → no-op (resolved is null)", async () => {
+    const { h, baseline } = setupReasoningHarness("manual");
+    // Deliberately no setOverride call and no defaultLevel in policy.
+
+    await handleToolExecuteBefore(
+      h.ctx,
+      { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+      { args: { subagent_type: "fast" } },
+    );
+
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("after-hook restores the captured baseline after a patched dispatch", async () => {
+    const { h, baseline } = setupReasoningHarness("manual");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    // Patch via before-hook.
+    await handleToolExecuteBefore(
+      h.ctx,
+      { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+      { args: { subagent_type: "fast" } },
+    );
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]?.variant).toBe("thinking");
+
+    // After-hook restores the baseline captured at handleConfig time.
+    await handleToolExecuteAfter(
+      h.ctx,
+      { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+      { output: "ok" },
+    );
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("patch failure is best-effort: hook does not throw and logs a warning instead", async () => {
+    const { h } = setupReasoningHarness("manual");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    // Freeze the agent def so applyReasoningPatch's `agentDef.variant = ...`
+    // assignment throws a TypeError (TypeScript modules are in strict mode).
+    const agentDef = h.ctx.opencodeConfig?.agent?.["fast"];
+    if (!agentDef) throw new Error("test setup: missing agent def");
+    Object.freeze(agentDef);
+
+    // The hook must NOT propagate the patch failure — dispatch continues.
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("orchestrator non-task calls still early-return without touching agent def", async () => {
+    const { h, baseline } = setupReasoningHarness("manual");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    // Non-task tool: the patch block is gated by `tool === "task"` and must
+    // not mutate anything.
+    await handleToolExecuteBefore(h.ctx, { sessionID: "sid-orch", tool: "read" }, { args: {} });
+
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
   });
 });
