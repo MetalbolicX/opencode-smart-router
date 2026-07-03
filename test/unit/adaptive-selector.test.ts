@@ -254,9 +254,11 @@ describe("selectAdaptiveLevel — keywordRules priority", () => {
       keywordRules: [{ keywords: ["refactor", "architecture"], level: "elevated" }],
     });
     const signals = { ...baseSignals, prompt: "please refactor this" };
+    // Reason includes rule index, matched keyword, mode, and source field.
+    // Default mode is `stem`; the prompt is the source.
     expect(selectAdaptiveLevel(signals, policy)).toMatchObject({
       level: "elevated",
-      reason: "keyword match: refactor",
+      reason: `keyword match: rule[0] "refactor" (stem) in prompt`,
     });
   });
 
@@ -266,7 +268,9 @@ describe("selectAdaptiveLevel — keywordRules priority", () => {
       keywordRules: [{ keywords: ["refactor", "architecture", "security"], level: "elevated" }],
     });
     const signals = { ...baseSignals, prompt: "review the architecture" };
-    expect(selectAdaptiveLevel(signals, policy).reason).toBe("keyword match: architecture");
+    expect(selectAdaptiveLevel(signals, policy).reason).toBe(
+      `keyword match: rule[0] "architecture" (stem) in prompt`,
+    );
   });
 });
 
@@ -378,13 +382,16 @@ describe("selectAdaptiveLevel — malformed keyword rules (fail-soft)", () => {
   it("preserves the decision reason of the still-valid matching rule (no reason text drift)", () => {
     // Spec requirement: malformed rules MUST NOT change `surfaceDecision`
     // behaviour for valid rules. The matched-keyword reason must remain
-    // exactly "keyword match: <kw>" — no mention of skipped malformed rules.
+    // a pure `keyword match: rule[i] "kw" (mode) in source` string — no
+    // mention of skipped malformed rules.
     const policy = policyWithRawRules([
       { keywords: undefined, level: "max" },
       { keywords: ["refactor"], level: "elevated" },
     ]);
     const signals = { ...baseSignals, prompt: "refactor this" };
-    expect(selectAdaptiveLevel(signals, policy).reason).toBe("keyword match: refactor");
+    expect(selectAdaptiveLevel(signals, policy).reason).toBe(
+      `keyword match: rule[1] "refactor" (stem) in prompt`,
+    );
   });
 });
 
@@ -513,7 +520,10 @@ describe("selectAdaptiveLevel — decision reasons (smoke)", () => {
         keywordRules: [{ keywords: ["refactor"], level: "elevated" }],
       }),
       signals: { ...baseSignals, prompt: "refactor this" },
-      expected: { level: "elevated", reason: "keyword match: refactor" },
+      expected: {
+        level: "elevated",
+        reason: `keyword match: rule[0] "refactor" (stem) in prompt`,
+      },
     },
     {
       name: "default level fallback",

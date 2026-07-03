@@ -11,10 +11,29 @@
 //   1. `policy.adaptive` is absent                 → null  (no adaptive config)
 //   2. `signals.isTrivial` is true                 → adaptive.trivialLevel ?? null
 //   3. `adaptive.tierDefaults[signals.tierName]`   → that level (wins over default)
-//   4. `adaptive.keywordRules` (array order)       → first rule whose keywords
-//                                                   match in prompt OR description
-//                                                   (case-insensitive substring)
+//   4. `adaptive.keywordRules` (array order)       → first rule whose
+//                                                   `excludeKeywords` are
+//                                                   absent AND whose `keywords`
+//                                                   match in prompt OR
+//                                                   description (via
+//                                                   `matchSignal` with the
+//                                                   rule's `match` mode;
+//                                                   default `"stem"`)
 //   5. catch-all                                   → adaptive.defaultLevel ?? null
+//
+// Keyword matching (step 4) is delegated to `src/reasoning/match.ts`, which
+// supports four modes:
+//   - `word`        Strict word/phrase boundary. `debug` ≠ `debugging`.
+//   - `stem`        DEFAULT. Word-boundary start; suffix inflections allowed
+//                   on the LAST token only (`debug` → `debugging`,
+//                   `refactor` → `refactoring`; `latest` no longer matches
+//                   `test`).
+//   - `substring`   Legacy `String.includes` behavior — kept as an opt-in
+//                   escape hatch for operators that really want cross-word
+//                   matches.
+//   - `regex`       User-supplied pattern. Compiled by `matchSignal`, which
+//                   fails soft at runtime; config validation is the fail-fast
+//                   gate.
 //
 // `null` at every step means "no patch" — the caller leaves the agent def at
 // its baseline. The resolver (`policy.ts`) is responsible for translating the
@@ -25,24 +44,27 @@
 
 import type { AdaptivePolicyConfig, ReasoningPolicyConfig } from "../router/config.types.js";
 import type { ReasoningLevel } from "./capability.js";
+import type { MatchMode } from "./match.js";
+import { matchSignal } from "./match.js";
 
 /**
  * Signals available at dispatch time. All inputs must be pre-normalised by
  * the caller (today: the plugin hook layer in `src/plugin/hooks.ts`).
  *
- * - `prompt` and `description` MUST be lowercased before being passed in.
- *   Keyword matching is case-insensitive substring matching, so the selector
- *   itself does not re-lowercase — keeping it cheap to call and predictable
- *   to test.
+ * - `prompt` and `description` MUST be normalised with `normalizeSignalText`
+ *   (lowercase + whitespace collapse + trim) before being passed in. The
+ *   selector itself does not re-normalise — it calls `matchSignal`, which
+ *   assumes caller-side normalisation so phrase whitespace does not silently
+ *   defeat a multi-word keyword.
  * - `tierName` is the dispatcher tier name (e.g. "medium", "heavy"). Looked
  *   up against `AdaptivePolicyConfig.tierDefaults`.
  * - `isTrivial` is the dispatch-time trivial classification result. Sourced
  *   from the session store.
  */
 export interface AdaptiveSignals {
-  /** Lowercased task prompt text from the Task tool args. May be empty. */
+  /** Normalised task prompt text from the Task tool args. May be empty. */
   prompt: string;
-  /** Lowercased task description from the Task tool args. May be empty. */
+  /** Normalised task description from the Task tool args. May be empty. */
   description: string;
   /** The tier name being dispatched (e.g. "medium", "heavy"). */
   tierName: string;
@@ -94,26 +116,54 @@ export const selectAdaptiveLevel = (
   }
 
   const keywordRules = adaptive.keywordRules;
-  if (keywordRules) {
-    for (const rule of keywordRules) {
+  if (Array.isArray(keywordRules)) {
+    for (let i = 0; i < keywordRules.length; i++) {
+      const rule = keywordRules[i];
       // Fail-soft guard: skip rules with a missing or non-array `keywords`
       // field without throwing. The TypeScript type is `string[]`, but
       // runtime config can drift (hand-edited files, partial migrations),
       // and the spec requires malformed rules to be skipped — never raised.
       if (!Array.isArray(rule?.keywords)) continue;
 
+      const mode: MatchMode = rule.match ?? "stem";
+      const ex = Array.isArray(rule.excludeKeywords) ? rule.excludeKeywords : [];
+
+      // Exclusions are evaluated under the SAME `match` mode as the rule's
+      // keywords so operators get one consistent semantic per rule. A
+      // non-string or empty exclusion entry is treated as non-matching
+      // (fail-soft against runtime config drift).
+      const excluded = ex.some(
+        (k) =>
+          typeof k === "string" &&
+          k.length > 0 &&
+          (matchSignal(signals.prompt, k, mode) || matchSignal(signals.description, k, mode)),
+      );
+      if (excluded) continue;
+
       // First keyword to hit wins; this preserves the design's "first match
       // wins" contract without scanning the rest of the rule's keywords.
-      // The inner `typeof kw === "string"` check is a parallel fail-soft
-      // guard: a non-string entry inside `keywords` would otherwise throw
-      // on `String.prototype.includes`. Such entries are simply non-matching.
-      const matched = rule.keywords.find(
-        (kw) =>
-          typeof kw === "string" &&
-          (signals.prompt.includes(kw) || signals.description.includes(kw)),
-      );
+      // The inner `typeof kw === "string" && kw.length > 0` checks are the
+      // parallel fail-soft guards: a non-string entry inside `keywords`
+      // would otherwise flow into `matchSignal` and compile a degenerate
+      // regex. Such entries are simply non-matching.
+      let source: "prompt" | "description" | null = null;
+      const matched = rule.keywords.find((kw) => {
+        if (typeof kw !== "string" || kw.length === 0) return false;
+        if (matchSignal(signals.prompt, kw, mode)) {
+          source = "prompt";
+          return true;
+        }
+        if (matchSignal(signals.description, kw, mode)) {
+          source = "description";
+          return true;
+        }
+        return false;
+      });
       if (matched !== undefined) {
-        return { level: rule.level, reason: `keyword match: ${matched}` };
+        return {
+          level: rule.level,
+          reason: `keyword match: rule[${i}] "${matched}" (${mode}) in ${source}`,
+        };
       }
     }
   }
