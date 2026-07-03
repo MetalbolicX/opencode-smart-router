@@ -14,6 +14,9 @@
 //     validateEnforcementMode / validateEnforcementVerify /
 //     validateEnforcementEscalate → validateEscalateCostCeiling /
 //     validateEnforcementPerTier / validateEnforcementGuard
+//   validateReasoningPolicy →
+//     validateReasoningPolicyMode / validateAdaptivePolicy →
+//       validateKeywordRules → validateKeywordRule / validateAdaptiveTierDefaults
 //
 // Every sub-validator throws with a `tiers.json: …` prefix on the first
 // failure so the operator sees the exact problem without re-running.
@@ -23,12 +26,31 @@
 // branch on `undefined`.
 // ---------------------------------------------------------------------------
 
-import { type EnforcementConfig, isPlainObject, type RouterConfig } from "./config.types";
+import type { MatchMode } from "../reasoning/match.js";
+import {
+  type EnforcementConfig,
+  isPlainObject,
+  type ReasoningLevel,
+  type RouterConfig,
+} from "./config.types";
 import { ENFORCEMENT_MODES, GRADER_POLICIES, VERIFY_REQUIRE_MODES } from "./config-resolve";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
 const EXPECTED_GRADER_POLICY = GRADER_POLICIES[0];
+
+// Reasoning-policy allow-lists. Mirrored from the `ReasoningLevel` type union
+// in `src/reasoning/capability.ts` and the `MatchMode` union in
+// `src/reasoning/match.ts`. Kept local here (not in `config-resolve.ts`) so
+// PR3 of `robust-adaptive-trigger-words` stays a single-file validator
+// change; promoting them to shared constants is a mechanical follow-up if
+// any other module needs the same lists.
+const REASONING_MODES = ["static", "manual", "adaptive"] as const;
+const REASONING_LEVELS = ["minimal", "normal", "elevated", "max"] as const;
+const MATCH_MODES = ["word", "stem", "substring", "regex"] as const;
+
+const isReasoningLevel = (v: unknown): v is ReasoningLevel =>
+  typeof v === "string" && (REASONING_LEVELS as readonly string[]).includes(v);
 
 // ---------------------------------------------------------------------------
 // validateConfig — orchestrator
@@ -46,6 +68,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   validateTierPrompts(raw);
   validateTaskPatterns(raw);
   validateEnforcement(raw);
+  validateReasoningPolicy(raw);
   return raw as unknown as RouterConfig;
 };
 
@@ -323,4 +346,175 @@ export const normalizeEnforcement = (
   e: EnforcementConfig | undefined,
 ): { mode: "off" | "advisory" | "enforced" } => {
   return { mode: e?.mode ?? "advisory" };
+};
+
+// ---------------------------------------------------------------------------
+// Reasoning policy (PR 3 of robust-adaptive-trigger-words)
+//
+// Validation contract:
+//   - `reasoningPolicy` is optional; missing ⇒ no-op.
+//   - `reasoningPolicy.mode` (optional) ∈ {static,manual,adaptive}.
+//   - `reasoningPolicy.adaptive` (optional) must be a plain object.
+//   - `adaptive.trivialLevel` / `adaptive.defaultLevel` (optional) ∈
+//     {minimal,normal,elevated,max} or `null`. Null means "no patch".
+//   - `adaptive.keywordRules` (optional) is an array; each rule needs:
+//       - non-empty `keywords` array of strings (rejects `[]`);
+//       - `level` from the level set;
+//       - `match` (optional) from {word,stem,substring,regex};
+//       - `excludeKeywords` (optional) array of strings;
+//       - when `match === "regex"`, every keyword must compile (`new
+//         RegExp(keyword)`) — failed patterns fail fast at config load
+//         instead of silently dropping at runtime.
+//   - `adaptive.tierDefaults` (optional) plain object whose values are
+//     drawn from the level set (no null allowed — nulls are reserved for
+//     `trivialLevel`/`defaultLevel` semantics).
+//   - `adaptive.surfaceDecision` (optional) boolean.
+//
+// Permissive skip policy matches the rest of the file: a top-level
+// `reasoningPolicy` that isn't a plain object throws; nested optional
+// blocks (`adaptive`, `keywordRules`, `tierDefaults`) that are present but
+// malformed also throw so operators see the exact misconfiguration.
+// ---------------------------------------------------------------------------
+
+const REASONING_MODES_LIST = REASONING_MODES.join("|");
+const REASONING_LEVELS_LIST = REASONING_LEVELS.join("|");
+const MATCH_MODES_LIST = MATCH_MODES.join("|");
+
+export const validateReasoningPolicy = (obj: Record<string, unknown>): void => {
+  if (obj.reasoningPolicy === undefined) return;
+  if (!isPlainObject(obj.reasoningPolicy) || Array.isArray(obj.reasoningPolicy)) {
+    throw new Error("tiers.json: 'reasoningPolicy' must be an object");
+  }
+  const policy = obj.reasoningPolicy;
+  validateReasoningPolicyMode(policy);
+  validateAdaptivePolicy(policy);
+};
+
+export const validateReasoningPolicyMode = (policy: Record<string, unknown>): void => {
+  if (policy.mode === undefined) return;
+  if (
+    typeof policy.mode !== "string" ||
+    !(REASONING_MODES as readonly string[]).includes(policy.mode)
+  ) {
+    throw new Error(
+      `tiers.json: reasoningPolicy.mode must be one of ${REASONING_MODES_LIST} (got ${JSON.stringify(policy.mode)})`,
+    );
+  }
+};
+
+export const validateAdaptivePolicy = (policy: Record<string, unknown>): void => {
+  if (policy.adaptive === undefined) return;
+  if (!isPlainObject(policy.adaptive) || Array.isArray(policy.adaptive)) {
+    throw new Error("tiers.json: reasoningPolicy.adaptive must be an object");
+  }
+  const adaptive = policy.adaptive;
+  validateLevelOrNull(adaptive.trivialLevel, "reasoningPolicy.adaptive.trivialLevel");
+  validateLevelOrNull(adaptive.defaultLevel, "reasoningPolicy.adaptive.defaultLevel");
+  validateKeywordRules(adaptive.keywordRules);
+  validateAdaptiveTierDefaults(adaptive.tierDefaults);
+  validateAdaptiveSurfaceDecision(adaptive.surfaceDecision);
+};
+
+/**
+ * Validate an adaptive level slot that admits `null` (e.g. `trivialLevel`,
+ * `defaultLevel`). Null/absent means "no patch"; any other value must be a
+ * member of the reasoning level set.
+ */
+const validateLevelOrNull = (value: unknown, path: string): void => {
+  if (value === undefined || value === null) return;
+  if (!isReasoningLevel(value)) {
+    throw new Error(
+      `tiers.json: ${path} must be one of ${REASONING_LEVELS_LIST} or null (got ${JSON.stringify(value)})`,
+    );
+  }
+};
+
+export const validateKeywordRules = (rules: unknown): void => {
+  if (rules === undefined) return;
+  if (!Array.isArray(rules)) {
+    throw new Error("tiers.json: reasoningPolicy.adaptive.keywordRules must be an array");
+  }
+  for (const [index, rule] of rules.entries()) {
+    validateKeywordRule(rule, index);
+  }
+};
+
+export const validateKeywordRule = (rule: unknown, index: number): void => {
+  const prefix = `reasoningPolicy.adaptive.keywordRules[${index}]`;
+  if (!isPlainObject(rule) || Array.isArray(rule)) {
+    throw new Error(`tiers.json: ${prefix} must be an object`);
+  }
+  // keywords: REQUIRED, non-empty array of strings
+  if (!Array.isArray(rule.keywords)) {
+    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
+  }
+  if (rule.keywords.length === 0) {
+    throw new Error(`tiers.json: ${prefix}.keywords must be a non-empty array of strings`);
+  }
+  if (!rule.keywords.every((k: unknown) => typeof k === "string")) {
+    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
+  }
+  // level: REQUIRED, must be in the level set
+  if (!isReasoningLevel(rule.level)) {
+    throw new Error(
+      `tiers.json: ${prefix}.level must be one of ${REASONING_LEVELS_LIST} (got ${JSON.stringify(rule.level)})`,
+    );
+  }
+  // match: OPTIONAL; must be one of the four mode literals
+  if (rule.match !== undefined) {
+    if (
+      typeof rule.match !== "string" ||
+      !(MATCH_MODES as readonly string[]).includes(rule.match as MatchMode)
+    ) {
+      throw new Error(
+        `tiers.json: ${prefix}.match must be one of ${MATCH_MODES_LIST} (got ${JSON.stringify(rule.match)})`,
+      );
+    }
+  }
+  // excludeKeywords: OPTIONAL; array of strings (may be empty)
+  if (rule.excludeKeywords !== undefined) {
+    if (
+      !Array.isArray(rule.excludeKeywords) ||
+      !rule.excludeKeywords.every((k: unknown) => typeof k === "string")
+    ) {
+      throw new Error(`tiers.json: ${prefix}.excludeKeywords must be an array of strings`);
+    }
+  }
+  // regex fail-fast: any keyword that does not compile under `new RegExp`
+  // throws at config load. Runtime (`matchSignal`) keeps fail-soft as a
+  // safety net, but malformed configs should not ship.
+  if (rule.match === "regex") {
+    for (const kw of rule.keywords as string[]) {
+      try {
+        new RegExp(kw);
+      } catch (err) {
+        throw new Error(
+          `tiers.json: ${prefix} has invalid regex '${kw}': ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+};
+
+export const validateAdaptiveTierDefaults = (td: unknown): void => {
+  if (td === undefined) return;
+  if (!isPlainObject(td) || Array.isArray(td)) {
+    throw new Error("tiers.json: reasoningPolicy.adaptive.tierDefaults must be an object");
+  }
+  for (const [tierName, level] of Object.entries(td)) {
+    if (!isReasoningLevel(level)) {
+      throw new Error(
+        `tiers.json: reasoningPolicy.adaptive.tierDefaults.${tierName} must be one of ${REASONING_LEVELS_LIST} (got ${JSON.stringify(level)})`,
+      );
+    }
+  }
+};
+
+const validateAdaptiveSurfaceDecision = (value: unknown): void => {
+  if (value === undefined) return;
+  if (typeof value !== "boolean") {
+    throw new Error(
+      `tiers.json: reasoningPolicy.adaptive.surfaceDecision must be a boolean (got ${JSON.stringify(value)})`,
+    );
+  }
 };

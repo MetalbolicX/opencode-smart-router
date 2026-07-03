@@ -20,6 +20,8 @@ import {
   VERIFY_REQUIRE_MODES,
 } from "../../src/router/config-resolve";
 import {
+  validateAdaptivePolicy,
+  validateAdaptiveTierDefaults,
   validateConfig,
   validateEnforcement,
   validateEnforcementEscalate,
@@ -28,10 +30,14 @@ import {
   validateEnforcementPerTier,
   validateEnforcementVerify,
   validateEscalateCostCeiling,
+  validateKeywordRule,
+  validateKeywordRules,
   validateMode,
   validateModes,
   validatePreset,
   validatePresets,
+  validateReasoningPolicy,
+  validateReasoningPolicyMode,
   validateRootFields,
   validateRulesAndDefaultTier,
   validateTaskPatterns,
@@ -364,6 +370,272 @@ describe("validateEnforcementGuard", () => {
   it("accepts boolean blockScriptWrites", () => {
     expect(() => validateEnforcementGuard({ guard: { blockScriptWrites: true } })).not.toThrow();
     expect(() => validateEnforcementGuard({ guard: { blockScriptWrites: false } })).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reasoning policy (PR 3 of robust-adaptive-trigger-words)
+// ---------------------------------------------------------------------------
+
+describe("validateReasoningPolicy", () => {
+  it("skips when reasoningPolicy is absent", () => {
+    expect(() => validateReasoningPolicy({})).not.toThrow();
+  });
+  it("rejects non-object reasoningPolicy", () => {
+    expect(() => validateReasoningPolicy({ reasoningPolicy: "x" })).toThrow(
+      /'reasoningPolicy' must be an object/,
+    );
+    expect(() => validateReasoningPolicy({ reasoningPolicy: [] })).toThrow(
+      /'reasoningPolicy' must be an object/,
+    );
+    expect(() => validateReasoningPolicy({ reasoningPolicy: null })).toThrow(
+      /'reasoningPolicy' must be an object/,
+    );
+  });
+});
+
+describe("validateReasoningPolicyMode", () => {
+  for (const mode of ["static", "manual", "adaptive"]) {
+    it(`accepts mode '${mode}'`, () => {
+      expect(() => validateReasoningPolicyMode({ mode })).not.toThrow();
+    });
+  }
+  it("skips when mode is absent", () => {
+    expect(() => validateReasoningPolicyMode({})).not.toThrow();
+  });
+  it("rejects unknown / non-string mode", () => {
+    expect(() => validateReasoningPolicyMode({ mode: "typo" })).toThrow(/reasoningPolicy\.mode/);
+    expect(() => validateReasoningPolicyMode({ mode: 1 })).toThrow(/reasoningPolicy\.mode/);
+    expect(() => validateReasoningPolicyMode({ mode: null })).toThrow(/reasoningPolicy\.mode/);
+  });
+  it("error message lists the three supported modes", () => {
+    expect(() => validateReasoningPolicyMode({ mode: "typo" })).toThrow(/static\|manual\|adaptive/);
+  });
+});
+
+describe("validateAdaptivePolicy", () => {
+  it("skips when adaptive is absent", () => {
+    expect(() => validateAdaptivePolicy({})).not.toThrow();
+  });
+  it("rejects non-object adaptive", () => {
+    expect(() => validateAdaptivePolicy({ adaptive: "x" })).toThrow(/adaptive must be an object/);
+    expect(() => validateAdaptivePolicy({ adaptive: [] })).toThrow(/adaptive must be an object/);
+  });
+
+  it("accepts trivialLevel=null and defaultLevel=null", () => {
+    expect(() =>
+      validateAdaptivePolicy({
+        adaptive: { trivialLevel: null, defaultLevel: null },
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts every level value in trivialLevel and defaultLevel", () => {
+    for (const level of ["minimal", "normal", "elevated", "max"]) {
+      expect(() =>
+        validateAdaptivePolicy({
+          adaptive: { trivialLevel: level, defaultLevel: level },
+        }),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects bogus trivialLevel / defaultLevel", () => {
+    for (const bad of ["bogus", "", 1, false]) {
+      expect(() => validateAdaptivePolicy({ adaptive: { trivialLevel: bad } })).toThrow(
+        /trivialLevel must be one of minimal\|normal\|elevated\|max/,
+      );
+      expect(() => validateAdaptivePolicy({ adaptive: { defaultLevel: bad } })).toThrow(
+        /defaultLevel must be one of minimal\|normal\|elevated\|max/,
+      );
+    }
+  });
+
+  it("accepts a complete valid adaptive block including regex and excludeKeywords", () => {
+    expect(() =>
+      validateAdaptivePolicy({
+        adaptive: {
+          trivialLevel: null,
+          defaultLevel: "normal",
+          keywordRules: [
+            {
+              keywords: ["refactor"],
+              level: "elevated",
+              match: "word",
+              excludeKeywords: ["refactor across modules"],
+            },
+            {
+              keywords: ["^\\bdebug\\b"],
+              level: "minimal",
+              match: "regex",
+            },
+          ],
+          tierDefaults: { fast: "minimal", medium: "normal", heavy: "elevated" },
+          surfaceDecision: true,
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects non-boolean surfaceDecision", () => {
+    expect(() => validateAdaptivePolicy({ adaptive: { surfaceDecision: "yes" } })).toThrow(
+      /surfaceDecision must be a boolean/,
+    );
+  });
+});
+
+describe("validateKeywordRules", () => {
+  it("skips when keywordRules is absent", () => {
+    expect(() => validateKeywordRules(undefined)).not.toThrow();
+  });
+  it("rejects non-array keywordRules", () => {
+    expect(() => validateKeywordRules("x")).toThrow(/keywordRules must be an array/);
+    expect(() => validateKeywordRules({})).toThrow(/keywordRules must be an array/);
+  });
+  it("accepts an empty array (no rules is legal)", () => {
+    expect(() => validateKeywordRules([])).not.toThrow();
+  });
+});
+
+describe("validateKeywordRule", () => {
+  it("accepts a minimal rule with keywords + level", () => {
+    expect(() => validateKeywordRule({ keywords: ["debug"], level: "elevated" }, 0)).not.toThrow();
+  });
+
+  it("rejects non-object rule", () => {
+    expect(() => validateKeywordRule("x", 0)).toThrow(/keywordRules\[0\] must be an object/);
+    expect(() => validateKeywordRule([], 1)).toThrow(/keywordRules\[1\] must be an object/);
+  });
+
+  it("rejects missing / non-array keywords", () => {
+    expect(() => validateKeywordRule({ level: "elevated" }, 0)).toThrow(
+      /keywordRules\[0\]\.keywords must be an array/,
+    );
+    expect(() => validateKeywordRule({ keywords: "debug", level: "elevated" }, 0)).toThrow(
+      /keywordRules\[0\]\.keywords must be an array/,
+    );
+  });
+
+  it("rejects empty keywords: []", () => {
+    expect(() => validateKeywordRule({ keywords: [], level: "elevated" }, 0)).toThrow(
+      /keywordRules\[0\]\.keywords must be a non-empty array/,
+    );
+  });
+
+  it("rejects non-string keywords entries", () => {
+    expect(() => validateKeywordRule({ keywords: ["ok", 7], level: "elevated" }, 0)).toThrow(
+      /keywordRules\[0\]\.keywords must be an array of strings/,
+    );
+  });
+
+  it("rejects bogus level", () => {
+    expect(() => validateKeywordRule({ keywords: ["debug"], level: "bogus" }, 0)).toThrow(
+      /keywordRules\[0\]\.level must be one of minimal\|normal\|elevated\|max/,
+    );
+    expect(() => validateKeywordRule({ keywords: ["debug"], level: 2 }, 0)).toThrow(
+      /keywordRules\[0\]\.level must be one of/,
+    );
+  });
+
+  for (const mode of ["word", "stem", "substring", "regex"]) {
+    it(`accepts match='${mode}' with a valid configuration`, () => {
+      expect(() =>
+        validateKeywordRule(
+          {
+            keywords: mode === "regex" ? ["^debug\\b"] : ["debug"],
+            level: "elevated",
+            match: mode,
+          },
+          0,
+        ),
+      ).not.toThrow();
+    });
+  }
+
+  it("rejects match outside the four-mode allow-list", () => {
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", match: "typo" }, 0),
+    ).toThrow(/keywordRules\[0\]\.match must be one of word\|stem\|substring\|regex/);
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", match: 1 }, 0),
+    ).toThrow(/keywordRules\[0\]\.match must be one of/);
+  });
+
+  it("error message includes the bad match value", () => {
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", match: "typo" }, 0),
+    ).toThrow(/got "typo"/);
+  });
+
+  it("accepts a rule with excludeKeywords (string array, possibly empty)", () => {
+    expect(() =>
+      validateKeywordRule(
+        {
+          keywords: ["refactor"],
+          level: "elevated",
+          match: "word",
+          excludeKeywords: ["refactor across modules"],
+        },
+        0,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", excludeKeywords: [] }, 0),
+    ).not.toThrow();
+  });
+
+  it("rejects non-array / non-string excludeKeywords", () => {
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", excludeKeywords: "nope" }, 0),
+    ).toThrow(/keywordRules\[0\]\.excludeKeywords must be an array of strings/);
+    expect(() =>
+      validateKeywordRule({ keywords: ["debug"], level: "elevated", excludeKeywords: [1, 2] }, 0),
+    ).toThrow(/keywordRules\[0\]\.excludeKeywords must be an array of strings/);
+  });
+
+  it("fail-fast rejects an invalid regex pattern when match='regex'", () => {
+    expect(() =>
+      validateKeywordRule({ keywords: ["(["], level: "minimal", match: "regex" }, 0),
+    ).toThrow(/keywordRules\[0\] has invalid regex '\(\['/);
+  });
+
+  it("accepts a valid regex pattern when match='regex'", () => {
+    expect(() =>
+      validateKeywordRule(
+        { keywords: ["^debug\\b", "refactor\\s+\\w+"], level: "minimal", match: "regex" },
+        0,
+      ),
+    ).not.toThrow();
+  });
+
+  it("does not compile-check non-regex match modes", () => {
+    // a string that would fail `new RegExp` if treated as regex must still
+    // pass when match is 'word' / 'stem' / 'substring', since the keyword
+    // is treated as a literal phrase in those modes.
+    expect(() =>
+      validateKeywordRule({ keywords: ["(["], level: "minimal", match: "word" }, 0),
+    ).not.toThrow();
+  });
+});
+
+describe("validateAdaptiveTierDefaults", () => {
+  it("skips when tierDefaults is absent", () => {
+    expect(() => validateAdaptiveTierDefaults(undefined)).not.toThrow();
+  });
+  it("rejects non-object tierDefaults", () => {
+    expect(() => validateAdaptiveTierDefaults([])).toThrow(/tierDefaults must be an object/);
+    expect(() => validateAdaptiveTierDefaults("x")).toThrow(/tierDefaults must be an object/);
+  });
+  it("accepts per-tier levels from the enum", () => {
+    expect(() =>
+      validateAdaptiveTierDefaults({ fast: "minimal", medium: "normal", heavy: "elevated" }),
+    ).not.toThrow();
+    expect(() => validateAdaptiveTierDefaults({})).not.toThrow();
+  });
+  it("rejects tier values outside the level set", () => {
+    expect(() => validateAdaptiveTierDefaults({ fast: "bogus" })).toThrow(
+      /tierDefaults\.fast must be one of minimal\|normal\|elevated\|max/,
+    );
   });
 });
 
