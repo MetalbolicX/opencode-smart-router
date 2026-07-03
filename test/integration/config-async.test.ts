@@ -99,7 +99,7 @@ describe("Async layer + state I/O — integration", () => {
 
   it("writeState → readState round-trips and ends with a newline (async atomic write)", async () => {
     await writeState({ activePreset: "openai", enforcementMode: "enforced" });
-    const stateFile = join(tmpHome, ".config", "opencode", "opencode-model-router.state.json");
+    const stateFile = join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json");
     const raw = readFileSync(stateFile, "utf-8");
     expect(raw.endsWith("\n")).toBe(true);
     const s = await readState();
@@ -109,7 +109,7 @@ describe("Async layer + state I/O — integration", () => {
   it("writeState succeeds even when the parent directory does not yet exist", async () => {
     // No .config/opencode/ staged yet — writeState should mkdir recursively.
     await writeState({ activePreset: "anthropic" });
-    const stateFile = join(tmpHome, ".config", "opencode", "opencode-model-router.state.json");
+    const stateFile = join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json");
     expect(readFileSync(stateFile, "utf-8")).toContain("anthropic");
   });
 
@@ -189,8 +189,8 @@ describe("Async layer + state I/O — integration", () => {
 // ---------------------------------------------------------------------------
 // XDG-aware path resolution integration.
 //
-// With XDG_CONFIG_HOME set, the resolver targets $XDG_CONFIG_HOME/opencode-model-router/
-// instead of $HOME/.config/opencode-model-router/. This integration test
+// With XDG_CONFIG_HOME set, the resolver targets $XDG_CONFIG_HOME/opencode-agent-router/
+// instead of $HOME/.config/opencode-agent-router/. This integration test
 // proves the full path with a real fs round-trip.
 // ---------------------------------------------------------------------------
 
@@ -248,15 +248,15 @@ describe("XDG-aware path resolution — integration", () => {
 
   it("writeState targets the XDG root, NOT $HOME", async () => {
     await writeState({ activePreset: "openai" });
-    const xdgState = join(tmpXdg, "opencode", "opencode-model-router.state.json");
-    const homeState = join(tmpHome, ".config", "opencode", "opencode-model-router.state.json");
+    const xdgState = join(tmpXdg, "opencode", "opencode-agent-router.state.json");
+    const homeState = join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json");
     expect(readFileSync(xdgState, "utf-8")).toContain("openai");
     // The legacy path MUST NOT exist — we only write to XDG.
     expect(() => readFileSync(homeState, "utf-8")).toThrow();
   });
 
   it("readMergedConfig honors the XDG root for global tiers.json", async () => {
-    const xdgGlobalDir = join(tmpXdg, "opencode-model-router");
+    const xdgGlobalDir = join(tmpXdg, "opencode-agent-router");
     mkdirSync(xdgGlobalDir, { recursive: true });
     writeFileSync(
       join(xdgGlobalDir, "tiers.json"),
@@ -274,7 +274,7 @@ describe("XDG-aware path resolution — integration", () => {
     const homeStateDir = join(tmpHome, ".config", "opencode");
     mkdirSync(homeStateDir, { recursive: true });
     writeFileSync(
-      join(homeStateDir, "opencode-model-router.state.json"),
+      join(homeStateDir, "opencode-agent-router.state.json"),
       JSON.stringify({ activePreset: "anthropic" }),
       "utf-8",
     );
@@ -288,12 +288,12 @@ describe("XDG-aware path resolution — integration", () => {
     const homeStateDir = join(tmpHome, ".config", "opencode");
     mkdirSync(homeStateDir, { recursive: true });
     writeFileSync(
-      join(homeStateDir, "opencode-model-router.state.json"),
+      join(homeStateDir, "opencode-agent-router.state.json"),
       JSON.stringify({ activePreset: "legacy" }),
       "utf-8",
     );
     await writeState({ activePreset: "fresh-write" });
-    const xdgState = join(tmpXdg, "opencode", "opencode-model-router.state.json");
+    const xdgState = join(tmpXdg, "opencode", "opencode-agent-router.state.json");
     const xdgContent = JSON.parse(readFileSync(xdgState, "utf-8")) as Record<string, unknown>;
     expect(xdgContent).toMatchObject({ activePreset: "fresh-write" });
     // The next readState sees the XDG file (preferred over legacy).

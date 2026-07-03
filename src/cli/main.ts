@@ -36,7 +36,7 @@ Options (install):
       --yes          Skip confirmation prompts (reserved)
 
 Options (uninstall):
-      --purge        Also remove cache + ~/.config/opencode-model-router/
+      --purge        Also remove cache + ~/.config/opencode-agent-router/
       --dry-run      Print the planned change without writing
       --yes          Skip confirmation prompts (reserved)
 

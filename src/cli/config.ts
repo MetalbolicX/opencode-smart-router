@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 // ---------------------------------------------------------------------------
 
 /** npm package name for this plugin. */
-export const PLUGIN_NAME = "opencode-model-router";
+export const PLUGIN_NAME = "opencode-agent-router";
 
 /** Maximum number of CLI-created backups retained in the config directory. */
 export const BACKUP_LIMIT = 3;
@@ -253,7 +253,7 @@ const stripJsoncComments = (text: string): string => {
 
 /**
  * True when `entry` is a string that resolves to this plugin by base name.
- * Matches `opencode-model-router` and any `opencode-model-router@<spec>`
+ * Matches `opencode-agent-router` and any `opencode-agent-router@<spec>`
  * variant. Non-string entries (legacy object-form leftover) return false.
  */
 export const matchesOmr = (entry: unknown): boolean => {
@@ -290,7 +290,7 @@ export const normalizePlugin = (raw: unknown): string[] => {
 
 /**
  * Dedupe the plugin list by base name (the part before the first `@`),
- * keeping the LAST occurrence of each base. Any `opencode-model-router`
+ * keeping the LAST occurrence of each base. Any `opencode-agent-router`
  * entries are removed entirely so the install flow can append one fresh
  * entry at the end without leaving stale versions behind.
  *
@@ -323,8 +323,8 @@ export const dedupePlugins = (entries: readonly string[]): string[] => {
 
 /**
  * Build the npm specifier we will write into `plugin[]`:
- * `"opencode-model-router"` when no version is supplied, otherwise
- * `"opencode-model-router@<version>"`. Empty / whitespace-only versions
+ * `"opencode-agent-router"` when no version is supplied, otherwise
+ * `"opencode-agent-router@<version>"`. Empty / whitespace-only versions
  * are treated as "no version".
  */
 export const buildSpecifier = (version?: string): string => {

@@ -10,7 +10,7 @@ import { writeTrajectoryLog } from "../../src/utils/log";
 // Centralises the mkdir+append pattern used by the per-delegation scorecard
 // (hooks.ts), the opt-in full trajectory dump (hooks.ts), and the delegate
 // scorecard (escalate/ladder.ts). The contract:
-// - Default filename: `<sid>.log` under `<tmpdir>/opencode-model-router-trajectory/`.
+// - Default filename: `<sid>.log` under `<tmpdir>/opencode-agent-router-trajectory/`.
 // - With `subdir`:     `<sid>.<subdir>.log` in the same directory.
 // - Fail-soft: any IO error is swallowed; callers must not crash a real
 //   session on a logging failure.
@@ -24,7 +24,7 @@ const uniqueSid = (prefix: string): string => {
 
 const trajPath = (sid: string, subdir?: string): string => {
   const filename = subdir ? `${sid}.${subdir}.log` : `${sid}.log`;
-  return join(tmpdir(), "opencode-model-router-trajectory", filename);
+  return join(tmpdir(), "opencode-agent-router-trajectory", filename);
 };
 
 const written: string[] = [];
@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 describe("writeTrajectoryLog", () => {
-  it("writes content to <tmpdir>/opencode-model-router-trajectory/<sid>.log by default", () => {
+  it("writes content to <tmpdir>/opencode-agent-router-trajectory/<sid>.log by default", () => {
     const sid = uniqueSid("ses-default");
     const path = trajPath(sid);
     written.push(path);

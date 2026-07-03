@@ -2,7 +2,7 @@
 // src/utils/observability.ts — Structured JSON logger for runtime events.
 //
 // This module is the single home for runtime observability in the
-// opencode-model-router plugin. It exists for three reasons:
+// opencode-agent-router plugin. It exists for three reasons:
 //
 // 1. Tests want deterministic, captured output. A wrapper that funnels
 //    every event through `console.{log,warn,error}` (with level filtering

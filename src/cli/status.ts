@@ -22,7 +22,7 @@ import { type CliFs, loadGlobalConfig, matchesOmr, normalizePlugin, PLUGIN_NAME 
 import { createRealFs } from "./real-fs";
 
 export interface StatusResult {
-  /** Whether an `opencode-model-router` entry is present in `plugin`. */
+  /** Whether an `opencode-agent-router` entry is present in `plugin`. */
   installed: boolean;
   /** Resolved config path the loader used. */
   path: string;
@@ -135,7 +135,7 @@ export const runDoctor = (
       info.push(`Plugin entries: ${plugins.length}`);
       const omrCount = plugins.filter(matchesOmr).length;
       if (omrCount > 1) {
-        warnings.push(`${omrCount} opencode-model-router entries present — install will dedupe`);
+        warnings.push(`${omrCount} opencode-agent-router entries present — install will dedupe`);
       }
     }
   }

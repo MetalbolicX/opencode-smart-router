@@ -3,7 +3,7 @@
 //
 // Both `src/plugin/hooks.ts` (per-delegation scorecard + opt-in full
 // trajectory dump) and `src/escalate/ladder.ts` (delegate scorecard) append
-// session-scoped log lines to `<tmpdir>/opencode-model-router-trajectory/`.
+// session-scoped log lines to `<tmpdir>/opencode-agent-router-trajectory/`.
 // This helper centralises the mkdir+append pattern so the directory, the
 // fail-soft semantics, and the filename convention all stay in one place.
 //
@@ -23,11 +23,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** Top-level directory every trajectory log file lives under. */
-const TRAJECTORY_DIR = "opencode-model-router-trajectory";
+const TRAJECTORY_DIR = "opencode-agent-router-trajectory";
 
 /**
  * Append `content` to a session-scoped trajectory log under
- * `<tmpdir>/opencode-model-router-trajectory/<sid>[.<subdir>].log`. The
+ * `<tmpdir>/opencode-agent-router-trajectory/<sid>[.<subdir>].log`. The
  * directory is created on demand (recursive), and the write is append-only
  * so multiple invocations for the same `sid` accumulate without truncation.
  *

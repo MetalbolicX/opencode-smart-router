@@ -98,7 +98,7 @@ export const configPath = (): string => {
  * Re-export the XDG-aware global config path resolver. The signature is
  * preserved (`globalConfigPath(): string`) so callers do not change; the
  * implementation now honours `$XDG_CONFIG_HOME` before falling back to
- * `$HOME/.config/opencode-model-router/tiers.json`.
+ * `$HOME/.config/opencode-agent-router/tiers.json`.
  */
 export { globalConfigPath };
 

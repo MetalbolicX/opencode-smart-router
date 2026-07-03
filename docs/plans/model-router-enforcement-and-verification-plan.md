@@ -1,4 +1,4 @@
-# Implementation Plan — Enforced Delegation Architecture for `opencode-model-router`
+# Implementation Plan — Enforced Delegation Architecture for `opencode-agent-router`
 
 > **Status:** Draft **v2** (review-hardened; ready to execute)
 > **Owner:** Marco Jardim
@@ -31,7 +31,7 @@ Empirical signal (model = Kimi `accounts/fireworks/routers/kimi-k2p6-turbo`, liv
 - **Easy task at N=5:** `freeform` 60% · `guided` 100% · `enforced` 100%.
 - **Three failure modes without a hard-block:** `freeform` = *thrash* (flails until the budget cap), `guided` = *false-finish* (declares "done" without producing the deliverable), `enforced` = *correct* (a "deliverable-first" guard pins time-to-first-action = 1).
 
-`opencode-model-router` today is exactly the *guided* condition: it injects an excellent delegation protocol and appends advisory cap/redundancy/narration banners, but **every control is advisory** and the subagent's `DONE: / NEED MORE: / ESCALATE:` return is **self-reported**. There is **no hard-block, no objective acceptance of a subagent's output before the orchestrator trusts it, and no quality-based escalation** (the only fallback today is provider-level failover on API error).
+`opencode-agent-router` today is exactly the *guided* condition: it injects an excellent delegation protocol and appends advisory cap/redundancy/narration banners, but **every control is advisory** and the subagent's `DONE: / NEED MORE: / ESCALATE:` return is **self-reported**. There is **no hard-block, no objective acceptance of a subagent's output before the orchestrator trusts it, and no quality-based escalation** (the only fallback today is provider-level failover on API error).
 
 **Thesis of this plan:** convert the router from *"the weak model says it finished"* into *"the weak model's output was objectively accepted"* — with proportional, opt-in enforcement that does not over-engineer trivial work.
 
@@ -85,7 +85,7 @@ Every task/subtask below is tagged with `[tier:fast]`, `[tier:medium]`, or `[tie
 - **Delegation = OpenCode built-in `Task(subagent_type="fast"|"medium"|"heavy", prompt=…)`.** There is **no** custom delegate tool today. Tier agents are registered in the `config` hook (:1016) from the active `tiers.json` preset.
 - **Subagent detection.** `chat.message` (:934) matches `input.agent` to a tier name → records `sessionID` in a `subagentSessionIDs` Set and initialises per-session cap state; `parseCapDirective` reads `CAP:N` from the dispatch text.
 - **Advisory controls (the part we will harden).** `tool.execute.after` (:968) appends `[cap: N/MAX]`, `[⚠ REDUNDANT]`, `[⚠ CAP REACHED]` banners to read-only tool results (grep/read/glob/ls), using `fingerprintToolCall`. `experimental.text.complete` (:999) appends a narration-detected banner. **All observe-after-the-fact; none can block.**
-- **Config.** `tiers.json`: `tierCaps {fast:8, medium:5, heavy:3}`, presets (`anthropic`, `openai`, `github-copilot`, `google`, `hybrid`), modes (`normal`, `budget`, `quality`, `deep`), `taskPatterns`, `rules`, `tierPrompts`, provider-only `fallback`. State persisted at `~/.config/opencode/opencode-model-router.state.json`.
+- **Config.** `tiers.json`: `tierCaps {fast:8, medium:5, heavy:3}`, presets (`anthropic`, `openai`, `github-copilot`, `google`, `hybrid`), modes (`normal`, `budget`, `quality`, `deep`), `taskPatterns`, `rules`, `tierPrompts`, provider-only `fallback`. State persisted at `~/.config/opencode/opencode-agent-router.state.json`.
 
 **Invariant:** none of the above changes semantics for a *normal* (non-subagent, non-enforced) session unless a task explicitly says so.
 

@@ -1,7 +1,7 @@
 /**
  * QUICK REFERENCE: Custom Slash Commands in OpenCode Plugins
  *
- * Source: D:\git\opencode-model-router\src\index.ts
+ * Source: D:\git\opencode-agent-router\src\index.ts
  * Reference Documentation: COMMAND_PATTERNS.md
  */
 
@@ -175,7 +175,7 @@ function buildPresetOutput(cfg: RouterConfig, args: string): string {
     return [
       `Preset switched to **${resolved}**.`, // Bold markdown
       "",
-      "Selection is now persisted in ~/.config/opencode/opencode-model-router.state.json.",
+      "Selection is now persisted in ~/.config/opencode/opencode-agent-router.state.json.",
       "System prompt delegation rules update immediately.",
     ].join("\n");
   }

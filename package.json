@@ -1,5 +1,5 @@
 {
-  "name": "opencode-model-router",
+  "name": "opencode-agent-router",
   "version": "1.4.0",
   "description": "OpenCode plugin that routes tasks to tiered subagents (fast/medium/heavy) based on complexity",
   "type": "module",
@@ -25,11 +25,11 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/marco-jardim/opencode-model-router.git"
+    "url": "git+https://github.com/marco-jardim/opencode-agent-router.git"
   },
-  "homepage": "https://github.com/marco-jardim/opencode-model-router",
+  "homepage": "https://github.com/marco-jardim/opencode-agent-router",
   "bugs": {
-    "url": "https://github.com/marco-jardim/opencode-model-router/issues"
+    "url": "https://github.com/marco-jardim/opencode-agent-router/issues"
   },
   "author": {
     "name": "Marco Jardim",

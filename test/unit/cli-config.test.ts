@@ -347,7 +347,7 @@ describe("dedupePlugins", () => {
     expect(dedupePlugins(["foo", "foo@2.0.0"])).toEqual(["foo@2.0.0"]);
   });
 
-  it("removes every opencode-model-router variant, leaving nothing OMR behind", () => {
+  it("removes every opencode-agent-router variant, leaving nothing OMR behind", () => {
     expect(
       dedupePlugins([`${PLUGIN_NAME}`, `${PLUGIN_NAME}@1.0.0`, `${PLUGIN_NAME}@2.0.0-beta`]),
     ).toEqual([]);

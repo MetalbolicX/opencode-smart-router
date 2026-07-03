@@ -141,7 +141,7 @@ describe("readConfigLayer — failure modes emit typed RouterConfigError kinds",
   it("returns undefined (warn+default) when an optional layer is missing (ENOENT)", async () => {
     const result = await readConfigLayer({
       kind: "global",
-      path: join(tmpHome, ".config", "opencode-model-router", "tiers.json"),
+      path: join(tmpHome, ".config", "opencode-agent-router", "tiers.json"),
       required: false,
     });
     expect(result).toBeUndefined();

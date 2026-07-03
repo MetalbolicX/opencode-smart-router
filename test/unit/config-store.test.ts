@@ -18,7 +18,7 @@ import { createConfigStore } from "../../src/router/config-store";
 //
 // PR3b: read / refresh / getFresh are all async; every assertion awaits.
 // The tests stage files into a temp HOME and a temp cwd so they do not
-// interfere with the developer's real `~/.config/opencode-model-router/`.
+// interfere with the developer's real `~/.config/opencode-agent-router/`.
 // ---------------------------------------------------------------------------
 
 let tmpHome: string;

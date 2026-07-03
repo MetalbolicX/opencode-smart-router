@@ -3,8 +3,8 @@
 //
 // `readState()` / `writeState()` manage the on-disk state file at the
 // XDG-aware path resolved by `./config-paths.ts` (preferred:
-// `$XDG_CONFIG_HOME/opencode/opencode-model-router.state.json`; legacy
-// fallback: `$HOME/.config/opencode/opencode-model-router.state.json`).
+// `$XDG_CONFIG_HOME/opencode/opencode-agent-router.state.json`; legacy
+// fallback: `$HOME/.config/opencode/opencode-agent-router.state.json`).
 // The state overlays ONLY `activePreset`, `activeMode`, `enforcementMode`,
 // and `reasoningMode` on top of the merged manual config; it never touches
 // `tiers.json`.

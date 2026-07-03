@@ -8,7 +8,7 @@
 
 ## What these are
 
-`opencode-model-router` ships with enforcement **OFF by default** — with no
+`opencode-agent-router` ships with enforcement **OFF by default** — with no
 `enforcement` key in `tiers.json`, the plugin behaves exactly as it did before the
 enforcement work (byte-for-byte identical routing; see GA-1). The blocks below are
 **opt-in, copy-paste examples** you can add under the root of your `tiers.json` to
@@ -183,7 +183,7 @@ tune for real:
    blocking) and run a representative workload (aim for N ≥ 20 delegations per
    tier/task-type).
 2. Read the per-delegation **scorecards** and **trajectory** records the plugin
-   writes under the OS temp dir (`…/opencode-model-router-trajectory/*.scorecard.log`
+   writes under the OS temp dir (`…/opencode-agent-router-trajectory/*.scorecard.log`
    and `*.delegate.log`), plus the trajectory metrics (`ttfa`, `read_exec_ratio`,
    `self_script_count`, `attempts`, `escalations`, `final_tier`, `cost_units`,
    `verdict`, `verify_method`, `grader_tier`).

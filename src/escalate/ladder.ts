@@ -196,7 +196,7 @@ export const formatLadderScorecard = (
 };
 
 /** Append-only temp-file dump for a finished delegation. Writes under
- *  `<tmpdir>/opencode-model-router-trajectory/<sid>.delegate.log` (same dir
+ *  `<tmpdir>/opencode-agent-router-trajectory/<sid>.delegate.log` (same dir
  *  the event-hook scorecard uses) and never throws — a logging failure must
  *  never crash a real session. */
 export const dumpDelegateScorecard = (

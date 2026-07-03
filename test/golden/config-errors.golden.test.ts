@@ -53,7 +53,7 @@ describe("golden — operator-facing error messages", () => {
   });
 
   it("global layer malformed JSON", async () => {
-    const dir = join(tmpHome, ".config", "opencode-model-router");
+    const dir = join(tmpHome, ".config", "opencode-agent-router");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "tiers.json"), "{not json", "utf-8");
     await expect(readMergedConfig({ cwd: tmpHome })).rejects.toMatchObject({
@@ -83,21 +83,21 @@ describe("golden — operator-facing error messages", () => {
   it("state file present but malformed throws RouterStateError", async () => {
     const dir = join(tmpHome, ".config", "opencode");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "opencode-model-router.state.json"), "{not json", "utf-8");
+    writeFileSync(join(dir, "opencode-agent-router.state.json"), "{not json", "utf-8");
     await expect(readState()).rejects.toBeInstanceOf(RouterStateError);
   });
 
   it("state file present with non-object root throws RouterStateError", async () => {
     const dir = join(tmpHome, ".config", "opencode");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "opencode-model-router.state.json"), "[]", "utf-8");
+    writeFileSync(join(dir, "opencode-agent-router.state.json"), "[]", "utf-8");
     await expect(readState()).rejects.toBeInstanceOf(RouterStateError);
   });
 
   it("writeState on a fresh HOME succeeds and the file is valid JSON ending in newline", async () => {
     await writeState({ activePreset: "openai", enforcementMode: "enforced" });
     const stateDir = join(tmpHome, ".config", "opencode");
-    const file = join(stateDir, "opencode-model-router.state.json");
+    const file = join(stateDir, "opencode-agent-router.state.json");
     expect(readFileSync(file, "utf-8").endsWith("\n")).toBe(true);
     const parsed = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
     expect(parsed).toEqual({ activePreset: "openai", enforcementMode: "enforced" });

@@ -2,7 +2,7 @@
 // src/cli/install.ts — `omr install` command.
 //
 // Edits the global OpenCode config so `plugin` contains exactly one
-// `opencode-model-router[@version]` entry. The flow is idempotent:
+// `opencode-agent-router[@version]` entry. The flow is idempotent:
 // existing omr entries are filtered out before the new one is appended,
 // and re-running with the same version is a no-op. With `--dry-run` the
 // pipeline runs end-to-end but no bytes hit disk.

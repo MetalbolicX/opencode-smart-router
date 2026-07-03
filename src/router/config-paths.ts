@@ -117,9 +117,9 @@ export const resolveConfigPaths = (env: NodeJS.ProcessEnv = process.env): Resolv
   const legacyRoot = resolveLegacyConfigRoot(env);
 
   const paths: ResolvedConfigPaths = {
-    globalConfig: join(root, "opencode-model-router", "tiers.json"),
-    statePreferred: join(root, "opencode", "opencode-model-router.state.json"),
-    stateLegacy: join(legacyRoot, "opencode", "opencode-model-router.state.json"),
+    globalConfig: join(root, "opencode-agent-router", "tiers.json"),
+    statePreferred: join(root, "opencode", "opencode-agent-router.state.json"),
+    stateLegacy: join(legacyRoot, "opencode", "opencode-agent-router.state.json"),
   };
 
   cached = { env: { ...env }, paths };

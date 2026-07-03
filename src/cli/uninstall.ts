@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
 // src/cli/uninstall.ts — `omr uninstall` command.
 //
-// Removes every `opencode-model-router` entry from the global OpenCode
+// Removes every `opencode-agent-router` entry from the global OpenCode
 // config's `plugin` list. With `--purge`, also deletes the runtime cache
-// directory (`~/.cache/opencode/node_modules/opencode-model-router`) and
-// the plugin's own config dir (`~/.config/opencode-model-router/`).
+// directory (`~/.cache/opencode/node_modules/opencode-agent-router`) and
+// the plugin's own config dir (`~/.config/opencode-agent-router/`).
 //
 // Like `install`, the function is side-effect-free beyond prints and disk
 // writes through `fs`. Tests inject an in-memory `CliFs` to exercise the

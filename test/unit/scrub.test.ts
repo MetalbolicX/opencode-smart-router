@@ -93,7 +93,7 @@ describe("scrubText", () => {
   });
 
   it("does not alter Windows file path with tiers.json", () => {
-    const s = "D:\\git\\opencode-model-router\\tiers.json";
+    const s = "D:\\git\\opencode-agent-router\\tiers.json";
     expect(scrubText(s)).toBe(s);
   });
 
