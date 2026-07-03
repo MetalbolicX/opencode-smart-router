@@ -90,16 +90,35 @@ export interface EnforcementConfig {
 /**
  * Single keyword rule inside `AdaptivePolicyConfig.keywordRules`.
  *
- * `keywords` are matched case-insensitively as substrings against either the
- * task prompt or the task description. Order in the parent array is the
- * priority order — first match wins, so high-precision rules MUST come
- * before catch-alls.
+ * `keywords` are matched against either the task prompt or the task
+ * description under the rule's `match` mode (default `"stem"`: word-boundary
+ * start with suffix inflections allowed on the LAST token only — so
+ * `debug` still matches `debugging` but `latest` no longer matches `test`).
+ * Order in the parent array is the priority order — first match wins, so
+ * high-precision rules MUST come before catch-alls.
+ *
+ * See `src/reasoning/match.ts` for the full mode semantics and the
+ * memoized compiler used at runtime.
  */
 export interface AdaptiveKeywordRule {
-  /** Case-insensitive substrings; a match in prompt OR description wins. */
+  /** Case-insensitive terms; a match in prompt OR description wins. */
   keywords: string[];
   /** Level applied when any keyword matches. */
   level: import("../reasoning/capability.js").ReasoningLevel;
+  /**
+   * Match strategy for this rule's `keywords` AND `excludeKeywords`. Defaults
+   * to `"stem"` (word-boundary start; suffix inflections allowed on the LAST
+   * token only). Other options: `"word"` (strict), `"substring"` (legacy
+   * cross-word `includes` behavior — opt-in escape hatch), `"regex"` (user
+   * pattern; compile-checked at config load).
+   */
+  match?: import("../reasoning/match.js").MatchMode;
+  /**
+   * Optional disqualifiers: if any entry matches (under the rule's `match`
+   * mode), the whole rule is skipped — even if a `keywords` entry would
+   * otherwise hit. Useful for carving out exceptions to a catch-all.
+   */
+  excludeKeywords?: string[];
 }
 
 /**
@@ -130,8 +149,13 @@ export interface AdaptivePolicyConfig {
   trivialLevel?: import("../reasoning/capability.js").ReasoningLevel | null;
   /** Level for non-trivial tasks that match no keyword rule. `null`/absent → no patch. */
   defaultLevel?: import("../reasoning/capability.js").ReasoningLevel | null;
-  /** Keyword rules: case-insensitive substring match in prompt OR description.
-   *  First match wins (array order = priority). */
+  /**
+   * Keyword rules: each rule's `keywords` are matched in prompt OR
+   * description under the rule's `match` mode (default `"stem"` —
+   * word-boundary start with suffix inflections on the LAST token).
+   * `excludeKeywords` (optional) are checked first under the same mode and
+   * skip the rule on hit. First match wins (array order = priority).
+   */
   keywordRules?: AdaptiveKeywordRule[];
   /** Per-tier default override. Keyed by tier name. Wins over `keywordRules`
    *  and `defaultLevel`, loses only to `trivialLevel`. */
