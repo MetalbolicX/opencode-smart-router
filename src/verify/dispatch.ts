@@ -333,26 +333,33 @@ export const verifyTaskAfterHook = async (
   const inputRec = (input ?? {}) as Record<string, unknown>;
   const toolName = inputRec["tool"];
   if (typeof toolName !== "string") return;
-  const taskArgs = asTaskToolArgs(inputRec["args"]);
-  const activeCfg = await ctx.getConfig();
-  let mode = "off";
+  // Parse the childSessionID UNCONDITIONALLY so the cleanup `finally` can
+  // always reach it, even when verification is disabled (mode === "off") or
+  // require === "never". SDD: plan 017 — the previous early-return at
+  // `shouldVerifyTask` bypassed the entire try/finally, leaving Task child
+  // sessions as orphans in the TUI. `parseTaskResult` is a pure parser (reads
+  // from `output.metadata`, returns nulls when absent) — safe to call before
+  // the gate.
+  const parsedEarly = parseTaskResult(output);
+  let childSessionID: string | null = parsedEarly.childSessionID;
   try {
-    mode = resolveEnforcementMode({ config: activeCfg, env: process.env }).mode;
-  } catch {
-    // fall through with mode "off"
-  }
-  const requireMode = activeCfg.enforcement?.verify?.require;
-  if (!shouldVerifyTask(toolName, mode, requireMode)) return;
-  // Hoist the parsed childSessionID OUTSIDE the verification try block so the
-  // cleanup `finally` can always reach it. Without this, an uncaught throw
-  // inside `accept()` (or earlier) would skip the cleanup tail entirely and
-  // leak the Task child session across stores forever. Mirrors the
-  // `src/plugin/delegate.ts` per-attempt cleanup discipline (SDD change:
-  // fix-orphan-subagent-sessions).
-  let childSessionID: string | null = null;
-  try {
-    const parsed = parseTaskResult(output);
-    childSessionID = parsed.childSessionID;
+    const taskArgs = asTaskToolArgs(inputRec["args"]);
+    const activeCfg = await ctx.getConfig();
+    let mode = "off";
+    try {
+      mode = resolveEnforcementMode({ config: activeCfg, env: process.env }).mode;
+    } catch {
+      // fall through with mode "off"
+    }
+    const requireMode = activeCfg.enforcement?.verify?.require;
+    if (!shouldVerifyTask(toolName, mode, requireMode)) return;
+    // Hoist the parsed childSessionID OUTSIDE the verification try block so the
+    // cleanup `finally` can always reach it. Without this, an uncaught throw
+    // inside `accept()` (or earlier) would skip the cleanup tail entirely and
+    // leak the Task child session across stores forever. Mirrors the
+    // `src/plugin/delegate.ts` per-attempt cleanup discipline (SDD change:
+    // fix-orphan-subagent-sessions).
+    const parsed = parsedEarly;
     const { finalReturnText, parentSessionID } = parsed;
     const producerTier = taskArgs?.subagent_type ?? "";
     const dod = buildDelegationDoD({

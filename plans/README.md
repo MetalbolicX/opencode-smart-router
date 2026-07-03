@@ -27,6 +27,8 @@ and update your row when done.
 | 013  | Add an automated CI gate for typecheck, lint, tests, and build | P1 | S | LOW | 011 | DONE |
 | 014  | Make reasoning control production-ready with runtime mode switching | P1 | M | MED | — | DONE (PR 1 + PR 2 + PR 3 + PR 4 on stacked branch `feature/reasoning-mode-switch`) |
 | 015  | Ship an adaptive reasoning engine as a deterministic, config-driven selector | P1 | L | MED | 010, 014 | DONE (PR 1 + PR 2 + PR 3 + PR 4 on stacked branch `feature/adaptive-reasoning-engine`) |
+| 016  | Harden the adaptive reasoning engine against runtime config errors | P2 | S | LOW | — | DONE (single commit `576c577` on master) |
+| 017  | Fix Task child session cleanup bypassing when verification is off | P1 | S | LOW | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
@@ -42,6 +44,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **012 should land before any further adaptive-reasoning work.** The manual runtime override path (`mode: "manual"`) is currently inert because the before-hook patch block is unreachable dead code. Building more reasoning behavior on top of a broken dispatch path is wasted effort.
 - **012 edits `src/plugin/hooks.ts`** — the single hottest file in the repo (10+ commits touch it). Land it on its own branch; do not combine with other `hooks.ts` changes.
 - **013 is intentionally minimal.** It automates the current repo contract (`typecheck` → `lint` → `build` → `test`) and does not add smoke, release, or coverage-upload jobs. Those are separate concerns for future plans.
+- **016 is fully independent** — pure hardening of `src/reasoning/adaptive.ts` + `src/reasoning/policy.ts`. No overlap with any other plan's files.
+- **017 is fully independent** — edits only `src/verify/dispatch.ts` and `test/unit/verify-dispatch.test.ts`. It fixes a structural flaw in `verifyTaskAfterHook` that Plan 007 did not catch: the early return at `shouldVerifyTask` bypasses the `try/finally` cleanup block, leaving Task child sessions as orphans in the TUI when verification is off. The fix moves `parseTaskResult` + cleanup above the gate.
 
 ## Verification commands (apply to every plan)
 

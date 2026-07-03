@@ -876,6 +876,128 @@ describe("verifyTaskAfterHook", () => {
     expect(deleteCalls).toEqual(["child-fail"]);
   });
 
+  // -------------------------------------------------------------------------
+  // SDD: plan 017 — fix Task child session cleanup bypassing when verification
+  // is off. The `shouldVerifyTask` gate early-returned BEFORE the cleanup
+  // `finally` block, so Task child sessions leaked as TUI orphans whenever
+  // `mode === "off"` (the default). These three tests pin the contract:
+  // cleanup MUST run on every gate-skipping path.
+  // -------------------------------------------------------------------------
+
+  it("still aborts and deletes the Task child session when enforcement mode is OFF", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "0";
+
+    const abortCalls: string[] = [];
+    const deleteCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "Do some work.",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE: work done.\n</task_result>",
+      metadata: { sessionId: "child-mode-off" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    // Verification is OFF so output is not modified — but cleanup MUST still run.
+    expect(abortCalls).toEqual(["child-mode-off"]);
+    expect(deleteCalls).toEqual(["child-mode-off"]);
+  });
+
+  it("still aborts and deletes the Task child session when verify.require is 'never'", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+
+    const abortCalls: string[] = [];
+    const deleteCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: {
+        enforcement: {
+          verify: { require: "never" },
+        } as any,
+      },
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "fast",
+        prompt: "Do some work.",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.\n</task_result>",
+      metadata: { sessionId: "child-req-never" },
+    };
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    expect(abortCalls).toEqual(["child-req-never"]);
+    expect(deleteCalls).toEqual(["child-req-never"]);
+  });
+
+  it("does not crash when enforcement is OFF and output has no sessionId", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "0";
+
+    const abortCalls: string[] = [];
+    const deleteCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: { subagent_type: "fast", prompt: "Do some work." },
+    };
+    const output = {
+      output: "<task_result>\nDONE.\n</task_result>",
+      // No metadata.sessionId — childSessionID will be null
+    };
+
+    // Must not throw — null childSessionID means no cleanup needed.
+    await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
+    expect(abortCalls).toEqual([]);
+    expect(deleteCalls).toEqual([]);
+  });
+
   it("clears all three stores once even when verification rejects", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     // Missing file -> deterministic fail -> forcing note appended.
