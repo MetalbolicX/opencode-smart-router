@@ -479,29 +479,48 @@
       "keywordRules": [
         {
           "keywords": [
-            "refactor",
-            "architecture",
-            "security",
-            "migration"
+            "format",
+            "lint",
+            "rename",
+            "sort import",
+            "bump version",
+            "typo"
           ],
-          "level": "elevated"
+          "level": "minimal",
+          "excludeKeywords": [
+            "refactor",
+            "architect",
+            "redesign"
+          ]
         },
         {
           "keywords": [
+            "root cause",
+            "rca",
+            "security audit",
+            "architecture redesign",
+            "architect",
+            "data migration"
+          ],
+          "level": "max"
+        },
+        {
+          "keywords": [
+            "refactor",
+            "security",
             "debug",
             "diagnose",
             "investigate",
-            "root cause"
+            "performance",
+            "profiling",
+            "concurrency",
+            "race condition",
+            "optimize",
+            "optimization",
+            "memory leak",
+            "bottleneck"
           ],
           "level": "elevated"
-        },
-        {
-          "keywords": [
-            "test",
-            "fix",
-            "patch"
-          ],
-          "level": "normal"
         }
       ],
       "surfaceDecision": false
