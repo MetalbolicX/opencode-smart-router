@@ -15,6 +15,7 @@
 // During dev, `pnpm tsx src/cli/main.ts ...` works the same way.
 // ---------------------------------------------------------------------------
 
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { runInstall } from "./install";
@@ -186,13 +187,26 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
  * cli.mjs`), `false` when it was imported from a test harness. We avoid
  * `import.meta.main` because the package floor is Node 20 and that field
  * only landed in Node 22.
+ *
+ * Symlink-aware: when the script is invoked through a symlink (e.g. the
+ * pnpm global store, where `node_modules/<pkg>` is a symlink into a
+ * content-addressable store), `process.argv[1]` carries the symlink path
+ * while `import.meta.url` carries the real path after symlink resolution.
+ * Comparing the two verbatim would always be `false` under pnpm, causing
+ * the CLI to silently exit. We resolve both sides through `realpathSync`
+ * before comparing.
  */
 const invokedAsMain = ((): boolean => {
   if (!process.argv[1]) return false;
   try {
-    return import.meta.url === pathToFileURL(process.argv[1]).href;
+    const realArgv = pathToFileURL(realpathSync(process.argv[1])).href;
+    return import.meta.url === realArgv;
   } catch {
-    return false;
+    try {
+      return import.meta.url === pathToFileURL(process.argv[1]).href;
+    } catch {
+      return false;
+    }
   }
 })();
 
