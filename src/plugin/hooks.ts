@@ -19,6 +19,7 @@ import {
 } from "../guard/enforce";
 import { detectNarration } from "../guard/narration";
 import { type AdaptiveSignals, selectAdaptiveLevel } from "../reasoning/adaptive.js";
+import { normalizeSignalText } from "../reasoning/match.js";
 import { resolveReasoningOverride } from "../reasoning/policy.js";
 import { applyReasoningPatch, registerTierAgents, restoreAgentBaseline } from "../router/agents";
 import { registerRouterCommands } from "../router/commands";
@@ -152,12 +153,15 @@ export const handleToolExecuteBefore = async (
             }
             const override = ctx.reasoningStore.getOverride(sid);
             // PR 3 of adaptive-reasoning: thread the real Task-tool prompt +
-            // description into the selector. Both are lowercased here so the
-            // selector's keyword step is a cheap case-insensitive substring
-            // match against already-normalised text.
+            // description into the selector. Both are routed through
+            // `normalizeSignalText` (lowercase + whitespace collapse + trim)
+            // so phrase keywords like `root cause` match across any
+            // whitespace input and the selector's word/stem regex shapes see
+            // a single canonical form. The selector assumes caller-side
+            // normalisation — see `AdaptiveSignals` JSDoc.
             const signals: AdaptiveSignals = {
-              prompt: prompt.toLowerCase(),
-              description: description.toLowerCase(),
+              prompt: normalizeSignalText(prompt),
+              description: normalizeSignalText(description),
               tierName: subagentType,
               isTrivial: ctx.sessionStore.isTrivial(sid),
             };
