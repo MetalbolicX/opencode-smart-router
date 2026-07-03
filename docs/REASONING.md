@@ -149,8 +149,8 @@ The runtime extracts these from the Task-tool args at `tool.execute.before` (see
 
 | Signal | Source | Note |
 |---|---|---|
-| `prompt` | `args.prompt` from the built-in `task` tool | Lowercased by the caller. Keyword matching is case-insensitive substring on already-normalised text. May be empty. |
-| `description` | `args.description` from the built-in `task` tool | Lowercased by the caller. May be empty. |
+| `prompt` | `args.prompt` from the built-in `task` tool | Normalised by the caller via `normalizeSignalText` (lowercase + collapse whitespace runs + trim). Keyword matching respects each rule's `match` mode (default `stem`); see [Keyword match modes](#keyword-match-modes). May be empty. |
+| `description` | `args.description` from the built-in `task` tool | Same normalisation as `prompt`. May be empty. |
 | `tierName` | `args.subagent_type` (e.g. `"medium"`, `"heavy"`) | Looked up against `reasoningPolicy.adaptive.tierDefaults`. |
 | `isTrivial` | `ctx.sessionStore.isTrivial(sessionID)` | The dispatch-time trivial classification result. |
 
@@ -161,7 +161,7 @@ The selector runs the steps below in order and stops at the first match. `null` 
 1. `reasoningPolicy.adaptive` is absent → `null` (no adaptive config). This is the same effective behaviour as `static` mode for an unprepared config.
 2. `signals.isTrivial === true` → `adaptive.trivialLevel` (or `null` if unset → no patch for trivial sessions).
 3. `adaptive.tierDefaults[signals.tierName]` is set → that level.
-4. `adaptive.keywordRules` scanned in array order — first rule whose keywords (case-insensitive substring) match in `prompt` OR `description` wins.
+4. `adaptive.keywordRules` scanned in array order — first rule whose `excludeKeywords` do NOT match AND whose `keywords` match in `prompt` OR `description` wins. Matching respects the rule's `match` mode (default `"stem"`); see [Keyword match modes](#keyword-match-modes).
 5. `adaptive.defaultLevel` (or `null` if unset → no patch).
 6. Fall-through to `null` (no patch).
 
@@ -199,6 +199,56 @@ This precedence is mirrored in the file header of `src/reasoning/policy.ts` and 
 ```
 
 All fields are optional — a partial block is a valid config. `null` on `trivialLevel` / `defaultLevel` is a valid value (means "no patch"). Order matters in `keywordRules`: the **first** rule whose keywords match wins, so high-precision rules MUST come before catch-alls. The shipped `config/tiers/base.json` carries the conservative defaults above with `mode: "manual"` so existing installs behave unchanged until operators opt in.
+
+#### Keyword match modes
+
+Each rule can declare a `match` strategy and a list of `excludeKeywords`. Both fields are optional; when omitted, `match` defaults to `"stem"` and `excludeKeywords` to `[]`.
+
+```ts
+type MatchMode = "word" | "stem" | "substring" | "regex";
+
+interface AdaptiveKeywordRule {
+  keywords: string[];
+  level: ReasoningLevel;
+  match?: MatchMode;          // default: "stem"
+  excludeKeywords?: string[]; // same mode as `match`
+}
+```
+
+| Mode | Behaviour | Example |
+|---|---|---|
+| `word` | Strict `\b<phrase>\b`. `debug` ≠ `debugging`. Use when you want to forbid inflections. | `match: "word"`, `keywords: ["debug"]` → matches `"debug the test"`, not `"debugging the test"`. |
+| `stem` _(default)_ | Word-boundary at the start; suffix inflections allowed on the LAST token only. `debug` → `debugging`; `refactor` → `refactoring`. `latest` → ✗`test`; `prefix` → ✗`fix`. This is the only default that keeps inflections AND rejects cross-word false positives. | `keywords: ["debug"]` → matches both `"debug"` and `"debugging"`. |
+| `substring` | Legacy `String.includes` behavior. Opt-in escape hatch for operators that explicitly want cross-word matches. | `match: "substring"`, `keywords: ["test"]` → matches `latest`, `contest`, etc. |
+| `regex` | User-supplied pattern, compiled as-is. Power-user escape hatch. Fail-soft at runtime (selector returns `false` for invalid patterns); fail-fast at config load (`validateReasoningPolicy` rejects invalid `regex` rules before they ever reach dispatch). | `match: "regex"`, `keywords: ["^perf"]` → matches `"performance regression"`. |
+
+`excludeKeywords` runs the same `match` mode as the rule's `keywords`. If any exclusion matches in `prompt` or `description`, the whole rule is skipped and the selector continues to the next rule. Use exclusions to disambiguate: a `format` rule can exclude on `refactor` so it does not fire for `format and refactor the module`.
+
+The shipped `config/tiers/base.json` (as of Plan 018) demonstrates both new fields:
+
+```jsonc
+"keywordRules": [
+  {
+    "keywords": ["format", "lint", "rename", "sort import", "bump version", "typo"],
+    "level": "minimal",
+    "excludeKeywords": ["refactor", "architect", "redesign"]
+  },
+  {
+    "keywords": ["root cause", "rca", "security audit", "architecture redesign", "architect", "data migration"],
+    "level": "max"
+  },
+  {
+    "keywords": ["refactor", "security", "debug", "diagnose", "investigate", "performance", "profiling", "concurrency", "race condition", "optimize", "optimization", "memory leak", "bottleneck"],
+    "level": "elevated"
+  }
+]
+```
+
+The first rule is a precision rule: it picks `minimal` for cosmetic tasks (format, lint, rename, sort import, bump version, typo) but explicitly opts out when the same prompt also mentions `refactor`, `architect`, or `redesign` — those escalate through the elevated or max rules instead. `mode: "manual"` and `defaultLevel: "normal"` are unchanged, so existing installs continue to behave the same until operators opt in with `/model-router-reasoning mode adaptive`.
+
+> **Stem mode is prefix-based, not linguistic stemming.** It covers suffix inflections of the *exact base* (`debug` → `debugging`, `refactor` → `refactoring`). Words with divergent bases (`optimize` vs `optimization`) must each be listed in the rule's `keywords`. Plan 018 ships both forms explicitly in the elevated rule above.
+
+> **Known residual.** `word` and `stem` still match identifiers like `test_fixture` and `prefix_setup` because `_` is a `\w` character and `\b` is ASCII-only. Stripping code-fences before matching is a deeper change deferred to a future plan. The current shipped vocabulary does not include `test`, `fix`, or `patch` as standalone keywords (they are handled by `defaultLevel: "normal"`), so the residual is unlikely to surface in practice — but operators adding custom rules with those bare keywords should be aware.
 
 #### What adaptive does NOT consider (yet)
 
@@ -381,7 +431,9 @@ Per [plans/010-adaptive-reasoning.md](../../plans/010-adaptive-reasoning.md) (in
 |---|---|
 | Unit — inference | `test/unit/reasoning-capability.test.ts` — all 4 shapes incl. positional-vs-named variant split. |
 | Unit — translation | `test/unit/reasoning-translate.test.ts` — every capability × level; `none` always `null`; 2-level discrete clamping; field routing. |
-| Unit — adaptive selector | `test/unit/adaptive-selector.test.ts` — every `selectAdaptiveLevel` branch: no-config → `null`; trivial; tierDefaults; keyword priority (first match wins); case-insensitivity; description-only match; default fallback; empty inputs; deterministic. |
+| Unit — adaptive matcher | `test/unit/adaptive-match.test.ts` — `normalizeSignalText`; the four `match` modes (`word` / `stem` / `substring` / `regex`); stem cross-word rejection (`latest`✗`test`, `prefix`✗`fix`); inflection (`debug`→`debugging`); invalid regex fail-soft; memoization smoke. |
+| Unit — adaptive selector | `test/unit/adaptive-selector.test.ts` — every `selectAdaptiveLevel` branch: no-config → `null`; trivial; tierDefaults; keyword priority (first match wins); case-insensitivity; description-only match; default fallback; empty inputs; deterministic. As of Plan 018: cross-word regression (`test`✗`latest`, `fix`✗`prefix`); inflection via `stem` (`debug`→`debugging`); strict `word` mode rejecting inflections; `excludeKeywords` skip; phrase whitespace; richer reason (`rule[i] "<kw>" (<mode>) in <source>`); backward-compat for match-less rules. |
+| Unit — adaptive policy validation | `test/unit/config-validate-sections.test.ts` — `validateReasoningPolicy` happy/error paths; rejects empty `keywords`, bad `level`, bad `match` mode, invalid regex; accepts `null` levels. |
 | Unit — policy | `test/unit/reasoning-policy.test.ts` — `static` ALWAYS null; `manual`+override applies; `adaptive` precedence (session override wins → selector → `defaultLevel` → null); `surfaceLimits` does NOT alter resolved patch. |
 | Unit — agent wiring | `test/unit/router-agents.test.ts` — `applyReasoningPatch` + `restoreAgentBaseline` round-trip; `none`-capability NEVER mutated; `resolveReasoningOverride` accepts the new 4-param `signals` argument. |
 | Unit — command | `test/unit/router-commands.test.ts` — `/model-router-reasoning` validates level, persists `mode static|manual|adaptive`, sets/clears store, names capability. |
@@ -390,5 +442,5 @@ Per [plans/010-adaptive-reasoning.md](../../plans/010-adaptive-reasoning.md) (in
 Run:
 
 ```bash
-pnpm test -- adaptive-selector reasoning router-agents router-commands plugin-hooks
+pnpm test -- adaptive-match adaptive-selector config-validate-sections reasoning router-agents router-commands plugin-hooks
 ```

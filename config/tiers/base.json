@@ -14,9 +14,19 @@
       "trivialLevel": null,
       "defaultLevel": "normal",
       "keywordRules": [
-        { "keywords": ["refactor", "architecture", "security", "migration"], "level": "elevated" },
-        { "keywords": ["debug", "diagnose", "investigate", "root cause"], "level": "elevated" },
-        { "keywords": ["test", "fix", "patch"], "level": "normal" }
+        {
+          "keywords": ["format", "lint", "rename", "sort import", "bump version", "typo"],
+          "level": "minimal",
+          "excludeKeywords": ["refactor", "architect", "redesign"]
+        },
+        {
+          "keywords": ["root cause", "rca", "security audit", "architecture redesign", "architect", "data migration"],
+          "level": "max"
+        },
+        {
+          "keywords": ["refactor", "security", "debug", "diagnose", "investigate", "performance", "profiling", "concurrency", "race condition", "optimize", "optimization", "memory leak", "bottleneck"],
+          "level": "elevated"
+        }
       ],
       "surfaceDecision": false
     }
