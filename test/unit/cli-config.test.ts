@@ -10,7 +10,7 @@
 //   - Temp HOME dirs are created with `tmpdir()` + random suffix and
 //     cleaned up in `afterEach`.
 //
-// These tests cover PR 1 of the omr-cli change: config helpers + unit
+// These tests cover PR 1 of the osr-cli change: config helpers + unit
 // tests. PR 2 will add the install/uninstall/status command flow which
 // reuses the same `CliFs` shape under integration-level tests.
 // ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ import {
   type CliFs,
   dedupePlugins,
   loadGlobalConfig,
-  matchesOmr,
+  matchesOsr,
   normalizePlugin,
   PLUGIN_NAME,
   parseJsonc,
@@ -255,38 +255,38 @@ describe("parseJsonc", () => {
 });
 
 // ---------------------------------------------------------------------------
-// matchesOmr
+// matchesOsr
 // ---------------------------------------------------------------------------
 
-describe("matchesOmr", () => {
+describe("matchesOsr", () => {
   it("matches the bare plugin name", () => {
-    expect(matchesOmr(PLUGIN_NAME)).toBe(true);
+    expect(matchesOsr(PLUGIN_NAME)).toBe(true);
   });
 
   it("matches version-pinned variants", () => {
-    expect(matchesOmr(`${PLUGIN_NAME}@1.0.0`)).toBe(true);
-    expect(matchesOmr(`${PLUGIN_NAME}@latest`)).toBe(true);
-    expect(matchesOmr(`${PLUGIN_NAME}@1.2.3-beta.1`)).toBe(true);
+    expect(matchesOsr(`${PLUGIN_NAME}@1.0.0`)).toBe(true);
+    expect(matchesOsr(`${PLUGIN_NAME}@latest`)).toBe(true);
+    expect(matchesOsr(`${PLUGIN_NAME}@1.2.3-beta.1`)).toBe(true);
   });
 
   it("does not match unrelated plugins", () => {
-    expect(matchesOmr("some-other-plugin")).toBe(false);
-    expect(matchesOmr("some-other-plugin@1.0.0")).toBe(false);
+    expect(matchesOsr("some-other-plugin")).toBe(false);
+    expect(matchesOsr("some-other-plugin@1.0.0")).toBe(false);
   });
 
   it("does not match scoped packages", () => {
-    expect(matchesOmr(`@scope/${PLUGIN_NAME}`)).toBe(false);
+    expect(matchesOsr(`@scope/${PLUGIN_NAME}`)).toBe(false);
   });
 
   it("does not match non-strings", () => {
-    expect(matchesOmr(undefined)).toBe(false);
-    expect(matchesOmr(null)).toBe(false);
-    expect(matchesOmr({ name: PLUGIN_NAME })).toBe(false);
-    expect(matchesOmr(42)).toBe(false);
+    expect(matchesOsr(undefined)).toBe(false);
+    expect(matchesOsr(null)).toBe(false);
+    expect(matchesOsr({ name: PLUGIN_NAME })).toBe(false);
+    expect(matchesOsr(42)).toBe(false);
   });
 
   it("does not match empty string", () => {
-    expect(matchesOmr("")).toBe(false);
+    expect(matchesOsr("")).toBe(false);
   });
 });
 
@@ -347,13 +347,13 @@ describe("dedupePlugins", () => {
     expect(dedupePlugins(["foo", "foo@2.0.0"])).toEqual(["foo@2.0.0"]);
   });
 
-  it("removes every opencode-agent-router variant, leaving nothing OMR behind", () => {
+  it("removes every opencode-smart-router variant, leaving nothing OSR behind", () => {
     expect(
       dedupePlugins([`${PLUGIN_NAME}`, `${PLUGIN_NAME}@1.0.0`, `${PLUGIN_NAME}@2.0.0-beta`]),
     ).toEqual([]);
   });
 
-  it("removes OMR entries while preserving unrelated ones, with last-wins per base", () => {
+  it("removes OSR entries while preserving unrelated ones, with last-wins per base", () => {
     const input = [
       `${PLUGIN_NAME}@1.0.0`,
       "alpha",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ---------------------------------------------------------------------------
-// src/cli/main.ts — `omr` CLI entry point.
+// src/cli/main.ts — `osr` CLI entry point.
 //
 // Parses argv with `node:util.parseArgs` and dispatches to install,
 // uninstall, status, or doctor. Exit codes follow the standard CLI
@@ -11,7 +11,7 @@
 //   2 — invalid usage (unknown command, missing required arg, etc.)
 //
 // When the file is built (rolldown, PR 3), the shebang stays in place via
-// the banner plugin so `dist/cli.mjs` is directly executable as `omr`.
+// the banner plugin so `dist/cli.mjs` is directly executable as `osr`.
 // During dev, `pnpm tsx src/cli/main.ts ...` works the same way.
 // ---------------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ import { runInstall } from "./install";
 import { runDoctor, runStatus } from "./status";
 import { runUninstall } from "./uninstall";
 
-const USAGE = `Usage: omr <command> [options]
+const USAGE = `Usage: osr <command> [options]
 
 Commands:
   install     Register the plugin in the global OpenCode config
@@ -36,7 +36,7 @@ Options (install):
       --yes          Skip confirmation prompts (reserved)
 
 Options (uninstall):
-      --purge        Also remove cache + ~/.config/opencode-agent-router/
+      --purge        Also remove cache + ~/.config/opencode-smart-router/
       --dry-run      Print the planned change without writing
       --yes          Skip confirmation prompts (reserved)
 
@@ -117,7 +117,7 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
   try {
     parsed = parseCliArgs(args);
   } catch (err) {
-    console.error(`omr: ${(err as Error).message}`);
+    console.error(`osr: ${(err as Error).message}`);
     setExit(2);
     return { command: null, exitCode: 2 };
   }
@@ -130,7 +130,7 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
   const command = parsed.positionals[0];
 
   if (!command) {
-    console.error("omr: missing command. Run `omr --help` for usage.");
+    console.error("osr: missing command. Run `osr --help` for usage.");
     setExit(2);
     return { command: null, exitCode: 2 };
   }
@@ -170,12 +170,12 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
         return { command, exitCode: result.ok ? 0 : 1 };
       }
       default:
-        console.error(`omr: unknown command '${command}'. Run \`omr --help\` for usage.`);
+        console.error(`osr: unknown command '${command}'. Run \`osr --help\` for usage.`);
         setExit(2);
         return { command, exitCode: 2 };
     }
   } catch (err) {
-    console.error(`omr: ${(err as Error).message}`);
+    console.error(`osr: ${(err as Error).message}`);
     setExit(1);
     return { command, exitCode: 1 };
   }

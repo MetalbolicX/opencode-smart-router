@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { tool } from "@opencode-ai/plugin";
 
-const LOG_DIR = "D:\\git\\opencode-agent-router\\tmp\\probe";
+const LOG_DIR = "D:\\git\\opencode-smart-router\\tmp\\probe";
 const LOG_FILE = path.join(LOG_DIR, "probe-events.log");
 
 function appendLog(obj) {

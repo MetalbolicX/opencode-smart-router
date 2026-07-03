@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
-// src/cli/install.ts — `omr install` command.
+// src/cli/install.ts — `osr install` command.
 //
 // Edits the global OpenCode config so `plugin` contains exactly one
-// `opencode-agent-router[@version]` entry. The flow is idempotent:
-// existing omr entries are filtered out before the new one is appended,
+// `opencode-smart-router[@version]` entry. The flow is idempotent:
+// existing osr entries are filtered out before the new one is appended,
 // and re-running with the same version is a no-op. With `--dry-run` the
 // pipeline runs end-to-end but no bytes hit disk.
 //
@@ -18,7 +18,7 @@ import {
   type CliFs,
   dedupePlugins,
   loadGlobalConfig,
-  matchesOmr,
+  matchesOsr,
   normalizePlugin,
   writeAtomically,
 } from "./config";
@@ -47,9 +47,9 @@ export interface InstallResult {
 const JSON_INDENT = 2;
 
 /**
- * Run `omr install` against the global OpenCode config.
+ * Run `osr install` against the global OpenCode config.
  *
- * Steps: load → normalize → dedupe (drops existing omr) → append new
+ * Steps: load → normalize → dedupe (drops existing osr) → append new
  * specifier → backup → atomic write. The backup is a timestamped sibling
  * of the config file; rotation to `BACKUP_LIMIT` is handled inside
  * `backupIfWritable`.
@@ -73,12 +73,12 @@ export const runInstall = (
   const config: Record<string, unknown> = { ...loaded.config };
   const existing = normalizePlugin(config.plugin);
 
-  // Compute the post-install plugin list: keep non-omr entries in their
+  // Compute the post-install plugin list: keep non-osr entries in their
   // original order and append the requested specifier at the end. Comparing
   // against `existing` is the canonical no-op check — if the post-install
   // state equals what we already have, no write is needed.
-  const nonOmr = existing.filter((entry) => !matchesOmr(entry));
-  const finalPlugins = [...nonOmr, specifier];
+  const nonOsr = existing.filter((entry) => !matchesOsr(entry));
+  const finalPlugins = [...nonOsr, specifier];
   const isNoop = !opts.dryRun && JSON.stringify(finalPlugins) === JSON.stringify(existing);
 
   if (isNoop) {
@@ -88,11 +88,11 @@ export const runInstall = (
 
   config.plugin = finalPlugins;
 
-  // Dedupe non-omr entries by base name (keeps last occurrence) so a
+  // Dedupe non-osr entries by base name (keeps last occurrence) so a
   // hand-edited config with duplicate plugins is cleaned up on write.
   // The specifier itself is appended fresh after dedup.
-  const dedupedNonOmr = dedupePlugins(nonOmr);
-  config.plugin = [...dedupedNonOmr, specifier];
+  const dedupedNonOsr = dedupePlugins(nonOsr);
+  config.plugin = [...dedupedNonOsr, specifier];
 
   if (opts.dryRun) {
     console.log(`[dry-run] Would write to ${loaded.path}:`);

@@ -2,9 +2,9 @@
 
 ## Overview
 
-This folder contains comprehensive documentation on how custom slash commands are registered and handled in OpenCode plugins, extracted from the `opencode-agent-router` plugin.
+This folder contains comprehensive documentation on how custom slash commands are registered and handled in OpenCode plugins, extracted from the `opencode-smart-router` plugin.
 
-**Source:** `D:\git\opencode-agent-router\src\index.ts` (655 lines)
+**Source:** `D:\git\opencode-smart-router\src\index.ts` (655 lines)
 
 ---
 
@@ -86,7 +86,7 @@ This folder contains comprehensive documentation on how custom slash commands ar
 
 ### 5. **src/index.ts** 📄 SOURCE CODE
 **Size:** 655 lines  
-**Location:** `D:\git\opencode-agent-router\src\index.ts`
+**Location:** `D:\git\opencode-smart-router\src\index.ts`
 
 The actual plugin implementation. Contains:
 - Lines 1-10: Imports
@@ -196,13 +196,13 @@ return [
 ## File Dependencies
 
 ```
-opencode-agent-router/
+opencode-smart-router/
 │
 ├── src/index.ts (655 lines)
 │   ├── Exports: ModelRouterPlugin (default)
 │   ├── Dependencies: @opencode-ai/plugin
 │   ├── Config: tiers.json
-│   └── State: ~/.config/opencode/opencode-agent-router.state.json
+│   └── State: ~/.config/opencode/opencode-smart-router.state.json
 │
 ├── tiers.json
 │   ├── Presets: anthropic, openai, github-copilot
@@ -254,7 +254,7 @@ opencode-agent-router/
 
 ## Exported Commands in model-router Plugin
 
-The opencode-agent-router plugin registers 4 commands:
+The opencode-smart-router plugin registers 4 commands:
 
 | Command | Template | Arguments | Handler | Output Builder |
 |---------|----------|-----------|---------|-----------------|
@@ -334,7 +334,7 @@ When creating a new command plugin:
 
 ## Version Information
 
-- **Source File:** `D:\git\opencode-agent-router\src\index.ts`
+- **Source File:** `D:\git\opencode-smart-router\src\index.ts`
 - **Total Lines:** 655
 - **Commands Documented:** 4 (tiers, preset, budget, annotate-plan)
 - **Hooks Used:** 3 (config, command.execute.before, experimental.chat.system.transform)

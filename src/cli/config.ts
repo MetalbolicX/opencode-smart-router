@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // src/cli/config.ts — Discovery, JSONC-safe parse, plugin migration helpers,
-// backup rotation, and atomic writes for the `omr` CLI.
+// backup rotation, and atomic writes for the `osr` CLI.
 //
 // The CLI edits only the global OpenCode config (`$OPENCODE_CONFIG_DIR` or
 // `~/.config/opencode/opencode.json[.jsonc]`). Helpers are split so the
@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 // ---------------------------------------------------------------------------
 
 /** npm package name for this plugin. */
-export const PLUGIN_NAME = "opencode-agent-router";
+export const PLUGIN_NAME = "opencode-smart-router";
 
 /** Maximum number of CLI-created backups retained in the config directory. */
 export const BACKUP_LIMIT = 3;
@@ -253,10 +253,10 @@ const stripJsoncComments = (text: string): string => {
 
 /**
  * True when `entry` is a string that resolves to this plugin by base name.
- * Matches `opencode-agent-router` and any `opencode-agent-router@<spec>`
+ * Matches `opencode-smart-router` and any `opencode-smart-router@<spec>`
  * variant. Non-string entries (legacy object-form leftover) return false.
  */
-export const matchesOmr = (entry: unknown): boolean => {
+export const matchesOsr = (entry: unknown): boolean => {
   if (typeof entry !== "string") return false;
   const at = entry.indexOf("@");
   const base = at === -1 ? entry : entry.slice(0, at);
@@ -290,19 +290,19 @@ export const normalizePlugin = (raw: unknown): string[] => {
 
 /**
  * Dedupe the plugin list by base name (the part before the first `@`),
- * keeping the LAST occurrence of each base. Any `opencode-agent-router`
+ * keeping the LAST occurrence of each base. Any `opencode-smart-router`
  * entries are removed entirely so the install flow can append one fresh
  * entry at the end without leaving stale versions behind.
  *
  * Order is preserved for the surviving entries (last-wins per base).
  */
 export const dedupePlugins = (entries: readonly string[]): string[] => {
-  // Strip all OMR entries first — they will be re-added by the caller
-  // with the requested version. This guarantees at most one OMR entry
+  // Strip all OSR entries first — they will be re-added by the caller
+  // with the requested version. This guarantees at most one OSR entry
   // survives, regardless of how many variants already exist.
   const filtered: string[] = [];
   for (const entry of entries) {
-    if (!matchesOmr(entry)) filtered.push(entry);
+    if (!matchesOsr(entry)) filtered.push(entry);
   }
 
   // Walk in order, overwriting the same base with the latest variant so
@@ -323,8 +323,8 @@ export const dedupePlugins = (entries: readonly string[]): string[] => {
 
 /**
  * Build the npm specifier we will write into `plugin[]`:
- * `"opencode-agent-router"` when no version is supplied, otherwise
- * `"opencode-agent-router@<version>"`. Empty / whitespace-only versions
+ * `"opencode-smart-router"` when no version is supplied, otherwise
+ * `"opencode-smart-router@<version>"`. Empty / whitespace-only versions
  * are treated as "no version".
  */
 export const buildSpecifier = (version?: string): string => {

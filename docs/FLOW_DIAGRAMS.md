@@ -84,7 +84,7 @@
 │                                                                 │
 │ Check: if (_cachedConfig && !_configDirty)                      │
 │   NO → Read tiers.json from disk                                │
-│ Merge: state from ~/.config/opencode/opencode-agent-router... │
+│ Merge: state from ~/.config/opencode/opencode-smart-router... │
 │ Cache: _cachedConfig = cfg; _configDirty = false                │
 │ Return: RouterConfig                                            │
 └─────────────────────────────────────────────────────────────────┘
@@ -95,7 +95,7 @@
 │                                                                 │
 │ Step 1: cfg.activePreset = "openai"                             │
 │ Step 2: writeState({activePreset: "openai"})                    │
-│         └─ ~/.config/opencode/opencode-agent-router.state.json  │
+│         └─ ~/.config/opencode/opencode-smart-router.state.json  │
 │            {                                                    │
 │              "activePreset": "openai",                          │
 │              "activeMode": "normal"                             │
@@ -357,7 +357,7 @@ All responses are built as Markdown strings:
 ## 7. File Organization
 
 ```
-opencode-agent-router/
+opencode-smart-router/
 │
 ├── tiers.json                    # Config: presets, modes, rules
 │   ├── activePreset: "anthropic"
@@ -384,7 +384,7 @@ opencode-agent-router/
 │           └── command.execute.before (lines 624-651)
 │
 ├── ~/.config/opencode/
-│   └── opencode-agent-router.state.json  # Runtime state
+│   └── opencode-smart-router.state.json  # Runtime state
 │       ├── activePreset: "openai"  (user selection)
 │       └── activeMode: "budget"    (user selection)
 ```

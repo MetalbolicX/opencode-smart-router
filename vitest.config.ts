@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// Vitest configuration for opencode-agent-router.
+// Vitest configuration for opencode-smart-router.
 // - Tests live in the top-level `test/` directory (NEVER under `src/`), so the
 //   published package (files: ["src/", ...]) can never ship tests (plan C4).
 // - The default run excludes `test/smoke/**`: those are opt-in real-OpenCode

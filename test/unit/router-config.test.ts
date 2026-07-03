@@ -182,9 +182,9 @@ describe("saveReasoningMode", () => {
 // Layered manual config (bundled / global / local) + state overlay
 // ---------------------------------------------------------------------------
 
-/** Stage `content` at `<tmpHome>/.config/opencode-agent-router/tiers.json`. */
+/** Stage `content` at `<tmpHome>/.config/opencode-smart-router/tiers.json`. */
 const stageGlobal = (content: string | Record<string, unknown>): void => {
-  const dir = join(tmpHome, ".config", "opencode-agent-router");
+  const dir = join(tmpHome, ".config", "opencode-smart-router");
   mkdirSync(dir, { recursive: true });
   const p = join(dir, "tiers.json");
   if (typeof content === "string") {
@@ -215,9 +215,9 @@ const clearLocal = (): void => {
 };
 
 describe("globalConfigPath / localConfigPath", () => {
-  it("globalConfigPath resolves under $HOME/.config/opencode-agent-router/tiers.json", () => {
+  it("globalConfigPath resolves under $HOME/.config/opencode-smart-router/tiers.json", () => {
     expect(globalConfigPath()).toBe(
-      join(tmpHome, ".config", "opencode-agent-router", "tiers.json"),
+      join(tmpHome, ".config", "opencode-smart-router", "tiers.json"),
     );
   });
 
@@ -497,7 +497,7 @@ describe("Layered config — state overlay", () => {
     // Write a raw state file with an invalid enforcement mode value.
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
     writeFileSync(
-      join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json"),
+      join(tmpHome, ".config", "opencode", "opencode-smart-router.state.json"),
       JSON.stringify({ enforcementMode: "bogus" }),
       "utf-8",
     );
@@ -512,7 +512,7 @@ describe("Layered config — state overlay", () => {
     stageGlobal({ enforcement: { mode: "off" } });
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
     writeFileSync(
-      join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json"),
+      join(tmpHome, ".config", "opencode", "opencode-smart-router.state.json"),
       JSON.stringify({ enforcementMode: "bogus" }),
       "utf-8",
     );
@@ -526,7 +526,7 @@ describe("Layered config — state overlay", () => {
     stageGlobal({ enforcement: { mode: "off" } });
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
     writeFileSync(
-      join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json"),
+      join(tmpHome, ".config", "opencode", "opencode-smart-router.state.json"),
       JSON.stringify({ enforcementMode: "enforced" }),
       "utf-8",
     );
@@ -583,7 +583,7 @@ describe("Layered config — state overlay", () => {
     clearLocal();
     mkdirSync(join(tmpHome, ".config", "opencode"), { recursive: true });
     writeFileSync(
-      join(tmpHome, ".config", "opencode", "opencode-agent-router.state.json"),
+      join(tmpHome, ".config", "opencode", "opencode-smart-router.state.json"),
       JSON.stringify({ reasoningMode: "bogus" }),
       "utf-8",
     );

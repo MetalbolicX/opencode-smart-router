@@ -17,7 +17,7 @@ describe("guard-before-wiring integration", () => {
     savedHome = process.env.HOME;
     savedUserProfile = process.env.USERPROFILE;
     // Hermetic home: never read the developer's real state file
-    // (~/.config/opencode/opencode-agent-router.state.json), whose persisted
+    // (~/.config/opencode/opencode-smart-router.state.json), whose persisted
     // enforcementMode would otherwise leak into these off/on assertions.
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "gbw-"));
     process.env.HOME = dir;

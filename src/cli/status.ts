@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// src/cli/status.ts — `omr status` and `omr doctor` commands.
+// src/cli/status.ts — `osr status` and `osr doctor` commands.
 //
 // `status` reports whether the plugin is installed (and at what version)
 // in the global OpenCode config — it's a read-only, idempotent probe
@@ -18,19 +18,19 @@
 
 import { accessSync, constants as fsConstants, statSync } from "node:fs";
 import { dirname } from "node:path";
-import { type CliFs, loadGlobalConfig, matchesOmr, normalizePlugin, PLUGIN_NAME } from "./config";
+import { type CliFs, loadGlobalConfig, matchesOsr, normalizePlugin, PLUGIN_NAME } from "./config";
 import { createRealFs } from "./real-fs";
 
 export interface StatusResult {
-  /** Whether an `opencode-agent-router` entry is present in `plugin`. */
+  /** Whether an `opencode-smart-router` entry is present in `plugin`. */
   installed: boolean;
   /** Resolved config path the loader used. */
   path: string;
   /** Detected on-disk format. */
   format: "json" | "jsonc";
-  /** The active omr specifier, or `null` when not installed. */
+  /** The active osr specifier, or `null` when not installed. */
   specifier: string | null;
-  /** Other plugin entries preserved alongside the omr one. */
+  /** Other plugin entries preserved alongside the osr one. */
   extras: string[];
 }
 
@@ -56,15 +56,15 @@ const formatFromPath = (path: string): "json" | "jsonc" =>
 export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
   const loaded = loadGlobalConfig(fs);
   const plugins = normalizePlugin(loaded.config.plugin);
-  const omrEntries = plugins.filter(matchesOmr);
-  const extras = plugins.filter((entry) => !matchesOmr(entry));
+  const osrEntries = plugins.filter(matchesOsr);
+  const extras = plugins.filter((entry) => !matchesOsr(entry));
   const format = formatFromPath(loaded.path);
 
   console.log(`Config path:    ${loaded.path}`);
   console.log(`Format:         ${format}`);
   console.log(`Exists on disk: ${loaded.existed ? "yes" : "no (will be created on install)"}`);
 
-  if (omrEntries.length === 0) {
+  if (osrEntries.length === 0) {
     console.log(`Installed:      no`);
     return {
       installed: false,
@@ -75,9 +75,9 @@ export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
     };
   }
 
-  // In practice `install` dedupes so at most one omr entry survives;
+  // In practice `install` dedupes so at most one osr entry survives;
   // reporting the first keeps the output stable for scripting.
-  const specifier = omrEntries[0] ?? null;
+  const specifier = osrEntries[0] ?? null;
   console.log(`Installed:      yes`);
   console.log(`Specifier:      ${specifier}`);
   if (extras.length > 0) {
@@ -133,9 +133,9 @@ export const runDoctor = (
     } else {
       const plugins = normalizePlugin(rawPlugin);
       info.push(`Plugin entries: ${plugins.length}`);
-      const omrCount = plugins.filter(matchesOmr).length;
-      if (omrCount > 1) {
-        warnings.push(`${omrCount} opencode-agent-router entries present — install will dedupe`);
+      const osrCount = plugins.filter(matchesOsr).length;
+      if (osrCount > 1) {
+        warnings.push(`${osrCount} opencode-smart-router entries present — install will dedupe`);
       }
     }
   }

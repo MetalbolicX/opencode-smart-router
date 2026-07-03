@@ -29,18 +29,18 @@ describe("packaging: published tarball excludes tests and dev config (plan C4)",
   });
 });
 
-// Plan omr-cli PR 3: the package.json `bin` field wires the `omr` command to the
+// Plan osr-cli PR 3: the package.json `bin` field wires the `osr` command to the
 // built CLI, and the build must emit both the plugin and CLI bundles as .mjs.
 // These tests are cheap static checks so a misconfigured package or build is
 // caught at `pnpm test` time, before publish.
-describe("packaging: `omr` CLI bin + built .mjs bundles", () => {
-  it("package.json wires `omr` to ./dist/cli.mjs and ships dist/", () => {
+describe("packaging: `osr` CLI bin + built .mjs bundles", () => {
+  it("package.json wires `osr` to ./dist/cli.mjs and ships dist/", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
       bin?: Record<string, string>;
       files?: string[];
     };
 
-    expect(pkg.bin?.omr).toBe("./dist/cli.mjs");
+    expect(pkg.bin?.osr).toBe("./dist/cli.mjs");
     expect(pkg.files ?? []).toContain("dist/");
   });
 

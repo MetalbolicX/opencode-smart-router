@@ -15,7 +15,7 @@ import { createSessionStore } from "../../src/router/sessions";
  */
 
 const trajFile = (sid: string): string => {
-  return join(tmpdir(), "opencode-agent-router-trajectory", `${sid}.log`);
+  return join(tmpdir(), "opencode-smart-router-trajectory", `${sid}.log`);
 };
 
 afterEach(() => {

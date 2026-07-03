@@ -19,7 +19,7 @@ import { buildGateDeps, dispatchGrader, verifyTaskAfterHook } from "../../src/ve
 //   3. Grader temperature wiring: `dispatchGrader` adds the session id to
 //      `ctx.graderSessions` while it is open and removes it on completion.
 //   4. Scorecard temp path: `dumpDelegateScorecard` writes under
-//      `<tmpdir>/opencode-agent-router-trajectory/<sid>.delegate.log`.
+//      `<tmpdir>/opencode-smart-router-trajectory/<sid>.delegate.log`.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -1358,7 +1358,7 @@ describe("verifyTaskAfterHook — toast helper wiring (SDD tui-toast-verificatio
 // ---------------------------------------------------------------------------
 
 describe("dumpDelegateScorecard", () => {
-  it("writes a one-line scorecard under <tmpdir>/opencode-agent-router-trajectory/<sid>.delegate.log", () => {
+  it("writes a one-line scorecard under <tmpdir>/opencode-smart-router-trajectory/<sid>.delegate.log", () => {
     const sid = `sid-${process.pid}-${Date.now()}`;
     const state = {
       currentTier: "medium",
@@ -1371,7 +1371,7 @@ describe("dumpDelegateScorecard", () => {
 
     dumpDelegateScorecard(sid, state, true, "deterministic");
 
-    const expectedDir = join(tmpdir(), "opencode-agent-router-trajectory");
+    const expectedDir = join(tmpdir(), "opencode-smart-router-trajectory");
     const path = join(expectedDir, `${sid}.delegate.log`);
     expect(existsSync(path)).toBe(true);
 
@@ -1400,7 +1400,7 @@ describe("dumpDelegateScorecard", () => {
     dumpDelegateScorecard(sid, { ...base }, true, "deterministic");
     dumpDelegateScorecard(sid, { ...base, totalAttempts: 2 }, false, "checker");
 
-    const path = join(tmpdir(), "opencode-agent-router-trajectory", `${sid}.delegate.log`);
+    const path = join(tmpdir(), "opencode-smart-router-trajectory", `${sid}.delegate.log`);
     const contents = readFileSync(path, "utf-8");
     const lines = contents.trim().split("\n");
     expect(lines).toHaveLength(2);

@@ -1,6 +1,6 @@
 # Plans index
 
-This directory holds design/implementation plans for `opencode-agent-router`.
+This directory holds design/implementation plans for `opencode-smart-router`.
 
 ## Active plans
 

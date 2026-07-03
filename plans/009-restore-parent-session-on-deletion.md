@@ -260,7 +260,7 @@ import type { TuiPluginModule } from "@opencode-ai/plugin/tui";
 import { shouldRestoreParent } from "./tui/restore-parent";
 
 const plugin: TuiPluginModule = {
-  id: "opencode-agent-router-tui",
+  id: "opencode-smart-router-tui",
   tui: async (api) => {
     const off = api.event.on("session.deleted", (event) => {
       const deletedID = event.properties.sessionID;

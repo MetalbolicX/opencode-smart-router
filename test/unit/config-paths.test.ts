@@ -141,13 +141,13 @@ describe("resolveConfigPaths", () => {
       process.env["HOME"] = "/home/someone";
       __resetPathsForTest();
       const paths: ResolvedConfigPaths = resolveConfigPaths();
-      expect(paths.globalConfig).toBe(join("/custom/xdg", "opencode-agent-router", "tiers.json"));
+      expect(paths.globalConfig).toBe(join("/custom/xdg", "opencode-smart-router", "tiers.json"));
       expect(paths.statePreferred).toBe(
-        join("/custom/xdg", "opencode", "opencode-agent-router.state.json"),
+        join("/custom/xdg", "opencode", "opencode-smart-router.state.json"),
       );
       // stateLegacy mirrors $HOME regardless of XDG.
       expect(paths.stateLegacy).toBe(
-        join("/home/someone", ".config", "opencode", "opencode-agent-router.state.json"),
+        join("/home/someone", ".config", "opencode", "opencode-smart-router.state.json"),
       );
     } finally {
       for (const k of Object.keys(saved)) {
@@ -166,12 +166,12 @@ describe("resolveConfigPaths", () => {
       __resetPathsForTest();
       const paths = resolveConfigPaths();
       expect(paths.globalConfig).toBe(
-        join("/home/someone", ".config", "opencode-agent-router", "tiers.json"),
+        join("/home/someone", ".config", "opencode-smart-router", "tiers.json"),
       );
       // With no XDG, preferred and legacy collapse to the same path.
       expect(paths.statePreferred).toBe(paths.stateLegacy);
       expect(paths.statePreferred).toBe(
-        join("/home/someone", ".config", "opencode", "opencode-agent-router.state.json"),
+        join("/home/someone", ".config", "opencode", "opencode-smart-router.state.json"),
       );
     } finally {
       for (const k of Object.keys(saved)) {
@@ -238,7 +238,7 @@ describe("convenience accessors", () => {
       process.env["HOME"] = "/home/someone";
       __resetPathsForTest();
       expect(globalConfigPath()).toBe(
-        join("/home/someone", ".config", "opencode-agent-router", "tiers.json"),
+        join("/home/someone", ".config", "opencode-smart-router", "tiers.json"),
       );
     } finally {
       for (const k of Object.keys(saved)) {
@@ -255,9 +255,9 @@ describe("convenience accessors", () => {
       process.env["XDG_CONFIG_HOME"] = "/custom/xdg";
       process.env["HOME"] = "/home/someone";
       __resetPathsForTest();
-      expect(statePath()).toBe(join("/custom/xdg", "opencode", "opencode-agent-router.state.json"));
+      expect(statePath()).toBe(join("/custom/xdg", "opencode", "opencode-smart-router.state.json"));
       expect(stateLegacyPath()).toBe(
-        join("/home/someone", ".config", "opencode", "opencode-agent-router.state.json"),
+        join("/home/someone", ".config", "opencode", "opencode-smart-router.state.json"),
       );
     } finally {
       for (const k of Object.keys(saved)) {

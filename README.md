@@ -1,4 +1,4 @@
-# opencode-agent-router
+# opencode-smart-router
 
 > **Use the cheapest model that can do the job. Automatically.**
 
@@ -6,7 +6,7 @@ An [OpenCode](https://opencode.ai) plugin that routes every coding task to the r
 
 ## Why it's different
 
-Most AI coding tools give you one model for everything. You pay Opus prices to run `grep`. opencode-agent-router changes that with a stack of interlocking ideas:
+Most AI coding tools give you one model for everything. You pay Opus prices to run `grep`. opencode-smart-router changes that with a stack of interlocking ideas:
 
 **Use a mid-tier model as orchestrator.**
 The orchestrator runs on *every* message. Put Sonnet there, not Opus. Sonnet reads a routing protocol and delegates just as well as Opus — at 4x lower cost. Reserve Opus for when it genuinely matters.
@@ -57,7 +57,7 @@ If you're running Opus (20x cost) for all of it, you're overpaying by **3-10x** 
 
 ## The solution
 
-opencode-agent-router injects a **delegation protocol** into the system prompt that teaches the orchestrator to:
+opencode-smart-router injects a **delegation protocol** into the system prompt that teaches the orchestrator to:
 
 1. **Match task to tier** using a configurable task taxonomy
 2. **Split composite tasks** — explore first with a cheap model, then implement with a mid-tier model
@@ -198,37 +198,37 @@ Then install and configure model-router to handle the rest.
 
 ### Quick install (recommended)
 ```bash
-npx opencode-agent-router install
+npx opencode-smart-router install
 ```
 
 This adds the plugin to your global opencode config. Restart opencode to activate.
 
 Other commands:
 ```bash
-omr install              # Install plugin to global config
-omr uninstall            # Remove plugin from global config
-omr status               # Check installation status
-omr doctor               # Validate config health
+osr install              # Install plugin to global config
+osr uninstall            # Remove plugin from global config
+osr status               # Check installation status
+osr doctor               # Validate config health
 ```
 
 ### From npm (recommended)
 ```bash
 # In your opencode project or globally
-npm install -g opencode-agent-router
+npm install -g opencode-smart-router
 ```
 
 Add to `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-agent-router"]
+  "plugin": ["opencode-smart-router"]
 }
 ```
 
 ### Local clone
 ```bash
-git clone https://github.com/your-username/opencode-agent-router
-cd opencode-agent-router
+git clone https://github.com/your-username/opencode-smart-router
+cd opencode-smart-router
 npm install
 ```
 
@@ -236,7 +236,7 @@ In `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-agent-router@/absolute/path/to/opencode-agent-router"]
+  "plugin": ["opencode-smart-router@/absolute/path/to/opencode-smart-router"]
 }
 ```
 
@@ -251,9 +251,9 @@ state  >  local  >  global  >  bundled
 | Layer | Path | Required? | Purpose |
 |-------|------|-----------|---------|
 | **bundled** | `<plugin>/tiers.json` | yes | Shipped defaults. Read on every load. |
-| **global**  | `~/.config/opencode-agent-router/tiers.json` | no | User-level override that applies across all projects. |
+| **global**  | `~/.config/opencode-smart-router/tiers.json` | no | User-level override that applies across all projects. |
 | **local**   | `<cwd>/.opencode/tiers.json` | no | Repo-local override. Re-evaluated on every call (changes to `process.cwd()` require `invalidateConfigCache()` to take effect). |
-| **state**   | `~/.config/opencode/opencode-agent-router.state.json` | no | Runtime state (`activePreset`, `activeMode`, `enforcement.mode`). Written by `/preset`, `/budget`, and `/router enforce`. |
+| **state**   | `~/.config/opencode/opencode-smart-router.state.json` | no | Runtime state (`activePreset`, `activeMode`, `enforcement.mode`). Written by `/preset`, `/budget`, and `/router enforce`. |
 
 **Manual layers (bundled → global → local)** are deep-merged: plain objects merge by key union; arrays, scalars, and an explicit `null` **replace** the lower value (not delete). The merged result is validated exactly once with `validateConfig()`.
 
@@ -280,7 +280,7 @@ Override only the fields you want to change at the repo root (`<repo>/.opencode/
 }
 ```
 
-The bundled `anthropic`, `openai`, and `google` presets remain available in the merged result; only the fields you override change. A global override at `~/.config/opencode-agent-router/tiers.json` works the same way and applies across all repos.
+The bundled `anthropic`, `openai`, and `google` presets remain available in the merged result; only the fields you override change. A global override at `~/.config/opencode-smart-router/tiers.json` works the same way and applies across all repos.
 
 ### Presets
 

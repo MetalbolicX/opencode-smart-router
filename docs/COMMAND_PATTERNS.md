@@ -1,7 +1,7 @@
 # Custom Slash Command Patterns in OpenCode Plugins
 
 ## Source File Location
-**File:** `D:\git\opencode-agent-router\src\index.ts`
+**File:** `D:\git\opencode-smart-router\src\index.ts`
 
 ---
 
@@ -277,7 +277,7 @@ return [
   "",
   models,  // Multi-line content
   "",
-  "Selection is now persisted in ~/.config/opencode/opencode-agent-router.state.json.",
+  "Selection is now persisted in ~/.config/opencode/opencode-smart-router.state.json.",
   "Restart OpenCode for subagent model registration to take effect.",
   "System prompt delegation rules update immediately.",
 ].join("\n");
@@ -424,7 +424,7 @@ function saveActivePreset(presetName: string): void {
 | **Command Handler** | `command.execute.before` hook, lines 624-651 | Check `input.command`, access `input.arguments`, write to `output.parts` |
 | **Template Syntax** | Command config | `""` for no args, `"$ARGUMENTS"` for args |
 | **Output Format** | `output.parts.push()` | `{ type: "text" as const, text: string }` |
-| **State Persistence** | `writeState()`, lines 227-232 | Writes to `~/.config/opencode/opencode-agent-router.state.json` |
+| **State Persistence** | `writeState()`, lines 227-232 | Writes to `~/.config/opencode/opencode-smart-router.state.json` |
 | **Config Caching** | Lines 66-73, 180-208 | Use `invalidateConfigCache()` after state changes |
 | **System Prompt Injection** | `experimental.chat.system.transform` hook, lines 612-619 | Append to `output.system` array |
 | **User Feedback** | Helper functions, lines 410-525 | Markdown formatted strings, no `tui.showToast()` |

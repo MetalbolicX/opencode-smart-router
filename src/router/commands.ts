@@ -173,7 +173,7 @@ export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promis
       "",
       models,
       "",
-      "Selection is now persisted in ~/.config/opencode/opencode-agent-router.state.json.",
+      "Selection is now persisted in ~/.config/opencode/opencode-smart-router.state.json.",
       "Restart OpenCode for subagent model registration to take effect.",
       "System prompt delegation rules update immediately.",
     ].join("\n");

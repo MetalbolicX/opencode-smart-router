@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// src/cli/uninstall.ts — `omr uninstall` command.
+// src/cli/uninstall.ts — `osr uninstall` command.
 //
-// Removes every `opencode-agent-router` entry from the global OpenCode
+// Removes every `opencode-smart-router` entry from the global OpenCode
 // config's `plugin` list. With `--purge`, also deletes the runtime cache
-// directory (`~/.cache/opencode/node_modules/opencode-agent-router`) and
-// the plugin's own config dir (`~/.config/opencode-agent-router/`).
+// directory (`~/.cache/opencode/node_modules/opencode-smart-router`) and
+// the plugin's own config dir (`~/.config/opencode-smart-router/`).
 //
 // Like `install`, the function is side-effect-free beyond prints and disk
 // writes through `fs`. Tests inject an in-memory `CliFs` to exercise the
@@ -19,7 +19,7 @@ import {
   backupIfWritable,
   type CliFs,
   loadGlobalConfig,
-  matchesOmr,
+  matchesOsr,
   normalizePlugin,
   PLUGIN_NAME,
   writeAtomically,
@@ -92,7 +92,7 @@ export const runUninstall = (
 
   const config: Record<string, unknown> = { ...loaded.config };
   const existing = normalizePlugin(config.plugin);
-  const removed = existing.filter(matchesOmr);
+  const removed = existing.filter(matchesOsr);
   const remaining = existing.filter((entry) => !removed.includes(entry));
 
   // Compute purge candidates up front so dry-run can report them too.

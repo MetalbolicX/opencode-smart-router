@@ -174,7 +174,7 @@ describe("runInstall", () => {
     expect(result.status).toBe("noop");
   });
 
-  it("replaces existing omr entry with new version", () => {
+  it("replaces existing osr entry with new version", () => {
     const fs = createMemFs({
       [CONFIG_PATH]: JSON.stringify({ plugin: ["other", `${PLUGIN_NAME}@1.0.0`] }),
     });
@@ -234,7 +234,7 @@ describe("runInstall", () => {
 // ---------------------------------------------------------------------------
 
 describe("runUninstall", () => {
-  it("removes omr from plugin array", () => {
+  it("removes osr from plugin array", () => {
     const fs = createMemFs({
       [CONFIG_PATH]: JSON.stringify({ plugin: ["other", PLUGIN_NAME] }),
     });
@@ -307,7 +307,7 @@ describe("runUninstall", () => {
     expect(() => runUninstall({}, fs)).toThrow("malformed JSON");
   });
 
-  it("removes versioned omr entries", () => {
+  it("removes versioned osr entries", () => {
     const fs = createMemFs({
       [CONFIG_PATH]: JSON.stringify({
         plugin: [`${PLUGIN_NAME}@1.0.0`, `${PLUGIN_NAME}@2.0.0`, "other"],
