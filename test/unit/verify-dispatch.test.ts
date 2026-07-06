@@ -964,11 +964,17 @@ describe("verifyTaskAfterHook", () => {
     expect(deleteCalls).toEqual(["child-req-never"]);
   });
 
-  it("does not crash when enforcement is OFF and output has no sessionId", async () => {
+  it("does not crash when enforcement is OFF and output has no sessionId — cleanup runs unconditionally", async () => {
+    // PR3: the finally block always runs; stores are called even when
+    // childSessionID is null (no-op on missing key). SDK teardown is the
+    // only step guarded by truthy childSessionID (real network call).
     process.env.MODEL_ROUTER_ENFORCE = "0";
 
     const abortCalls: string[] = [];
     const deleteCalls: string[] = [];
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
 
     const ctx = makeCtx({
       directory: workDir,
@@ -979,6 +985,21 @@ describe("verifyTaskAfterHook", () => {
       deleteImpl: async (req: any) => {
         deleteCalls.push(req?.path?.id);
         return { data: true };
+      },
+      changedFileStore: {
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
+        },
+      },
+      sessionStore: {
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
+        },
       },
     });
 
@@ -992,10 +1013,130 @@ describe("verifyTaskAfterHook", () => {
       // No metadata.sessionId — childSessionID will be null
     };
 
-    // Must not throw — null childSessionID means no cleanup needed.
+    // Must not throw — null childSessionID means cleanup runs as a no-op.
     await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
+    // PR3: SDK teardown is guarded by truthy childSessionID — MUST NOT run
+    // with a null id (real network call with `path:{id:null}` is unsafe).
     expect(abortCalls).toEqual([]);
     expect(deleteCalls).toEqual([]);
+    // PR3: store cleanups run UNCONDITIONALLY — null id falls through to ""
+    // which is a no-op for Map/Set.delete (no entry at key "").
+    expect(clearChangedCalls).toEqual([""]);
+    expect(unregisterCalls).toEqual([""]);
+    expect(clearGuardCalls).toEqual([""]);
+  });
+
+  it("runs cleanup to completion when enforcement is ON and metadata is missing — task-child SDK is skipped, grader SDK still runs", async () => {
+    // PR3 triangulation: enforcement ON exercises the verification body,
+    // which is already null-safe. The cleanup `finally` must still run,
+    // release the stores, and skip SDK teardown for the task child
+    // (childSessionID is null) — even though the grader's own SDK
+    // teardown continues to run. The spec scenario "Cleanup runs when
+    // metadata is missing" is enforced end-to-end: stores no-op, task
+    // child SDK skipped, grader SDK runs, no throw.
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+
+    const abortCalls: string[] = [];
+    const deleteCalls: string[] = [];
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
+
+    const ctx = makeCtx({
+      directory: workDir,
+      // Unique grader id lets us distinguish the grader's abort/delete
+      // (from `dispatchGrader`'s own finally) from the task-child
+      // abort/delete (which PR3 must SKIP when childSessionID is null).
+      createImpl: async () => ({ data: { id: "grader-sid-3" } }),
+      abortImpl: async (req: any) => {
+        abortCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      deleteImpl: async (req: any) => {
+        deleteCalls.push(req?.path?.id);
+        return { data: true };
+      },
+      changedFileStore: {
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
+        },
+      },
+      sessionStore: {
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
+        },
+      },
+      guardStore: {
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: { subagent_type: "fast", prompt: "Do some work." },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      // No metadata.sessionId — childSessionID will be null
+    };
+
+    // PR3: with enforcement ON and missing metadata, cleanup still runs to completion.
+    await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
+    // SDK teardown: grader is aborted (it has an id), but the task child is NOT
+    // (childSessionID is null — guarded by the PR3 truthy check). The
+    // presence of exactly one abort and one delete (for the grader) proves
+    // the task-child SDK was skipped — adding a second would mean the
+    // `if (childSessionID)` guard is broken.
+    expect(abortCalls).toEqual(["grader-sid-3"]);
+    expect(deleteCalls).toEqual(["grader-sid-3"]);
+    // Stores run unconditionally.
+    expect(clearChangedCalls).toEqual([""]);
+    expect(unregisterCalls).toEqual([""]);
+    expect(clearGuardCalls).toEqual([""]);
+  });
+
+  it("cleanup catches store throws — no secondary throw escapes the finally when stores throw", async () => {
+    // PR3 triangulation: every store call is wrapped in its own try/catch.
+    // If any store throws, the next one still runs and the finally stays
+    // fail-closed. The spec scenario "Null child session identifier is
+    // tolerated" extends to "tolerated even if cleanup is buggy".
+    process.env.MODEL_ROUTER_ENFORCE = "0";
+
+    const ctx = makeCtx({
+      directory: workDir,
+      changedFileStore: {
+        clear: () => {
+          throw new Error("changedFileStore boom");
+        },
+      },
+      sessionStore: {
+        unregister: () => {
+          throw new Error("sessionStore boom");
+        },
+      },
+      guardStore: {
+        clear: () => {
+          throw new Error("guardStore boom");
+        },
+      },
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: { subagent_type: "fast", prompt: "Do some work." },
+    };
+    const output = {
+      output: "<task_result>\nDONE.</task_result>",
+      // No metadata.sessionId — childSessionID will be null
+    };
+
+    // All three stores throw, but each call is in its own try/catch — the
+    // finally is fail-closed and the hook resolves.
+    await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
   });
 
   it("clears all three stores once even when verification rejects", async () => {

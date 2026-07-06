@@ -447,7 +447,13 @@ export const verifyTaskAfterHook = async (
     });
   } finally {
     // Task child-session cleanup — ALWAYS runs (success, rejection, crash).
-    // Order mirrors `src/plugin/delegate.ts` per-attempt cleanup:
+    // PR3: the stores run UNCONDITIONALLY (each in its own try/catch) so
+    // the cleanup flow always reaches every step, even when
+    // `output.metadata.sessionId` is missing. SDK teardown is the only
+    // step guarded by truthy `childSessionID` — `session.abort/delete`
+    // are NOT null-safe (real network call with `path:{id:null}` would
+    // be unsafe). Order mirrors `src/plugin/delegate.ts` per-attempt
+    // cleanup:
     //   1. changedFileStore.clear — the changed-file data must remain
     //      readable through `accept()`; now that the artefact is assembled
     //      and scored, the per-session map is safe to drop.
@@ -458,18 +464,31 @@ export const verifyTaskAfterHook = async (
     //   3. guardStore.clear — last because guards depend on session and
     //      changed-file state; drop guard state only after the producer is
     //      fully released.
+    // PR3: the three stores are null-safe (Map/Set.delete is a no-op on a
+    // missing key, including the empty-string sentinel below), so they
+    // satisfy the spec scenario "Cleanup runs when metadata is missing"
+    // without needing an `if (childSessionID)` guard of their own. A
+    // null `childSessionID` is normalized to `""` so the existing
+    // `string`-typed store signatures stay happy — `Map.delete("")` is a
+    // no-op unless someone has stored a value at the empty-string key
+    // (the session-id namespace never does).
+    const sid = childSessionID ?? "";
+    try {
+      ctx.changedFileStore.clear(sid);
+    } catch {
+      // non-fatal
+    }
+    try {
+      ctx.sessionStore.unregister(sid);
+    } catch {
+      // non-fatal
+    }
+    try {
+      ctx.guardStore.clear(sid);
+    } catch {
+      // non-fatal
+    }
     if (childSessionID) {
-      ctx.changedFileStore.clear(childSessionID);
-      try {
-        ctx.sessionStore.unregister(childSessionID);
-      } catch {
-        // non-fatal
-      }
-      try {
-        ctx.guardStore.clear(childSessionID);
-      } catch {
-        // non-fatal
-      }
       // SDK teardown — removes the child session from the TUI session list.
       // Use short timeouts so a stuck SDK cleanup call cannot hang the
       // tool.execute.after hook forever. Each call is best-effort and
