@@ -1104,3 +1104,170 @@ describe("handleToolExecuteBefore/After — plan 014 surface-limits events + in-
     expect(h.ctx.reasoningStore.getTierOwner("fast")).toBe("sid-current");
   });
 });
+
+// ---------------------------------------------------------------------------
+// fix-task-model-fallback-cleanup — PR 2: built-in task runtime guard.
+//
+// The config validator (PR 1) already rejects malformed `provider/model`
+// strings at load time. This block pins the defense-in-depth runtime guard
+// inside `handleToolExecuteBefore`: a malformed tier model that somehow
+// reaches the built-in `task` path must hard-fail BEFORE the per-tier
+// in-flight owner is acquired or any reasoning patch is applied. The
+// runtime guard is the last safe boundary before patching/dispatch side
+// effects; the built-in `task` path bypasses the delegate's fail-soft
+// behavior, so the throw MUST escape the hook's best-effort catch.
+//
+// Spec scenario: "Block built-in task registration for malformed model".
+// ---------------------------------------------------------------------------
+
+describe("handleToolExecuteBefore — built-in task runtime guard (PR 2)", () => {
+  // Helper: build a harness where the `fast` tier carries an INJECTED model
+  // string. The live `ctx.opencodeConfig.agent["fast"]` is seeded with a
+  // matching baseline so any reasoning-patch mutation would be observable.
+  const setupGuardHarness = (model: string) => {
+    const h = makeHarness({
+      configOverrides: {
+        presets: {
+          default: {
+            fast: {
+              model, // injected per test
+              description: "fast",
+              whenToUse: [],
+            } as TierConfig,
+          },
+        },
+      },
+    });
+    const baseline = {
+      model, // the same value, so the agent def mirrors the tier config
+      mode: "subagent",
+      description: "fast",
+      prompt: "test prompt",
+      variant: "low",
+    };
+    h.ctx.opencodeConfig = { agent: { fast: { ...baseline } } };
+    h.ctx.reasoningStore.setBaseline("fast", structuredClone(baseline));
+    return { h, baseline };
+  };
+
+  it("throws with the canonical reason when the model has no slash", async () => {
+    const { h, baseline } = setupGuardHarness("no-slash");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/invalid model or provider configuration/);
+
+    // The guard must fire BEFORE acquireTierOwner: no owner is held.
+    expect(h.ctx.reasoningStore.getTierOwner("fast")).toBeUndefined();
+    // No patch was applied: the agent def is byte-identical to the baseline.
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("throws with the canonical reason when the model has a leading slash", async () => {
+    const { h, baseline } = setupGuardHarness("/claude");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/invalid model or provider configuration/);
+
+    expect(h.ctx.reasoningStore.getTierOwner("fast")).toBeUndefined();
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("throws with the canonical reason when the model has a trailing slash", async () => {
+    const { h, baseline } = setupGuardHarness("anthropic/");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/invalid model or provider configuration/);
+
+    expect(h.ctx.reasoningStore.getTierOwner("fast")).toBeUndefined();
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]).toEqual(baseline);
+  });
+
+  it("names the offending tier in the thrown error", async () => {
+    // The error message must identify which tier was rejected — operators
+    // see the message and need to know which `tiers.json` entry to fix.
+    const { h } = setupGuardHarness("no-slash");
+
+    let captured: Error | undefined;
+    try {
+      await handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      );
+    } catch (e) {
+      captured = e as Error;
+    }
+    expect(captured).toBeDefined();
+    expect(captured?.message).toContain("fast");
+  });
+
+  it("does NOT throw and still acquires the per-tier owner when the model is well-formed (regression)", async () => {
+    // Sanity check: a well-formed tier model must continue through the
+    // existing patch path. The guard must NOT short-circuit valid models.
+    const { h } = setupGuardHarness("anthropic/claude-3-5-sonnet");
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).resolves.toBeUndefined();
+
+    // The pre-existing patch path is intact: the per-tier owner is acquired
+    // AFTER the guard passes — proves the guard did not short-circuit.
+    expect(h.ctx.reasoningStore.getTierOwner("fast")).toBe("sid-orch");
+  });
+
+  it("does not run the guard for non-task tools (preserves the existing tool gate)", async () => {
+    // The guard is a built-in-`task`-only seam. A malformed tier model
+    // reached via a non-task tool (e.g. a stray read with subagent_type
+    // in args) must NOT throw — the hook's outer tool gate filters it out
+    // before the guard runs.
+    const { h } = setupGuardHarness("no-slash");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "read" },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not run the guard for subagent sessions (preserves the nested-task guard)", async () => {
+    // The existing nested-task guard must still fire for subagent sessions
+    // with tool === "task" — the runtime tier-model guard is for the
+    // ORCHESTRATOR path only (the built-in `task` path that bypasses the
+    // delegate's fail-soft behavior).
+    const { h } = setupGuardHarness("no-slash");
+    // sid-A1 is the subagent in the default harness.
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-A1", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/Nested subagent delegation is not allowed/);
+  });
+});

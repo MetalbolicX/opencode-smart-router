@@ -29,6 +29,7 @@ import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
 import { READ_ONLY_TOOLS } from "../router/tools";
 import { writeTrajectoryLog } from "../utils/log";
 import { log } from "../utils/observability";
+import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { verifyTaskAfterHook } from "../verify/dispatch";
 import type { PluginContext } from "./context";
 import type { HookEventPayload, HookPayload } from "./types";
@@ -136,6 +137,25 @@ export const handleToolExecuteBefore = async (
           const tiers = getActiveTiers(cfg);
           const tier = tiers[subagentType];
           if (tier) {
+            // Defense-in-depth runtime guard (PR 2 of fix-task-model-fallback-cleanup).
+            // The config validator (PR 1) already rejects malformed `provider/model`
+            // strings at load time, but a malformed model that somehow reaches
+            // this path must hard-fail BEFORE the per-tier in-flight owner is
+            // acquired or any reasoning patch is applied. This is the last safe
+            // boundary before patching/dispatch side effects; the built-in `task`
+            // path bypasses the delegate's fail-soft behavior, so the throw
+            // MUST escape the best-effort `try/catch` below.
+            const guard = resolveTierModelGuard(cfg, subagentType);
+            if (!guard.ok) {
+              const guardError = new Error(
+                `Built-in task rejected: cannot register tier agent "${subagentType}" — ${guard.reason}`,
+              );
+              // Marker so the outer catch propagates the guard error
+              // instead of swallowing it as a best-effort patch failure.
+              (guardError as Error & { __tierGuardError?: true }).__tierGuardError = true;
+              throw guardError;
+            }
+
             // Per-tier in-flight guard: only one patch may be active per tier
             // at a time. A second same-tier dispatch observes a `false` from
             // `acquireTierOwner` and skips the patch — overwriting an
@@ -214,6 +234,17 @@ export const handleToolExecuteBefore = async (
           }
         }
       } catch (err) {
+        // PR 2 of fix-task-model-fallback-cleanup: guard errors MUST
+        // propagate — the runtime tier-model guard is a hard-fail, not a
+        // best-effort patch. Anything else is a recoverable patch-internal
+        // error and is logged without blocking the task.
+        if (
+          err &&
+          typeof err === "object" &&
+          (err as { __tierGuardError?: true }).__tierGuardError === true
+        ) {
+          throw err;
+        }
         // best-effort: a reasoning patch failure must never block the task.
         log.warn({
           event: "reasoning.patch_failed",
