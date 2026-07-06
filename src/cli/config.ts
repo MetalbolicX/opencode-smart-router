@@ -28,6 +28,17 @@ import { basename, dirname, join } from "node:path";
 /** npm package name for this plugin. */
 export const PLUGIN_NAME = "opencode-smart-router";
 
+/**
+ * Historical package names that should be treated as the same plugin.
+ * The 1.4.1 release renamed the package, so global configs may still
+ * contain entries under the old names; install/uninstall must migrate
+ * them to the current canonical name.
+ */
+export const LEGACY_PLUGIN_NAMES: readonly string[] = [
+  "opencode-agent-router",
+  "opencode-model-router",
+];
+
 /** Maximum number of CLI-created backups retained in the config directory. */
 export const BACKUP_LIMIT = 3;
 
@@ -253,14 +264,16 @@ const stripJsoncComments = (text: string): string => {
 
 /**
  * True when `entry` is a string that resolves to this plugin by base name.
- * Matches `opencode-smart-router` and any `opencode-smart-router@<spec>`
- * variant. Non-string entries (legacy object-form leftover) return false.
+ * Matches `opencode-smart-router` (and any `opencode-smart-router@<spec>`
+ * variant), plus historical aliases such as `opencode-agent-router`.
+ * Non-string entries (legacy object-form leftover) return false.
  */
 export const matchesOsr = (entry: unknown): boolean => {
   if (typeof entry !== "string") return false;
   const at = entry.indexOf("@");
   const base = at === -1 ? entry : entry.slice(0, at);
-  return base === PLUGIN_NAME;
+  if (base === PLUGIN_NAME) return true;
+  return LEGACY_PLUGIN_NAMES.includes(base);
 };
 
 /**
@@ -291,8 +304,9 @@ export const normalizePlugin = (raw: unknown): string[] => {
 /**
  * Dedupe the plugin list by base name (the part before the first `@`),
  * keeping the LAST occurrence of each base. Any `opencode-smart-router`
- * entries are removed entirely so the install flow can append one fresh
- * entry at the end without leaving stale versions behind.
+ * entries — including historical aliases such as `opencode-agent-router`
+ * — are removed entirely so the install flow can append one fresh entry
+ * at the end without leaving stale versions behind.
  *
  * Order is preserved for the surviving entries (last-wins per base).
  */

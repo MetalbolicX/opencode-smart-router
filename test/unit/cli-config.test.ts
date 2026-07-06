@@ -269,6 +269,13 @@ describe("matchesOsr", () => {
     expect(matchesOsr(`${PLUGIN_NAME}@1.2.3-beta.1`)).toBe(true);
   });
 
+  it("matches historical legacy aliases", () => {
+    expect(matchesOsr("opencode-agent-router")).toBe(true);
+    expect(matchesOsr("opencode-model-router")).toBe(true);
+    expect(matchesOsr("opencode-agent-router@1.4.0")).toBe(true);
+    expect(matchesOsr("opencode-model-router@1.3.0")).toBe(true);
+  });
+
   it("does not match unrelated plugins", () => {
     expect(matchesOsr("some-other-plugin")).toBe(false);
     expect(matchesOsr("some-other-plugin@1.0.0")).toBe(false);
@@ -353,6 +360,15 @@ describe("dedupePlugins", () => {
     ).toEqual([]);
   });
 
+  it("removes every legacy alias variant, leaving nothing OSR behind", () => {
+    expect(
+      dedupePlugins([
+        "opencode-agent-router@1.4.0",
+        "opencode-model-router@1.3.0",
+      ]),
+    ).toEqual([]);
+  });
+
   it("removes OSR entries while preserving unrelated ones, with last-wins per base", () => {
     const input = [
       `${PLUGIN_NAME}@1.0.0`,
@@ -367,6 +383,15 @@ describe("dedupePlugins", () => {
     // duplicate "alpha@9.9.9" overwrites the value without changing
     // position. Result: ["alpha@9.9.9", "beta"].
     expect(dedupePlugins(input)).toEqual(["alpha@9.9.9", "beta"]);
+  });
+
+  it("treats legacy aliases as OSR entries and removes them alongside current ones", () => {
+    const input = [
+      "opencode-agent-router@1.4.0",
+      "other-plugin@1.0.0",
+      "opencode-smart-router@1.4.2",
+    ];
+    expect(dedupePlugins(input)).toEqual(["other-plugin@1.0.0"]);
   });
 
   it("ignores non-string entries silently", () => {
