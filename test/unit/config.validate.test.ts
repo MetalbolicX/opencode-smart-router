@@ -98,14 +98,57 @@ describe("validateConfig — tier shape", () => {
     );
   });
   it("throws when tier.description is not a string", () => {
-    expect(() => validateConfig(withTier({ model: "m", description: 1, whenToUse: [] }))).toThrow(
-      /\.description/,
-    );
+    expect(() =>
+      validateConfig(
+        withTier({ model: "anthropic/claude-haiku-4-5", description: 1, whenToUse: [] }),
+      ),
+    ).toThrow(/\.description/);
   });
   it("throws when tier.whenToUse is not an array", () => {
     expect(() =>
-      validateConfig(withTier({ model: "m", description: "d", whenToUse: "x" })),
+      validateConfig(
+        withTier({ model: "anthropic/claude-haiku-4-5", description: "d", whenToUse: "x" }),
+      ),
     ).toThrow(/whenToUse/);
+  });
+
+  // -------------------------------------------------------------------------
+  // Tier-model provider/model slash predicate (PR 1 of
+  // fix-task-model-fallback-cleanup). End-to-end through validateConfig()
+  // so a malformed model in any preset/tier hard-fails before task execution.
+  // -------------------------------------------------------------------------
+  it("throws when tier.model has no slash (no provider/model separator)", () => {
+    expect(() =>
+      validateConfig(withTier({ model: "no-slash", description: "d", whenToUse: [] })),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("throws when tier.model has a leading slash (missing provider segment)", () => {
+    expect(() =>
+      validateConfig(withTier({ model: "/claude", description: "d", whenToUse: [] })),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("throws when tier.model has a trailing slash (missing model segment)", () => {
+    expect(() =>
+      validateConfig(withTier({ model: "anthropic/", description: "d", whenToUse: [] })),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("malformed-model error names the offending preset.tier.model path", () => {
+    expect(() =>
+      validateConfig(
+        validRaw({
+          presets: {
+            anthropic: {
+              fast: { model: "no-slash", description: "d", whenToUse: [] },
+            },
+          },
+        }),
+      ),
+    ).toThrow(/anthropic\.fast\.model/);
+  });
+  it("accepts a tier with a well-formed provider/model string", () => {
+    expect(() =>
+      validateConfig(withTier({ model: "anthropic/claude-3-5-sonnet", description: "d", whenToUse: [] })),
+    ).not.toThrow();
   });
 });
 

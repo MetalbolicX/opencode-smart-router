@@ -126,27 +126,70 @@ describe("validatePresets / validatePreset / validateTier", () => {
     ).toThrow(/\.model/);
     expect(() =>
       validateTier("anthropic", "fast", {
-        model: "m",
+        model: "anthropic/claude-haiku-4-5",
         description: 1,
         whenToUse: [],
       }),
     ).toThrow(/\.description/);
     expect(() =>
       validateTier("anthropic", "fast", {
-        model: "m",
+        model: "anthropic/claude-haiku-4-5",
         description: "d",
         whenToUse: "x",
       }),
     ).toThrow(/whenToUse/);
   });
-  it("accepts a complete tier", () => {
+  it("accepts a complete well-formed tier (provider/model slash)", () => {
     expect(() =>
       validateTier("anthropic", "fast", {
-        model: "m",
+        model: "anthropic/claude-3-5-sonnet",
         description: "d",
         whenToUse: ["recon"],
       }),
     ).not.toThrow();
+  });
+
+  // -------------------------------------------------------------------------
+  // Tier-model provider/model slash predicate (PR 1 of
+  // fix-task-model-fallback-cleanup). Mirrors the runtime rule used by
+  // tierModel() in src/verify/dispatch.ts so malformed values fail fast at
+  // config load instead of silently returning null downstream.
+  // -------------------------------------------------------------------------
+  it("rejects tier.model with no slash (no provider/model separator)", () => {
+    expect(() =>
+      validateTier("anthropic", "fast", {
+        model: "no-slash",
+        description: "d",
+        whenToUse: [],
+      }),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("rejects tier.model with a leading slash (missing provider segment)", () => {
+    expect(() =>
+      validateTier("anthropic", "fast", {
+        model: "/claude",
+        description: "d",
+        whenToUse: [],
+      }),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("rejects tier.model with a trailing slash (missing model segment)", () => {
+    expect(() =>
+      validateTier("anthropic", "fast", {
+        model: "anthropic/",
+        description: "d",
+        whenToUse: [],
+      }),
+    ).toThrow(/must be provider\/model/);
+  });
+  it("malformed-model error names the offending preset.tier.model path", () => {
+    expect(() =>
+      validateTier("mypreset", "heavy", {
+        model: "no-slash",
+        description: "d",
+        whenToUse: [],
+      }),
+    ).toThrow(/mypreset\.heavy\.model/);
   });
 });
 

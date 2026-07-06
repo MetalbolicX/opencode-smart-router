@@ -123,6 +123,17 @@ export const validateTier = (presetName: string, tierName: string, tier: unknown
   if (typeof tier.model !== "string" || !tier.model) {
     throw new Error(`tiers.json: '${presetName}.${tierName}.model' must be a non-empty string`);
   }
+  // provider/model slash predicate (PR 1 of fix-task-model-fallback-cleanup).
+  // Mirrors the runtime rule used by tierModel() in src/verify/dispatch.ts so
+  // malformed values fail fast at config load instead of silently returning
+  // null downstream. `slash <= 0` covers missing-or-leading slash; `slash >=
+  // length - 1` covers missing-or-trailing slash.
+  const slash = tier.model.indexOf("/");
+  if (slash <= 0 || slash >= tier.model.length - 1) {
+    throw new Error(
+      `tiers.json: '${presetName}.${tierName}.model' must be provider/model (got ${JSON.stringify(tier.model)})`,
+    );
+  }
   if (typeof tier.description !== "string") {
     throw new Error(`tiers.json: '${presetName}.${tierName}.description' must be a string`);
   }
