@@ -401,7 +401,7 @@ describe("buildReasoningOutput", () => {
       reasoningPolicy: { mode: "manual", surfaceLimits: true },
     });
     cfg.presets.anthropic.medium = {
-      model: "minimax/MiniMax-M3",
+      model: "minimax-coding-plan/MiniMax-M3",
       description: "M",
       steps: 50,
       whenToUse: ["impl"],

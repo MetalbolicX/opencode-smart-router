@@ -64,7 +64,7 @@ The bundled presets declare capability explicitly on every tier. This table is t
 | Preset | Tier | Model | Capability |
 |---|---|---|---|
 | `multi-provider` | `fast` | `opencode-go/mimo-v2.5` | `discrete` · `variant` · `[low, medium, high]` |
-| `multi-provider` | `medium` | `minimax/MiniMax-M3` | `binary` · `variant` · elevated `thinking` |
+| `multi-provider` | `medium` | `minimax-coding-plan/MiniMax-M3` | `binary` · `variant` · elevated `thinking` |
 | `multi-provider` | `heavy` | `openai/gpt-5.4` | `discrete` · `reasoning.effort` · `[low, medium, high]` |
 | `openai` | `fast` | `openai/gpt-5.4-mini-fast` | `none` |
 | `openai` | `medium` | `openai/gpt-5.5-fast` | `discrete` · `variant` · `[low, medium, high]` |

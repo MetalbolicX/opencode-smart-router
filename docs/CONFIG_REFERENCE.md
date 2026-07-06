@@ -120,7 +120,7 @@ Optional field on every tier (`presets[<name>].<tier>.capability`). Authoritativ
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] }
       },
       "medium": {
-        "model": "minimax/MiniMax-M3",
+        "model": "minimax-coding-plan/MiniMax-M3",
         "variant": "thinking",
         "capability": { "kind": "binary", "field": "variant", "elevated": "thinking" }
       },

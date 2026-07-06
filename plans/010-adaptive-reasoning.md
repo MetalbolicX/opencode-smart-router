@@ -202,7 +202,7 @@ Current reasoning fields across `config/tiers/presets.json` (`multi-provider`):
 | Tier | Model | `variant` | `thinking` | `reasoning` | Inferred capability |
 |------|-------|-----------|------------|-------------|---------------------|
 | `fast` | `opencode-go/mimo-v2.5` | `"medium"` | — | — | `discrete` (levels: `low`, `medium`, `high`) |
-| `medium` | `minimax/MiniMax-M3` | `"thinking"` | — | — | `binary` (elevated: `thinking`) |
+| `medium` | `minimax-coding-plan/MiniMax-M3` | `"thinking"` | — | — | `binary` (elevated: `thinking`) |
 | `heavy` | `openai/gpt-5.4` | — | — | `effort:"high"` | `discrete` (levels: `low`, `medium`, `high`) |
 
 Other presets add variant-capable tiers:

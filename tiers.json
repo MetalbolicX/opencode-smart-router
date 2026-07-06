@@ -307,7 +307,7 @@
         ]
       },
       "medium": {
-        "model": "minimax/MiniMax-M3",
+        "model": "minimax-coding-plan/MiniMax-M3",
         "variant": "thinking",
         "costRatio": 5,
         "description": "MiniMax M3 for implementation, refactoring, and tests",
