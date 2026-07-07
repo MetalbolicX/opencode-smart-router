@@ -22,6 +22,7 @@ import { runInstall } from "./install";
 import { runDoctor, runStatus } from "./status";
 import { runConfigInit, runConfigPaths } from "./tiers-config";
 import { runUninstall } from "./uninstall";
+import { runUpdate } from "./update";
 
 const USAGE = `Usage: osr <command> [options]
 
@@ -30,6 +31,7 @@ Commands:
   uninstall   Remove the plugin from the global OpenCode config
   status      Show current installation status
   doctor      Run health checks against the global config
+  update      Check for updates and purge stale cache
   config      Manage the global tiers.json override (subcommands: init, paths)
 
 Options (install):
@@ -51,6 +53,9 @@ Options (config):
       --force           Overwrite an existing file (backs it up first)
       --dry-run         Print the planned change without writing
   paths                 Print bundled, global, local, and state paths
+
+Options (update):
+      --dry-run         Print the planned purge without writing
 
 Options (all):
   -h, --help         Show this help and exit
@@ -119,7 +124,7 @@ export interface MainResult {
  * `process.exitCode`, and returns a structured result so tests can assert
  * without reading the exit code.
  */
-export const runMain = (argv: readonly string[] = process.argv): MainResult => {
+export const runMain = async (argv: readonly string[] = process.argv): Promise<MainResult> => {
   const args = sliceProcessArgv(argv);
 
   // Short-circuit `--help` / `-h` before `parseArgs` so the user can ask
@@ -177,13 +182,17 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
         return { command, exitCode: 0 };
       }
       case "status": {
-        runStatus();
+        await runStatus();
         return { command, exitCode: 0 };
       }
       case "doctor": {
-        const result = runDoctor();
+        const result = await runDoctor();
         if (!result.ok) setExit(1);
         return { command, exitCode: result.ok ? 0 : 1 };
+      }
+      case "update": {
+        await runUpdate({ dryRun: parsed.values["dry-run"] === true });
+        return { command, exitCode: 0 };
       }
       case "config": {
         const subcommand = parsed.positionals[1];

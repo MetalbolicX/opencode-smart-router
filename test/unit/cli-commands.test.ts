@@ -14,6 +14,46 @@ import type { CliFs } from "../../src/cli/config";
 import { PLUGIN_NAME } from "../../src/cli/config";
 import { runInstall } from "../../src/cli/install";
 import { runMain } from "../../src/cli/main";
+
+// ---------------------------------------------------------------------------
+// Mock node:fs so runUpdate can be tested without touching disk.
+// ---------------------------------------------------------------------------
+
+const mockRmSync = vi.fn();
+
+vi.mock("node:fs", async () => {
+  const actual = await import("node:fs");
+  return {
+    ...actual,
+    get rmSync() {
+      return mockRmSync;
+    },
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Mock the registry module before importing runDoctor/runStatus so the
+// async I/O seams (fetchLatestVersion, getInstalledVersion) are fakeable.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Mock the registry module so runDoctor / runStatus use fake versions
+// instead of hitting the real npm registry or the real filesystem.
+// ---------------------------------------------------------------------------
+
+vi.mock("../../src/cli/registry", async () => {
+  const actual = await import("../../src/cli/registry");
+  return {
+    ...actual,
+    fetchLatestVersion: vi.fn<() => Promise<string | null>>(() => Promise.resolve(null)),
+    getInstalledVersion: vi.fn<() => string | null>(() => null),
+    isStale: actual.isStale,
+  };
+});
+
+import { fetchLatestVersion, getInstalledVersion, isStale } from "../../src/cli/registry";
+import { runDoctor, runStatus } from "../../src/cli/status";
+import { runUpdate } from "../../src/cli/update";
 import { runConfigInit, runConfigPaths } from "../../src/cli/tiers-config";
 import { runUninstall } from "../../src/cli/uninstall";
 
@@ -210,11 +250,11 @@ describe("runInstall", () => {
     const result = runInstall({}, fs);
 
     expect(result.status).toBe("wrote");
-    expect(result.specifier).toBe(PLUGIN_NAME);
+    expect(result.specifier).toBe(`${PLUGIN_NAME}@latest`);
     expect(result.path).toBe(CONFIG_PATH);
 
     const written = JSON.parse(fs.__files.get(CONFIG_PATH)!);
-    expect(written.plugin).toEqual([PLUGIN_NAME]);
+    expect(written.plugin).toEqual([`${PLUGIN_NAME}@latest`]);
   });
 
   it("adds to existing config without losing other keys", () => {
@@ -231,12 +271,12 @@ describe("runInstall", () => {
 
     const written = JSON.parse(fs.__files.get(CONFIG_PATH)!);
     expect(written.model).toBe("anthropic/claude-sonnet-4-5");
-    expect(written.plugin).toEqual(["some-other-plugin", PLUGIN_NAME]);
+    expect(written.plugin).toEqual(["some-other-plugin", `${PLUGIN_NAME}@latest`]);
   });
 
   it("is idempotent — re-running with same version is a no-op", () => {
     const fs = createMemFs({
-      [CONFIG_PATH]: JSON.stringify({ plugin: [PLUGIN_NAME] }),
+      [CONFIG_PATH]: JSON.stringify({ plugin: [`${PLUGIN_NAME}@latest`] }),
     });
 
     const result = runInstall({}, fs);
@@ -280,7 +320,7 @@ describe("runInstall", () => {
 
   it("does NOT print the `osr config init` tip on the noop path", () => {
     const fs = createMemFs({
-      [CONFIG_PATH]: JSON.stringify({ plugin: [PLUGIN_NAME] }),
+      [CONFIG_PATH]: JSON.stringify({ plugin: [`${PLUGIN_NAME}@latest`] }),
     });
     runInstall({}, fs);
 
@@ -317,7 +357,7 @@ describe("runInstall", () => {
     expect(result.status).toBe("wrote");
 
     const written = JSON.parse(fs.__files.get(CONFIG_PATH)!);
-    expect(written.plugin).toEqual([PLUGIN_NAME]);
+    expect(written.plugin).toEqual([`${PLUGIN_NAME}@latest`]);
     expect(written.model).toBe("test");
   });
 });
@@ -570,33 +610,33 @@ describe("runConfigPaths", () => {
 // ---------------------------------------------------------------------------
 
 describe("runMain — config dispatch", () => {
-  it("config init --dry-run exits 0 (write paths skipped)", () => {
-    const result = runMain(["node", "cli.mjs", "config", "init", "--dry-run"]);
+  it("config init --dry-run exits 0 (write paths skipped)", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "init", "--dry-run"]);
     expect(result.command).toBe("config");
     expect(result.exitCode).toBe(0);
   });
 
-  it("config paths dispatches to runConfigPaths (read-only)", () => {
-    const result = runMain(["node", "cli.mjs", "config", "paths"]);
+  it("config paths dispatches to runConfigPaths (read-only)", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "paths"]);
     expect(result.command).toBe("config");
     expect(result.exitCode).toBe(0);
   });
 
-  it("config with unknown subcommand exits 2", () => {
-    const result = runMain(["node", "cli.mjs", "config", "bogus"]);
+  it("config with unknown subcommand exits 2", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "bogus"]);
     expect(result.exitCode).toBe(2);
   });
 
-  it("config with missing subcommand exits 2", () => {
-    const result = runMain(["node", "cli.mjs", "config"]);
+  it("config with missing subcommand exits 2", async () => {
+    const result = await runMain(["node", "cli.mjs", "config"]);
     expect(result.exitCode).toBe(2);
   });
 
-  it("strict parseArgs accepts --preset <name>", () => {
+  it("strict parseArgs accepts --preset <name>", async () => {
     // --dry-run is the only safe way to exercise the dispatch path without
     // hitting the real fs; if parseArgs rejected --preset, runMain would
     // return exitCode 2 from the parse-error branch.
-    const result = runMain([
+    const result = await runMain([
       "node",
       "cli.mjs",
       "config",
@@ -608,23 +648,23 @@ describe("runMain — config dispatch", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("strict parseArgs accepts --from-bundled", () => {
-    const result = runMain(["node", "cli.mjs", "config", "init", "--dry-run", "--from-bundled"]);
+  it("strict parseArgs accepts --from-bundled", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "init", "--dry-run", "--from-bundled"]);
     expect(result.exitCode).toBe(0);
   });
 
-  it("strict parseArgs accepts --force", () => {
-    const result = runMain(["node", "cli.mjs", "config", "init", "--dry-run", "--force"]);
+  it("strict parseArgs accepts --force", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "init", "--dry-run", "--force"]);
     expect(result.exitCode).toBe(0);
   });
 
-  it("strict parseArgs accepts --target <global|local>", () => {
+  it("strict parseArgs accepts --target <global|local>", async () => {
     let captured = "";
     const errSpy = vi.spyOn(console, "error").mockImplementation((msg) => {
       captured += String(msg) + "\n";
     });
     try {
-      const result = runMain([
+      const result = await runMain([
         "node",
         "cli.mjs",
         "config",
@@ -642,8 +682,252 @@ describe("runMain — config dispatch", () => {
     }
   });
 
-  it("strict parseArgs rejects unknown flag with exit 2", () => {
-    const result = runMain(["node", "cli.mjs", "config", "init", "--bogus-flag"]);
+  it("strict parseArgs rejects unknown flag with exit 2", async () => {
+    const result = await runMain(["node", "cli.mjs", "config", "init", "--bogus-flag"]);
     expect(result.exitCode).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runDoctor — freshness (check #5, PR2)
+// ---------------------------------------------------------------------------
+
+describe("runDoctor — freshness check", () => {
+  it("when stale (installed < latest) warnings include the remediation hint", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockImplementation(() => "1.0.0");
+
+    const result = await runDoctor();
+
+    expect(result.warnings.some((w) => w.includes("npx opencode-smart-router@latest install"))).toBe(
+      true,
+    );
+    expect(result.installedVersion).toBe("1.0.0");
+    expect(result.latestVersion).toBe("2.0.0");
+  });
+
+  it("when current (installed == latest) no freshness warning is emitted", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("1.5.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+
+    const result = await runDoctor();
+
+    const freshnessWarnings = result.warnings.filter((w) =>
+      w.includes("npx opencode-smart-router@latest install"),
+    );
+    expect(freshnessWarnings).toHaveLength(0);
+    expect(result.installedVersion).toBe("1.5.0");
+    expect(result.latestVersion).toBe("1.5.0");
+  });
+
+  it("when registry lookup fails (offline/timeout) no freshness warning is emitted", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue(null);
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runDoctor();
+
+    const freshnessWarnings = result.warnings.filter((w) =>
+      w.includes("npx opencode-smart-router@latest install"),
+    );
+    expect(freshnessWarnings).toHaveLength(0);
+    expect(result.installedVersion).toBe("1.0.0");
+    expect(result.latestVersion).toBeNull();
+  });
+
+  it("DoctorResult includes installedVersion and latestVersion fields", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("3.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("2.5.0");
+
+    const result = await runDoctor();
+
+    expect(result.installedVersion).toBe("2.5.0");
+    expect(result.latestVersion).toBe("3.0.0");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runStatus — version lines (PR2)
+// ---------------------------------------------------------------------------
+
+describe("runStatus — version lines", () => {
+  it("prints Installed version and Latest lines when both versions are known", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+
+    const result = await runStatus();
+
+    // Verify return value has both versions — runStatus prints version lines
+    // only when both installedVersion and latestVersion are non-null.
+    expect(result.installedVersion).toBe("1.5.0");
+    expect(result.latestVersion).toBe("2.0.0");
+  });
+
+  it("omits Installed version and Latest lines when latestVersion is null (offline)", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue(null);
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+    vi.mocked(logSpy).mockClear();
+
+    await runStatus();
+
+    const allOutput = vi.mocked(logSpy).mock.calls.map((c: unknown[]) => String(c[0] ?? "")).join("\n");
+    expect(allOutput).not.toContain("Installed version:");
+    expect(allOutput).not.toContain("Latest:");
+  });
+
+  it("omits Installed version and Latest lines when installedVersion is null", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue(null);
+    vi.mocked(logSpy).mockClear();
+
+    await runStatus();
+
+    const allOutput = vi.mocked(logSpy).mock.calls.map((c: unknown[]) => String(c[0] ?? "")).join("\n");
+    expect(allOutput).not.toContain("Installed version:");
+    expect(allOutput).not.toContain("Latest:");
+  });
+
+  it("StatusResult includes installedVersion and latestVersion fields", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+
+    const result = await runStatus();
+
+    expect(result.installedVersion).toBe("1.5.0");
+    expect(result.latestVersion).toBe("2.0.0");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runMain — async status/doctor dispatch (PR2)
+// ---------------------------------------------------------------------------
+
+describe("runMain — status and doctor dispatch", () => {
+  beforeEach(() => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("1.5.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+  });
+
+  it("status command dispatches and exits 0", async () => {
+    const result = await runMain(["node", "cli.mjs", "status"]);
+    expect(result.command).toBe("status");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("doctor command dispatches with current version and exits 0", async () => {
+    const result = await runMain(["node", "cli.mjs", "doctor"]);
+    expect(result.command).toBe("doctor");
+    expect(result.exitCode).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runUpdate (PR4)
+// ---------------------------------------------------------------------------
+
+describe("runUpdate", () => {
+  beforeEach(() => {
+    mockRmSync.mockReset();
+  });
+
+  it("when stale — purges cachePath and prints install instruction", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runUpdate();
+
+    expect(result.status).toBe("purged");
+    expect(result.instruction).toBe("npx opencode-smart-router@latest install");
+    expect(result.cachePath).toMatch(/\.cache\/opencode\/node_modules\/opencode-smart-router$/);
+    expect(mockRmSync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.cache\/opencode\/node_modules\/opencode-smart-router$/),
+      { recursive: true, force: true },
+    );
+  });
+
+  it("when current — noop report and does not purge", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("1.5.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+
+    const result = await runUpdate();
+
+    expect(result.status).toBe("noop");
+    expect(result.instruction).toBe("");
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it("when cache path missing — no-op purge and still prints instruction", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+    // With force:true, rmSync succeeds even if the path doesn't exist
+    // (that's the whole point of force:true). So the mock just returns normally.
+    mockRmSync.mockReturnValue(undefined);
+
+    const result = await runUpdate();
+
+    expect(result.status).toBe("purged");
+    expect(result.instruction).toBe("npx opencode-smart-router@latest install");
+    expect(mockRmSync).toHaveBeenCalled();
+  });
+
+  it("when registry lookup fails — returns noop without printing", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue(null);
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runUpdate();
+
+    expect(result.status).toBe("noop");
+    expect(result.instruction).toBe("");
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it("dry-run — reports plan and does not touch disk", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runUpdate({ dryRun: true });
+
+    expect(result.status).toBe("planned");
+    expect(result.instruction).toBe("");
+    expect(result.cachePath).toMatch(/\.cache\/opencode\/node_modules\/opencode-smart-router$/);
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runMain — update dispatch (PR4)
+// ---------------------------------------------------------------------------
+
+describe("runMain — update dispatch", () => {
+  beforeEach(() => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("1.5.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.5.0");
+    mockRmSync.mockReset();
+    mockRmSync.mockImplementation(() => {});
+  });
+
+  it("update command dispatches and exits 0 when current", async () => {
+    const result = await runMain(["node", "cli.mjs", "update"]);
+    expect(result.command).toBe("update");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("update command with stale version exits 0 and purges", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runMain(["node", "cli.mjs", "update"]);
+    expect(result.command).toBe("update");
+    expect(result.exitCode).toBe(0);
+    expect(mockRmSync).toHaveBeenCalled();
+  });
+
+  it("update --dry-run exits 0 without purging", async () => {
+    vi.mocked(fetchLatestVersion).mockResolvedValue("2.0.0");
+    vi.mocked(getInstalledVersion).mockReturnValue("1.0.0");
+
+    const result = await runMain(["node", "cli.mjs", "update", "--dry-run"]);
+    expect(result.command).toBe("update");
+    expect(result.exitCode).toBe(0);
+    expect(mockRmSync).not.toHaveBeenCalled();
   });
 });

@@ -337,14 +337,14 @@ export const dedupePlugins = (entries: readonly string[]): string[] => {
 
 /**
  * Build the npm specifier we will write into `plugin[]`:
- * `"opencode-smart-router"` when no version is supplied, otherwise
+ * `"opencode-smart-router@latest"` when no version is supplied, otherwise
  * `"opencode-smart-router@<version>"`. Empty / whitespace-only versions
- * are treated as "no version".
+ * are treated as "no version" and default to `@latest`.
  */
 export const buildSpecifier = (version?: string): string => {
-  if (typeof version !== "string") return PLUGIN_NAME;
+  if (typeof version !== "string") return `${PLUGIN_NAME}@latest`;
   const trimmed = version.trim();
-  if (trimmed.length === 0) return PLUGIN_NAME;
+  if (trimmed.length === 0) return `${PLUGIN_NAME}@latest`;
   return `${PLUGIN_NAME}@${trimmed}`;
 };
 

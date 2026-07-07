@@ -412,19 +412,23 @@ describe("dedupePlugins", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSpecifier", () => {
-  it("returns the bare plugin name when no version is given", () => {
-    expect(buildSpecifier()).toBe(PLUGIN_NAME);
+  it("returns opencode-smart-router@latest when no version is given", () => {
+    expect(buildSpecifier()).toBe(`${PLUGIN_NAME}@latest`);
   });
 
-  it("returns the bare plugin name for empty / whitespace version", () => {
-    expect(buildSpecifier("")).toBe(PLUGIN_NAME);
-    expect(buildSpecifier("   ")).toBe(PLUGIN_NAME);
+  it("returns opencode-smart-router@latest for empty / whitespace version", () => {
+    expect(buildSpecifier("")).toBe(`${PLUGIN_NAME}@latest`);
+    expect(buildSpecifier("   ")).toBe(`${PLUGIN_NAME}@latest`);
   });
 
   it("appends @<version> for non-empty versions", () => {
     expect(buildSpecifier("1.0.0")).toBe(`${PLUGIN_NAME}@1.0.0`);
     expect(buildSpecifier("latest")).toBe(`${PLUGIN_NAME}@latest`);
     expect(buildSpecifier(" 1.2.3 ")).toBe(`${PLUGIN_NAME}@1.2.3`);
+  });
+
+  it("explicit version pin remains unchanged", () => {
+    expect(buildSpecifier("1.4.2")).toBe(`${PLUGIN_NAME}@1.4.2`);
   });
 });
 

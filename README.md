@@ -207,10 +207,11 @@ Other commands:
 ```bash
 osr install              # Install plugin to global config
 osr uninstall            # Remove plugin from global config
-osr status               # Check installation status
-osr doctor               # Validate config health
+osr status               # Check installation status (includes version info)
+osr doctor               # Validate config health (includes freshness check)
 osr config init          # Create a tiers.json override (global or local)
 osr config paths         # Show bundled/global/local/state tier paths
+osr update               # Detect stale install and print the fix
 ```
 
 After `osr install` the CLI prints a tip pointing at `osr config init`. Use
@@ -247,6 +248,45 @@ In `~/.config/opencode/opencode.json`:
   "plugin": ["opencode-smart-router@/absolute/path/to/opencode-smart-router"]
 }
 ```
+
+## Updating
+
+```bash
+npx opencode-smart-router@latest install
+```
+
+This always pulls the latest version from npm and re-registers it — no version pin to maintain, no stale cache to worry about.
+
+### Verify the active version
+
+```bash
+osr doctor         # Health check — includes version comparison
+osr status         # Show installed vs latest version
+```
+
+### osr update
+
+```bash
+osr update              # Check for stale install and print the fix
+osr update --dry-run    # Preview what would be purged, disk untouched
+```
+
+`osr update` compares your installed version against the npm registry. If stale, it clears the runtime cache and prints the canonical `npx` update command. It does **not** reinstall the package itself — the stale binary cannot bypass the package manager's own freshness gate, so the instruction is the honest limit.
+
+### pnpm v11 note
+
+pnpm v11 introduced `minimumReleaseAge: 1440` for newly published packages — a 24-hour cooldown before pnpm will install a freshly published version. This means **publishing a fix does NOT make it immediately available** via `pnpm add -g opencode-smart-router` — pnpm silently falls back to the newest version that is at least 24 hours old.
+
+**If you use pnpm:**
+- Wait 24 hours after publication, or
+- Add `opencode-smart-router` to `minimumReleaseAgeExclude` in your pnpm config (global or workspace):
+  ```yaml
+  minimumReleaseAgeExclude:
+    - opencode-smart-router
+  ```
+- Or use the `npx` update path above, which bypasses pnpm entirely
+
+**Republishing a fix does not help** — it resets the 24-hour clock, making the gate worse. Always use `npx opencode-smart-router@latest install` to get the latest version immediately.
 
 ## Configuration
 

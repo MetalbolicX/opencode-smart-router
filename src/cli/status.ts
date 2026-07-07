@@ -21,6 +21,7 @@ import { dirname } from "node:path";
 import { globalConfigPath } from "../router/config-paths";
 import { type CliFs, loadGlobalConfig, matchesOsr, normalizePlugin, PLUGIN_NAME } from "./config";
 import { createRealFs } from "./real-fs";
+import { fetchLatestVersion, getInstalledVersion, isStale } from "./registry";
 
 export interface StatusResult {
   /** Whether an `opencode-smart-router` entry is present in `plugin`. */
@@ -33,6 +34,10 @@ export interface StatusResult {
   specifier: string | null;
   /** Other plugin entries preserved alongside the osr one. */
   extras: string[];
+  /** The installed package version, or `null` when not found. */
+  installedVersion?: string | null;
+  /** The latest npm registry version, or `null` when lookup failed. */
+  latestVersion?: string | null;
 }
 
 export interface DoctorResult {
@@ -44,6 +49,10 @@ export interface DoctorResult {
   warnings: string[];
   /** Informational notes about what was checked. */
   info: string[];
+  /** The installed package version, or `null` when not found. */
+  installedVersion?: string | null;
+  /** The latest npm registry version, or `null` when lookup failed. */
+  latestVersion?: string | null;
 }
 
 const formatFromPath = (path: string): "json" | "jsonc" =>
@@ -53,8 +62,14 @@ const formatFromPath = (path: string): "json" | "jsonc" =>
  * Read-only status probe. Prints a human-readable report to stdout and
  * returns the same data as a structured result so callers (including
  * `main.ts` and tests) can consume it without parsing the message.
+ *
+ * Version lines (`Installed version` / `Latest`) are printed only when
+ * both the installed version and the latest registry version are known.
+ * If either lookup fails (offline, parse error), those lines are omitted
+ * silently — `status` should not produce error output for expected network
+ * failures.
  */
-export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
+export const runStatus = async (fs: CliFs = createRealFs()): Promise<StatusResult> => {
   const loaded = loadGlobalConfig(fs);
   const plugins = normalizePlugin(loaded.config.plugin);
   const osrEntries = plugins.filter(matchesOsr);
@@ -72,6 +87,12 @@ export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
   console.log(`Tiers config:   ${tiersPath}`);
   console.log(`Tiers exists:   ${existsSync(tiersPath) ? "yes" : "no"}`);
 
+  // Probe both version sources in parallel — neither blocks the other.
+  const [installedVersion, latestVersion] = await Promise.all([
+    Promise.resolve(getInstalledVersion(fs)),
+    fetchLatestVersion(),
+  ]);
+
   if (osrEntries.length === 0) {
     console.log(`Installed:      no`);
     return {
@@ -80,6 +101,8 @@ export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
       format,
       specifier: null,
       extras,
+      installedVersion,
+      latestVersion,
     };
   }
 
@@ -92,23 +115,38 @@ export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
     console.log(`Other plugins:  ${extras.join(", ")}`);
   }
 
+  // Print version lines only when both values are available.
+  if (installedVersion != null && latestVersion != null) {
+    console.log(`Installed version: ${installedVersion}`);
+    console.log(`Latest:            ${latestVersion}`);
+  }
+
   return {
     installed: true,
     path: loaded.path,
     format,
     specifier,
     extras,
+    installedVersion,
+    latestVersion,
   };
 };
 
 /**
  * Health checks. The function does not exit on its own — it returns a
  * `DoctorResult` and `main.ts` maps `ok === false` to exit code 1.
+ *
+ * Check #5 (package freshness) probes both the installed version and the
+ * latest npm registry version in parallel. When the install is stale, a
+ * remediation warning with the exact `npx opencode-smart-router@latest install`
+ * command is appended. When either lookup fails (offline, timeout, parse
+ * error), the freshness check degrades silently — no warning, no issue —
+ * so an offline machine does not get spurious upgrade instructions.
  */
-export const runDoctor = (
+export const runDoctor = async (
   fs: CliFs = createRealFs(),
   env: NodeJS.ProcessEnv = process.env,
-): DoctorResult => {
+): Promise<DoctorResult> => {
   const issues: string[] = [];
   const warnings: string[] = [];
   const info: string[] = [];
@@ -175,6 +213,20 @@ export const runDoctor = (
     // best-effort — never block on permission probes
   }
 
+  // 5. Package freshness — probe both version sources in parallel.
+  // Silent degrade when either lookup fails so offline machines get a
+  // clean report with no spurious upgrade instructions.
+  const [installedVersion, latestVersion] = await Promise.all([
+    Promise.resolve(getInstalledVersion(fs)),
+    fetchLatestVersion(),
+  ]);
+
+  if (isStale(installedVersion, latestVersion)) {
+    warnings.push(
+      `opencode-smart-router ${installedVersion} is stale — run: npx opencode-smart-router@latest install`,
+    );
+  }
+
   // Render the report. Order: info, warnings, errors, summary.
   for (const line of info) console.log(`  ✓ ${line}`);
   for (const line of warnings) console.warn(`  ! ${line}`);
@@ -187,5 +239,5 @@ export const runDoctor = (
     console.log(`\n✗ Doctor: ${issues.length} issue(s) found`);
   }
 
-  return { ok, issues, warnings, info };
+  return { ok, issues, warnings, info, installedVersion, latestVersion };
 };
