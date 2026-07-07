@@ -8,6 +8,7 @@
     "build": "npm run build:tiers && npx tsc --project tsconfig.build.json && pnpm exec -- rolldown --config rolldown.config.js build",
     "build:tiers": "node --experimental-strip-types scripts/build-tiers-config.ts",
     "prebuild": "node --experimental-strip-types scripts/build-tiers-config.ts",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
