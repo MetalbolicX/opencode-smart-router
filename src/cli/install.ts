@@ -106,6 +106,7 @@ export const runInstall = (
   console.log(`✓ Installed ${specifier}`);
   console.log(`  config: ${loaded.path}`);
   if (backup) console.log(`  backup: ${backup}`);
+  console.log(`tip: Run \`osr config init\` to create a global tiers.json override`);
 
   return { status: "wrote", path: loaded.path, specifier, backup };
 };

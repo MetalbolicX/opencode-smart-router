@@ -209,7 +209,15 @@ osr install              # Install plugin to global config
 osr uninstall            # Remove plugin from global config
 osr status               # Check installation status
 osr doctor               # Validate config health
+osr config init          # Create a tiers.json override (global or local)
+osr config paths         # Show bundled/global/local/state tier paths
 ```
+
+After `osr install` the CLI prints a tip pointing at `osr config init`. Use
+that command to create the optional `tiers.json` override file that the
+router reads on top of the bundled defaults — see
+[Configuration → `tiers.json` as an explicit override](#tiersjson-as-an-explicit-override)
+below.
 
 ### From npm (recommended)
 ```bash
@@ -260,6 +268,44 @@ state  >  local  >  global  >  bundled
 **Runtime state (state)** is the highest-precedence layer but it overlays **only** the three fields it owns — `activePreset`, `activeMode`, and `enforcement.mode`. All other manual fields are preserved. Runtime state is never written back into `tiers.json`.
 
 **Errors are tagged by layer path.** A present layer with malformed JSON, an unreadable bundled file, or a merged manual result that fails schema validation produces a descriptive error that names the offending file or field. Missing optional global/local files are treated as absent, not erroneous.
+
+### `tiers.json` as an explicit override
+
+`tiers.json` is **optional** — the bundled defaults are always loaded and
+the global + local layers only take effect when their file exists. To
+create one explicitly:
+
+```bash
+# Show every tier-relevant path + whether it currently exists
+osr config paths
+
+# Create the global override (~/.config/opencode-smart-router/tiers.json)
+osr config init                                  # starts as {}
+osr config init --preset multi-provider          # seeds activePreset
+osr config init --from-bundled                    # copies the shipped file
+
+# Create a repo-local override instead
+osr config init --target local --preset anthropic
+```
+
+The three init flavors trade off differently:
+
+| Flavor | Result | Use when |
+|--------|--------|----------|
+| `osr config init` (no flags) | `{ }` — empty object | You want a fresh override file you will edit by hand |
+| `osr config init --preset <name>` | `{ "activePreset": "<name>" }` | You only want to switch the active preset globally |
+| `osr config init --from-bundled` | Full copy of the shipped `tiers.json` | You want the current defaults as a starting point |
+
+`--preset` and `--from-bundled` are mutually exclusive. If the target
+file already exists, `osr config init` aborts with a `--force` hint —
+re-run with `--force` to back up the existing file and overwrite. Both
+flags accept `--dry-run` to preview the planned write without touching
+disk.
+
+`osr config init` does not modify `~/.config/opencode/opencode.json` —
+plugin registration stays the job of `osr install`. The two commands are
+independent: you can `install` without ever creating a `tiers.json`
+override, and you can `config init` without ever running `install`.
 
 ### Example: repo-local override
 

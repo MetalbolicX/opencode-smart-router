@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { runInstall } from "./install";
 import { runDoctor, runStatus } from "./status";
+import { runConfigInit, runConfigPaths } from "./tiers-config";
 import { runUninstall } from "./uninstall";
 
 const USAGE = `Usage: osr <command> [options]
@@ -29,6 +30,7 @@ Commands:
   uninstall   Remove the plugin from the global OpenCode config
   status      Show current installation status
   doctor      Run health checks against the global config
+  config      Manage the global tiers.json override (subcommands: init, paths)
 
 Options (install):
   -v, --version <v>  Install a specific version (default: latest)
@@ -40,6 +42,15 @@ Options (uninstall):
       --purge        Also remove cache + ~/.config/opencode-smart-router/
       --dry-run      Print the planned change without writing
       --yes          Skip confirmation prompts (reserved)
+
+Options (config):
+  init                  Create the tiers.json override file
+      --target <t>      'global' (default) or 'local'
+      --preset <name>   Seed the file with { "activePreset": "<name>" }
+      --from-bundled    Seed the file with the shipped tiers.json content
+      --force           Overwrite an existing file (backs it up first)
+      --dry-run         Print the planned change without writing
+  paths                 Print bundled, global, local, and state paths
 
 Options (all):
   -h, --help         Show this help and exit
@@ -71,6 +82,10 @@ const parseCliArgs = (argv: readonly string[]): ParsedArgs => {
       yes: { type: "boolean", short: "y" },
       "dry-run": { type: "boolean" },
       purge: { type: "boolean" },
+      target: { type: "string" },
+      preset: { type: "string" },
+      "from-bundled": { type: "boolean" },
+      force: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -169,6 +184,32 @@ export const runMain = (argv: readonly string[] = process.argv): MainResult => {
         const result = runDoctor();
         if (!result.ok) setExit(1);
         return { command, exitCode: result.ok ? 0 : 1 };
+      }
+      case "config": {
+        const subcommand = parsed.positionals[1];
+        if (subcommand !== "init" && subcommand !== "paths") {
+          console.error(
+            `osr: unknown config subcommand '${subcommand ?? ""}'. Supported: init, paths.`,
+          );
+          setExit(2);
+          return { command, exitCode: 2 };
+        }
+        if (subcommand === "paths") {
+          runConfigPaths();
+          return { command, exitCode: 0 };
+        }
+        // subcommand === "init"
+        const targetRaw = parsed.values.target;
+        const target: "global" | "local" | undefined =
+          targetRaw === "global" || targetRaw === "local" ? targetRaw : undefined;
+        runConfigInit({
+          target,
+          preset: typeof parsed.values.preset === "string" ? parsed.values.preset : undefined,
+          fromBundled: parsed.values["from-bundled"] === true,
+          force: parsed.values.force === true,
+          dryRun: parsed.values["dry-run"] === true,
+        });
+        return { command, exitCode: 0 };
       }
       default:
         console.error(`osr: unknown command '${command}'. Run \`osr --help\` for usage.`);

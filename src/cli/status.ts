@@ -16,8 +16,9 @@
 // to model POSIX permissions.
 // ---------------------------------------------------------------------------
 
-import { accessSync, constants as fsConstants, statSync } from "node:fs";
+import { accessSync, existsSync, constants as fsConstants, statSync } from "node:fs";
 import { dirname } from "node:path";
+import { globalConfigPath } from "../router/config-paths";
 import { type CliFs, loadGlobalConfig, matchesOsr, normalizePlugin, PLUGIN_NAME } from "./config";
 import { createRealFs } from "./real-fs";
 
@@ -63,6 +64,13 @@ export const runStatus = (fs: CliFs = createRealFs()): StatusResult => {
   console.log(`Config path:    ${loaded.path}`);
   console.log(`Format:         ${format}`);
   console.log(`Exists on disk: ${loaded.existed ? "yes" : "no (will be created on install)"}`);
+
+  // Discoverability aid: surface the global tiers.json override path so
+  // users know exactly where `osr config init` will write. Read-only,
+  // never a health check.
+  const tiersPath = globalConfigPath();
+  console.log(`Tiers config:   ${tiersPath}`);
+  console.log(`Tiers exists:   ${existsSync(tiersPath) ? "yes" : "no"}`);
 
   if (osrEntries.length === 0) {
     console.log(`Installed:      no`);
