@@ -160,6 +160,25 @@ export const createSessionStore = () => {
   const subagentSessionIDs = new Set<string>();
   const subagentCapState = new Map<string, SubagentState>();
 
+  // Plan 020/021: parent/depth tracking for nested delegation guard.
+  // parentMap: child sessionID → parent sessionID (only for registered children).
+  const parentMap = new Map<string, string>();
+  // Memoized depth cache. Recomputed lazily on first access per session.
+  const depthCache = new Map<string, number>();
+
+  /**
+   * Compute depth by walking up the parent chain, with cycle protection.
+   * Returns 0 for root/unregistered sessions.
+   */
+  const computeDepth = (sid: string, visited: Set<string> = new Set()): number => {
+    if (visited.has(sid)) return 0; // cycle guard — treat as root
+    const parent = parentMap.get(sid);
+    if (!parent) return 0; // no parent = root
+    visited.add(sid);
+    const parentDepth = computeDepth(parent, visited);
+    return parentDepth + 1;
+  };
+
   return {
     /** Returns true when sessionID belongs to a tracked subagent session. */
     isSubagent(sessionID: string): boolean {
@@ -193,10 +212,50 @@ export const createSessionStore = () => {
       });
     },
 
+    /**
+     * Called from the session.created hook event. Registers a child session
+     * with its parentID so depth and parent tracking are available before the
+     * child's first tool call. This is the foundation of the nested-delegation
+     * guard: the depth is derived synchronously at session creation time.
+     */
+    registerFromSessionCreated(input: { sessionID: string; parentID: string | null }): void {
+      // Invalidate cached depth for this session and all descendants.
+      // For simplicity we clear the whole cache; a full descendant walk is
+      // deferred until the profile shows this as a hotspot.
+      depthCache.clear();
+      if (input.parentID != null) {
+        parentMap.set(input.sessionID, input.parentID);
+      }
+    },
+
+    /**
+     * Returns the depth of the session (0 = root/unregistered, 1 = direct child,
+     * 2 = grandchild, etc.). Uses a memoized cache with lazy recomputation.
+     */
+    depth(sessionID: string): number {
+      let d = depthCache.get(sessionID);
+      if (d !== undefined) return d;
+      d = computeDepth(sessionID);
+      depthCache.set(sessionID, d);
+      return d;
+    },
+
+    /** Returns the parent sessionID for a child session, or null for root/unregistered. */
+    parentOf(sessionID: string): string | null {
+      return parentMap.get(sessionID) ?? null;
+    },
+
+    /** Returns true when sessionID is a descendant (depth >= 1). */
+    isDescendant(sessionID: string): boolean {
+      return this.depth(sessionID) >= 1;
+    },
+
     /** Remove a session from tracking (used to clean up delegate producer sessions). */
     unregister(sessionID: string): void {
       subagentSessionIDs.delete(sessionID);
       subagentCapState.delete(sessionID);
+      parentMap.delete(sessionID);
+      depthCache.delete(sessionID);
     },
 
     /**

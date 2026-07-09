@@ -31,6 +31,8 @@ and update your row when done.
 | 017  | Fix Task child session cleanup bypassing when verification is off | P1 | S | LOW | — | TODO |
 | 018  | Robust adaptive trigger-word selection | P2 | M | LOW | 015 | DONE |
 | 019  | Add explicit config init and path discovery for tiers.json | P1 | M | LOW | — | DONE |
+| 020  | Close nested-delegation bypass via session.created + depth guard | P1 | M | MED | 008 | DONE |
+| 021  | Rebuild Plan 020 through strict TDD | P1 | M | MED | 020 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
@@ -50,6 +52,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **016 is fully independent** — pure hardening of `src/reasoning/adaptive.ts` + `src/reasoning/policy.ts`. No overlap with any other plan's files.
 - **017 is fully independent** — edits only `src/verify/dispatch.ts` and `test/unit/verify-dispatch.test.ts`. It fixes a structural flaw in `verifyTaskAfterHook` that Plan 007 did not catch: the early return at `shouldVerifyTask` bypasses the `try/finally` cleanup block, leaving Task child sessions as orphans in the TUI when verification is off. The fix moves `parseTaskResult` + cleanup above the gate.
 - **018 depends on 015** — DONE (chained branch `feature/robust-adaptive-trigger-words`, four stacked PRs: PR 1 = pure matcher `src/reasoning/match.ts` + matcher tests; PR 2 = selector rewire to `matchSignal` with `stem` default + signal normalization in the hook + optional `match` / `excludeKeywords` config fields; PR 3 = `validateReasoningPolicy` config-load validation; PR 4 = refreshed seeded vocabulary in `config/tiers/base.json` + selector boundary/inflection/exclusion/phrase tests + `docs/REASONING.md` match-mode section). It hardens the adaptive selector's trigger-word matching without changing the adaptive decision order or the provider translation layer. The shipped `base.json` now uses all four levels (minimal / elevated / max) plus an `excludeKeywords` rule on the cosmetic-tier `minimal` group, so `format` no longer escalates when the prompt also mentions `refactor`/`architect`/`redesign`. Independent of 016/017.
+- **020 supersedes 008's flat-Set guard.** 008's minimal fix was correct given the information at the time and explicitly deferred parent/depth tracking. The orchestrator reasoning-patch branch added later by 012/014/015 (`hooks.ts:127`) created a bypass where an unregistered subagent's `task` call was swallowed before reaching 008's guard. 020 closes it by deriving depth from `parentID` recorded synchronously at `session.created` (fires before the child's first `tool.execute.before`) and blocking `task`+`delegate` at depth ≥ 1 before the orchestrator branch.
+- **021 is a strict-TDD retrofit of 020.** It does not change the production behavior; it replays the same nested-delegation fix with a revert-and-redo cycle, keeps hook unit tests mock-based for branch coverage, and adds a real-store integration test to prove the wiring end-to-end.
 
 ## Verification commands (apply to every plan)
 

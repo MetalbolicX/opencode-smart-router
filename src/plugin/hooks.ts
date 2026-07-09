@@ -36,6 +36,22 @@ import type { HookEventPayload, HookPayload } from "./types";
 import { asChatMessageInput, asTaskToolArgs, asToolCallInput } from "./types";
 
 // ---------------------------------------------------------------------------
+// session.created — parentID extraction helper.
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the parentID from a session.created event's properties.
+ * Returns null if the event has no info.parentID (root session).
+ * Safe to call on any event shape — returns null on missing fields.
+ */
+const extractParentID = (props: Record<string, unknown> | undefined): string | null => {
+  const info = props?.info as Record<string, unknown> | undefined;
+  const pid = info?.parentID;
+  if (typeof pid === "string") return pid;
+  return null;
+};
+
+// ---------------------------------------------------------------------------
 // chat.params — temperature override for open grader sessions.
 // ---------------------------------------------------------------------------
 
@@ -96,6 +112,25 @@ export const handleToolExecuteBefore = async (
   if (ctx.state.bypassed) return;
   const sid = input?.sessionID as string | undefined;
   const tool = input?.tool as string | undefined;
+
+  // Plan 020: depth-based nested-delegation guard.
+  // Fire BEFORE the orchestrator reasoning-patch branch and BEFORE the Plan 008
+  // flat-isSubagent guard. Blocks descendants (depth >= 1) from calling both
+  // "task" (built-in) and "delegate" tools. Depth is recorded synchronously at
+  // session.created via registerFromSessionCreated, so it is available from the
+  // very first tool call of any child session.
+  //
+  // The guard uses isDescendant() (backed by depth()) rather than isSubagent()
+  // because a descendant session may not yet be registered as a subagent via
+  // chat.message — the parentID is recorded at session.created before the child's
+  // first tool call reaches this hook.
+  if (sid && (tool === "task" || tool === "delegate")) {
+    if (typeof ctx.sessionStore.isDescendant === "function" && ctx.sessionStore.isDescendant(sid)) {
+      throw new Error(
+        "Nested subagent delegation is not allowed: subagent sessions cannot call the built-in task or delegate tools",
+      );
+    }
+  }
 
   // PR 2 of adaptive-reasoning: resolve the per-session override and patch
   // the targeted tier agent on the live `opencodeConfig` BEFORE the task
@@ -429,6 +464,26 @@ export const handleSessionIdle = async (
   payload: HookEventPayload,
 ): Promise<void> => {
   const event = payload?.event;
+
+  // Plan 020: handle session.created — record parentID so depth is available
+  // before the child's first tool call.
+  if (event?.type === "session.created") {
+    const props = event?.properties as Record<string, unknown> | undefined;
+    const sid = props?.sessionID as string | undefined;
+    if (typeof sid !== "string") return;
+    const parentID = extractParentID(props);
+    // Only call registerFromSessionCreated if the store exposes it (defensive:
+    // it may not exist in older store implementations).
+    if (typeof ctx.sessionStore.registerFromSessionCreated === "function") {
+      try {
+        ctx.sessionStore.registerFromSessionCreated({ sessionID: sid, parentID });
+      } catch {
+        // best-effort: store registration must never crash a real session
+      }
+    }
+    return;
+  }
+
   if (event?.type !== "session.idle") return;
   const props = event?.properties as Record<string, unknown> | undefined;
   const sid = props?.sessionID as string | undefined;
