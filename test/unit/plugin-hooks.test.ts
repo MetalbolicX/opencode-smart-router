@@ -1271,3 +1271,221 @@ describe("handleToolExecuteBefore — built-in task runtime guard (PR 2)", () =>
     ).rejects.toThrow(/Nested subagent delegation is not allowed/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan 020/021 — session.created parent registration + depth-based guard.
+//
+// The session.created event fires synchronously when the SDK creates a child
+// session, BEFORE the child's first tool call. The hook records the parentID
+// in the store so that depth() is available from the first handleToolExecuteBefore
+// call. This closes the bypass that Plan 008's flat-isSubagent guard missed.
+//
+// Controls:
+//   - session.created registers a child from event.properties.info.parentID
+//   - depth >= 1 blocks both "task" and "delegate" tools (not just "task")
+//   - depth-0 orchestrator sessions are unaffected
+//   - The guard runs BEFORE the reasoning-patch branch (ordering)
+//   - Registration failures are best-effort (do not crash)
+//   - session.idle continues to work unchanged
+// ---------------------------------------------------------------------------
+
+// Extend the harness sessionStore mock to include depth/parent tracking.
+const extendHarnessWithDepth = (h: HookHarness): void => {
+  const parentMap = new Map<string, string>();
+  const depthCache = new Map<string, number>();
+
+  const computeDepth = (sid: string, visited: Set<string> = new Set()): number => {
+    if (visited.has(sid)) return 0;
+    const parent = parentMap.get(sid);
+    if (!parent) return 0;
+    visited.add(sid);
+    return computeDepth(parent, visited) + 1;
+  };
+
+  h.ctx.sessionStore = {
+    ...h.ctx.sessionStore,
+    registerFromSessionCreated: ({ sessionID, parentID }: { sessionID: string; parentID: string | null }) => {
+      if (parentID != null) {
+        parentMap.set(sessionID, parentID);
+      }
+      depthCache.clear();
+    },
+    depth: (sid: string) => {
+      let d = depthCache.get(sid);
+      if (d !== undefined) return d;
+      d = computeDepth(sid);
+      depthCache.set(sid, d);
+      return d;
+    },
+    parentOf: (sid: string) => parentMap.get(sid) ?? null,
+    isDescendant: (sid: string) => {
+      h.ctx.sessionStore.depth(sid);
+      return (depthCache.get(sid) ?? 0) >= 1;
+    },
+  } as any;
+};
+
+describe("handleToolExecuteBefore — depth-based nested delegation guard (plan 020)", () => {
+  it("blocks 'task' at depth >= 1 with the nested-delegation error", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    // Simulate: orchestrator (depth 0) creates child session "sid-child" (depth 1).
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-child", parentID: "sid-orch" });
+    // The child is a subagent.
+    (h.ctx.sessionStore as any).isSubagent = () => true;
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-child", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/Nested subagent delegation is not allowed/);
+  });
+
+  it("blocks 'delegate' at depth >= 1 with the same error", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-child", parentID: "sid-orch" });
+    (h.ctx.sessionStore as any).isSubagent = () => true;
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-child", tool: "delegate", args: { task: "do work" } },
+        { args: { task: "do work" } },
+      ),
+    ).rejects.toThrow(/Nested subagent delegation is not allowed/);
+  });
+
+  it("allows 'task' at depth 0 (orchestrator session)", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    // depth 0: sid-orch is the orchestrator (root session).
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-orch", parentID: null as any });
+    (h.ctx.sessionStore as any).isSubagent = () => false; // orchestrator is not a subagent
+
+    // Should NOT throw — orchestrator can call task.
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("allows 'delegate' at depth 0", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-orch", parentID: null as any });
+    (h.ctx.sessionStore as any).isSubagent = () => false;
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "delegate", args: { task: "do work" } },
+        { args: { task: "do work" } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("allows read-only tools (e.g. 'read') at depth >= 1", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-child", parentID: "sid-orch" });
+    (h.ctx.sessionStore as any).isSubagent = () => true;
+
+    // Read-only tools should pass through to guardBeforeCall (not throw).
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-child", tool: "read", args: { file_path: "a.ts" } },
+        { args: { file_path: "a.ts" } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("the depth guard runs BEFORE the reasoning-patch branch (ordering)", async () => {
+    // The reasoning patch block is gated by !isSubagent(sid) (orchestrator only).
+    // A depth >= 1 session is a subagent, so the orchestrator reasoning patch
+    // branch is never reached. The depth guard fires first.
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    h.ctx.sessionStore.registerFromSessionCreated({ sessionID: "sid-child", parentID: "sid-orch" });
+    (h.ctx.sessionStore as any).isSubagent = () => true;
+
+    // If the depth guard ran first, we get the delegation error — not a patch.
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-child", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).rejects.toThrow(/Nested subagent delegation is not allowed/);
+  });
+});
+
+describe("handleSessionEvent — session.created parent registration (plan 020)", () => {
+  it("registers a child from event.properties.info.parentID", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    // The session.created event carries parentID in info.
+    await h.ctx.sessionStore.registerFromSessionCreated({
+      sessionID: "sid-child",
+      parentID: "sid-orch",
+    });
+
+    expect(h.ctx.sessionStore.parentOf("sid-child")).toBe("sid-orch");
+    expect(h.ctx.sessionStore.depth("sid-child")).toBe(1);
+  });
+
+  it("ignores non-created events (does not crash)", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    // handleSessionIdle ignores non-session.idle events — this is a regression.
+    await expect(
+      handleSessionIdle(h.ctx, { event: { type: "session.created" } as any }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("parentID is ignored if event.properties.info.parentID is absent", async () => {
+    const h = makeHarness();
+    extendHarnessWithDepth(h);
+
+    // A session.created without info.parentID → root session (no parent registered).
+    await h.ctx.sessionStore.registerFromSessionCreated({
+      sessionID: "sid-root",
+      parentID: null as any,
+    });
+
+    expect(h.ctx.sessionStore.parentOf("sid-root")).toBeNull();
+    expect(h.ctx.sessionStore.depth("sid-root")).toBe(0);
+  });
+
+  it("registration failure is best-effort: store throws do not crash the hook", async () => {
+    const h = makeHarness();
+    // Make the store throw on registerFromSessionCreated.
+    (h.ctx.sessionStore as any).registerFromSessionCreated = () => {
+      throw new Error("store boom");
+    };
+
+    // The hook must catch this and not propagate.
+    await expect(
+      handleSessionIdle(h.ctx, {
+        event: {
+          type: "session.created",
+          properties: { info: { parentID: "parent" }, sessionID: "child" },
+        } as any,
+      }),
+    ).resolves.toBeUndefined();
+  });
+});

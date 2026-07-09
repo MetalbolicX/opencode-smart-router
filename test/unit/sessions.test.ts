@@ -365,3 +365,100 @@ describe("createSessionStore — getTier", () => {
     expect(store.getTier("ses_tier3")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan 020/021 — depth / parent tracking for nested delegation guard.
+// ---------------------------------------------------------------------------
+
+describe("createSessionStore — depth / parent tracking", () => {
+  it("depth(root) === 0 for a root session (no parent)", () => {
+    const store = createSessionStore();
+    // A root session is registered via registerProducerSession or is not
+    // registered as a subagent at all; depth is only meaningful for sessions
+    // that were registered via registerFromSessionCreated with a parentID.
+    // When no parentID is present the session is a root (depth 0).
+    store.registerProducerSession("root", "fast", cfg);
+    expect(store.depth("root")).toBe(0);
+  });
+
+  it("depth(child) === 1 after registerFromSessionCreated(child, root)", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "child", parentID: "root" });
+    expect(store.depth("child")).toBe(1);
+  });
+
+  it("depth(grandchild) === 2 after chained registrations", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "child", parentID: "root" });
+    store.registerFromSessionCreated({ sessionID: "grandchild", parentID: "child" });
+    expect(store.depth("grandchild")).toBe(2);
+  });
+
+  it("parentOf(child) returns 'root' after registerFromSessionCreated(child, root)", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "child", parentID: "root" });
+    expect(store.parentOf("child")).toBe("root");
+  });
+
+  it("parentOf(root) returns null (no parent)", () => {
+    const store = createSessionStore();
+    store.registerProducerSession("root", "medium", cfg);
+    expect(store.parentOf("root")).toBeNull();
+  });
+
+  it("parentOf(unknown) returns null", () => {
+    const store = createSessionStore();
+    expect(store.parentOf("does-not-exist")).toBeNull();
+  });
+
+  it("isDescendant(child) is true when depth >= 1", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "child", parentID: "root" });
+    expect(store.isDescendant("child")).toBe(true);
+  });
+
+  it("isDescendant(root) is false for root session", () => {
+    const store = createSessionStore();
+    store.registerProducerSession("root", "fast", cfg);
+    expect(store.isDescendant("root")).toBe(false);
+  });
+
+  it("isDescendant(unknown) is false", () => {
+    const store = createSessionStore();
+    expect(store.isDescendant("does-not-exist")).toBe(false);
+  });
+
+  it("unregister removes parent edge: child is no longer tracked after unregister", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "child", parentID: "root" });
+    expect(store.depth("child")).toBe(1);
+    store.unregister("child");
+    // After unregister the child is gone from tracking — depth returns 0
+    // (not found → treated as unregistered root = depth 0).
+    expect(store.depth("child")).toBe(0);
+    expect(store.isDescendant("child")).toBe(false);
+  });
+
+  it("null-parent session is not a subagent (depth 0, not tracked as subagent)", () => {
+    const store = createSessionStore();
+    // A session.created event with no parentID → root session.
+    // It should not appear as a subagent (depth 0).
+    store.registerFromSessionCreated({ sessionID: "orphan", parentID: null as any });
+    expect(store.depth("orphan")).toBe(0);
+    expect(store.isSubagent("orphan")).toBe(false);
+    expect(store.isDescendant("orphan")).toBe(false);
+  });
+
+  it("cycle guard: registering child->parent->grandchild->child is defensive (depth stays bounded)", () => {
+    const store = createSessionStore();
+    store.registerFromSessionCreated({ sessionID: "a", parentID: "b" });
+    store.registerFromSessionCreated({ sessionID: "b", parentID: "a" });
+    // Both sessions have depth >= 1 but the cycle does not spiral.
+    // The implementation may choose to stop ascent at a cap or return 0.
+    const depthA = store.depth("a");
+    const depthB = store.depth("b");
+    // Neither should be an unreasonable number.
+    expect(depthA).toBeLessThan(10);
+    expect(depthB).toBeLessThan(10);
+  });
+});
