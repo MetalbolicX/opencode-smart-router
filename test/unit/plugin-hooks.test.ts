@@ -991,7 +991,7 @@ describe("handleToolExecuteBefore/After — plan 014 surface-limits events + in-
         },
       },
     });
-    h.ctx.opencodeConfig = { agent: { fast: { variant: "low" } } };
+    h.ctx.opencodeConfig = { agent: { fast: { mode: "subagent", variant: "low" } } };
     h.ctx.reasoningStore.setBaseline("fast", { variant: "low" });
     h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -1269,6 +1269,163 @@ describe("handleToolExecuteBefore — built-in task runtime guard (PR 2)", () =>
         { args: { subagent_type: "fast" } },
       ),
     ).rejects.toThrow(/Nested subagent delegation is not allowed/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fix-ghost-build-subagent — mode guard for non-subagent agent targets.
+//
+// The orchestrator LLM sometimes dispatches Task(subagent_type="build") where
+// "build" is the built-in primary/default agent (not a tier agent). This
+// agent stays in opencodeConfig.agent after registerTierAgents() adds
+// fast/medium/heavy, so agentDef resolves but the target has no tier model
+// and is not a router-managed subagent. The guard MUST reject such dispatches
+// with __tierGuardError before tier lookup or any patching occurs.
+//
+// Spec scenarios:
+//   AC1: build without mode → throws __tierGuardError naming "build"
+//   AC2: fast tier dispatch → unchanged (still passes)
+//   AC3: mode:"subagent" skill agent → unchanged (still passes)
+//   AC4: resolved agent with mode:undefined → throws __tierGuardError
+//   AC5: no regression in tier-model error propagation
+//   AC6: protocol.ts calls out "build" as invalid Task target
+// ---------------------------------------------------------------------------
+
+describe("handleToolExecuteBefore — ghost build subagent mode guard", () => {
+  // AC1: build agent resolves but has no mode → must throw __tierGuardError
+  it("throws __tierGuardError naming 'build' when build agent has no mode", async () => {
+    const h = makeHarness();
+    // Simulate the ghost build agent: resolves from opencodeConfig.agent but
+    // has no mode field (not mode:"subagent", not any valid tier mode).
+    h.ctx.opencodeConfig = {
+      agent: {
+        build: {
+          // No mode property — this is the ghost subagent scenario
+          description: "primary",
+          prompt: "build prompt",
+        },
+      },
+    };
+
+    let caught: Error | undefined;
+    try {
+      await handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "build" } },
+        { args: { subagent_type: "build" } },
+      );
+    } catch (e) {
+      caught = e as Error;
+    }
+
+    expect(caught).toBeDefined();
+    expect((caught as any).__tierGuardError).toBe(true);
+    expect(caught?.message).toContain("build");
+    expect(caught?.message).toMatch(/not a router-managed subagent target/i);
+  });
+
+  // AC4: resolved agent with explicit mode:undefined → same rejection
+  it("throws __tierGuardError when resolved agent has mode: undefined", async () => {
+    const h = makeHarness();
+    h.ctx.opencodeConfig = {
+      agent: {
+        someAgent: {
+          mode: undefined,
+          description: "test",
+          prompt: "test prompt",
+        },
+      },
+    };
+
+    let caught: Error | undefined;
+    try {
+      await handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "someAgent" } },
+        { args: { subagent_type: "someAgent" } },
+      );
+    } catch (e) {
+      caught = e as Error;
+    }
+
+    expect(caught).toBeDefined();
+    expect((caught as any).__tierGuardError).toBe(true);
+  });
+
+  // AC2 regression: fast tier dispatch with proper reasoning policy setup
+  // still passes through without throwing the mode guard.
+  it("fast tier dispatch with reasoning policy passes unchanged (regression AC2)", async () => {
+    const h = makeHarness({
+      configOverrides: {
+        reasoningPolicy: { mode: "manual" },
+        presets: {
+          default: {
+            fast: {
+              model: "anthropic/claude-haiku-4-5",
+              description: "fast",
+              whenToUse: [],
+              variant: "thinking", // elevated value for binary capability
+            },
+          },
+        },
+      },
+    });
+    const baseline = {
+      model: "anthropic/claude-haiku-4-5",
+      mode: "subagent",
+      description: "fast",
+      prompt: "test prompt",
+      variant: "low",
+    };
+    h.ctx.opencodeConfig = { agent: { fast: { ...baseline } } };
+    h.ctx.reasoningStore.setBaseline("fast", structuredClone(baseline));
+    h.ctx.reasoningStore.setOverride("sid-orch", "elevated");
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "fast" } },
+        { args: { subagent_type: "fast" } },
+      ),
+    ).resolves.toBeUndefined();
+
+    // fast tier owner is acquired (proves no early throw from guard)
+    expect(h.ctx.reasoningStore.getTierOwner("fast")).toBe("sid-orch");
+    // Agent def was patched from low → thinking (proves full reasoning flow intact)
+    expect(h.ctx.opencodeConfig?.agent?.["fast"]?.variant).toBe("thinking");
+  });
+
+  // AC3 regression: mode:"subagent" non-tier skill agent passes through
+  // without throwing. A skill agent (e.g. from opencode agent registry) that
+  // has mode:"subagent" but is not a configured tier should not be blocked.
+  // It skips the tier block (no tier-model guard, no reasoning patch) but
+  // must not throw the mode guard.
+  it("mode:subagent non-tier skill agent passes unchanged (regression AC3)", async () => {
+    const h = makeHarness();
+    // "mySkill" is NOT a configured tier - it exists only in agent registry.
+    // It has mode:"subagent" so it should pass the guard.
+    h.ctx.opencodeConfig = {
+      agent: {
+        mySkill: {
+          model: "anthropic/claude-haiku-4-5",
+          mode: "subagent",
+          description: "a skill agent",
+          prompt: "skill prompt",
+        },
+      },
+    };
+
+    await expect(
+      handleToolExecuteBefore(
+        h.ctx,
+        { sessionID: "sid-orch", tool: "task", args: { subagent_type: "mySkill" } },
+        { args: { subagent_type: "mySkill" } },
+      ),
+    ).resolves.toBeUndefined();
+
+    // No tier owner acquired (mySkill is not a tier) - this is expected.
+    // The point is that it passes the guard without throwing.
+    expect(h.ctx.reasoningStore.getTierOwner("mySkill")).toBeUndefined();
   });
 });
 

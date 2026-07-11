@@ -168,6 +168,20 @@ export const handleToolExecuteBefore = async (
         const description = taskArgs?.description ?? "";
         const agentDef = subagentType ? ctx.opencodeConfig.agent[subagentType] : undefined;
         if (subagentType && agentDef) {
+          // fix-ghost-build-subagent: mode guard — reject any resolved agent
+          // whose mode is not "subagent". Only tier agents (fast/medium/heavy)
+          // and skill subagents (mode:"subagent") are valid Task targets.
+          // The "build" agent and other built-in primary agents resolve from
+          // opencodeConfig.agent but are not router-managed subagents.
+          const mode = (agentDef as { mode?: unknown }).mode;
+          if (mode !== "subagent") {
+            const err = new Error(
+              `Built-in task rejected: "${subagentType}" is not a router-managed subagent target`,
+            ) as Error & { __tierGuardError?: true };
+            err.__tierGuardError = true;
+            throw err;
+          }
+
           const cfg = await ctx.getConfig();
           const tiers = getActiveTiers(cfg);
           const tier = tiers[subagentType];

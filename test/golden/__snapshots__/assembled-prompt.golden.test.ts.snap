@@ -76,6 +76,9 @@ Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→githu
 
 Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition.
+
 ---
 
 ### Acceptance / Definition of Done (enforcement is ON)
@@ -169,7 +172,10 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;
 
 exports[`assembled-prompt golden > assembled-prompt-anthropic-model-openai > assembled-prompt-anthropic-model-openai 1`] = `
@@ -213,7 +219,10 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;
 
 exports[`assembled-prompt golden > assembled-prompt-anthropic-model-undefined > assembled-prompt-anthropic-model-undefined 1`] = `
@@ -257,7 +266,10 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;
 
 exports[`assembled-prompt golden > assembled-prompt-openai-enforcement-on > assembled-prompt-openai-enforcement-on 1`] = `
@@ -302,6 +314,9 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot
 
 Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition.
 
 ---
 
@@ -396,7 +411,10 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;
 
 exports[`assembled-prompt golden > assembled-prompt-openai-model-openai > assembled-prompt-openai-model-openai 1`] = `
@@ -440,7 +458,10 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;
 
 exports[`assembled-prompt golden > assembled-prompt-openai-model-undefined > assembled-prompt-openai-model-undefined 1`] = `
@@ -484,5 +505,8 @@ Multi-phase: prefer explore(@fast)→execute(@medium) when phases are separable.
 
 Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot
 
-Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here."
+Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
+
+### Invalid Targets
+**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition."
 `;

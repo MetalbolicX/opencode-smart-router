@@ -141,6 +141,9 @@ export const buildDelegationProtocol = (cfg: RouterConfig): string => {
     ...(fallback ? [``, fallback] : []),
     ``,
     `Delegate with \`Task(subagent_type="fast"|"medium"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.`,
+    ``,
+    `### Invalid Targets`,
+    `**\`build\` is NOT a valid \`Task(subagent_type=...)\` target** — the \`build\` agent is the built-in primary/default agent, not a router-managed subagent. Dispatching \`Task(subagent_type="build")\` will be rejected with a runtime guard error. Use \`fast\`, \`medium\`, or \`heavy\` instead, or use a skill agent that carries the \`"subagent"\` mode marker in its definition.`,
   ].join("\n");
 };
 
