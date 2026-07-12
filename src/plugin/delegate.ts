@@ -54,8 +54,17 @@ export type { DelegateArgs } from "./types";
  * propagates — the contract is fail-soft. Failures are emitted as structured
  * `log.warn` events so operators have visibility without crashing the session.
  */
-const cleanupProducerSession = (ctx: PluginContext, producerSid: string): void => {
-  ctx.changedFileStore.clear(producerSid);
+const cleanupProducerSession = async (ctx: PluginContext, producerSid: string): Promise<void> => {
+  try {
+    ctx.changedFileStore.clear(producerSid);
+  } catch (err) {
+    log.warn({
+      event: "delegate.cleanup_failed",
+      store: "changedFileStore.clear",
+      sid: producerSid,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
   try {
     ctx.sessionStore.unregister(producerSid);
   } catch (err) {
@@ -75,6 +84,37 @@ const cleanupProducerSession = (ctx: PluginContext, producerSid: string): void =
       sid: producerSid,
       error: err instanceof Error ? err.message : String(err),
     });
+  }
+  // SDK teardown — fail-soft, null-safe, independent timeouts.
+  if (producerSid) {
+    try {
+      await withTimeout(
+        ctx.plugin.client.session.abort({ path: { id: producerSid } }),
+        10_000,
+        "delegate session.abort",
+      );
+    } catch (err) {
+      log.warn({
+        event: "delegate.cleanup_failed",
+        store: "session.abort",
+        sid: producerSid,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await withTimeout(
+        ctx.plugin.client.session.delete({ path: { id: producerSid } }),
+        10_000,
+        "delegate session.delete",
+      );
+    } catch (err) {
+      log.warn({
+        event: "delegate.cleanup_failed",
+        store: "session.delete",
+        sid: producerSid,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 };
 
@@ -206,7 +246,7 @@ export const executeDelegate = async (
       if (signal?.aborted) {
         const abortedSid = extractSessionId(created);
         if (abortedSid) {
-          cleanupProducerSession(ctx, abortedSid);
+          await cleanupProducerSession(ctx, abortedSid);
         }
         return "";
       }
@@ -216,7 +256,7 @@ export const executeDelegate = async (
         const maybeSid =
           created?.data?.id && typeof created.data.id === "string" ? created.data.id : "";
         if (maybeSid) {
-          cleanupProducerSession(ctx, maybeSid);
+          await cleanupProducerSession(ctx, maybeSid);
         }
         log.warn({
           event: "delegate.create_no_sid",
@@ -483,7 +523,7 @@ export const executeDelegate = async (
         // Always runs — even on timeout, abort, or throw from
         // session.prompt / gate — so a single stuck or cancelled subagent
         // cannot leak tracking entries forever.
-        cleanupProducerSession(ctx, producerSid);
+        await cleanupProducerSession(ctx, producerSid);
       }
     }
   } catch (err) {

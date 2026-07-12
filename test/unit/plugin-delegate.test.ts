@@ -82,6 +82,8 @@ interface SessionCall {
 const makeCtx = (opts: {
   createImpl?: (req: any) => Promise<any>;
   promptImpl?: (req: any) => Promise<any>;
+  abortImpl?: (req: any) => Promise<any>;
+  deleteImpl?: (req: any) => Promise<any>;
   getConfigImpl?: () => RouterConfig;
   refreshConfigImpl?: () => RouterConfig;
   sessionStoreOverrides?: Partial<{
@@ -168,6 +170,8 @@ const makeCtx = (opts: {
                 if (last) last.promptText = text;
                 return { data: { parts: [{ type: "text", text: "I did it." }] } };
               },
+          abort: opts.abortImpl ?? vi.fn().mockResolvedValue(undefined),
+          delete: opts.deleteImpl ?? vi.fn().mockResolvedValue(undefined),
         },
         // SDD: tui-toast-verification — wire a tui.showToast spy so the
         // terminal-failure tests can assert exactly-one-toast-per-outcome
@@ -343,6 +347,94 @@ describe("executeDelegate — happy path", () => {
     expect(counters.refreshConfig).toBe(1);
     expect(counters.getConfig).toBeGreaterThanOrEqual(1);
   });
+
+  it("calls session.abort and session.delete with producer SID after happy completion", async () => {
+    const gateOk = {
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValueOnce(gateOk);
+
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+
+    // Extract the SID that was used in session.create
+    const createdSid = "sess_1";
+
+    // SDK teardown should have been called with the producer SID
+    expect(abortSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { id: createdSid } }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { id: createdSid } }),
+    );
+  });
+});
+
+describe("executeDelegate — SDK teardown fail-soft", () => {
+  it("calls session.delete even when session.abort rejects", async () => {
+    const gateOk = {
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValueOnce(gateOk);
+
+    const abortSpy = vi.fn().mockRejectedValue(new Error("abort failed"));
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    // Should not throw — abort rejection is caught.
+    await expect(
+      executeDelegate(ctx, { task: "say hi", tier: "fast" }),
+    ).resolves.toBeDefined();
+
+    // delete MUST still be called even though abort failed.
+    expect(deleteSpy).toHaveBeenCalled();
+  });
+
+  it("does not propagate when session.delete rejects", async () => {
+    const gateOk = {
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValueOnce(gateOk);
+
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockRejectedValue(new Error("delete failed"));
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    // Should not throw — delete rejection is caught.
+    await expect(
+      executeDelegate(ctx, { task: "say hi", tier: "fast" }),
+    ).resolves.toBeDefined();
+
+    // abort was called before delete failed.
+    expect(abortSpy).toHaveBeenCalled();
+  });
+
+  it("does not propagate when both session.abort and session.delete reject", async () => {
+    const gateOk = {
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValueOnce(gateOk);
+
+    const abortSpy = vi.fn().mockRejectedValue(new Error("abort failed"));
+    const deleteSpy = vi.fn().mockRejectedValue(new Error("delete failed"));
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    // Should not throw — both rejections are caught.
+    await expect(
+      executeDelegate(ctx, { task: "say hi", tier: "fast" }),
+    ).resolves.toBeDefined();
+  });
 });
 
 describe("executeDelegate — refresh fallback", () => {
@@ -372,6 +464,21 @@ describe("executeDelegate — failure paths", () => {
     });
     const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
     expect(out).toContain("could not create a producer session");
+  });
+
+  it("does NOT call session.abort or session.delete when session.create yields no usable sid", async () => {
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: undefined }),
+      abortImpl: abortSpy,
+      deleteImpl: deleteSpy,
+    });
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("could not create a producer session");
+    // No SID means nothing to abort/delete — SDK teardown must not be called.
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
   it("early-returns without calling registerProducerSession when session.create yields empty-string id", async () => {
@@ -1022,6 +1129,8 @@ describe("executeDelegate — abort between create and prompt (post-create check
     const ac = new AbortController();
     const unregisterCalls: string[] = [];
     const clearCalls: string[] = [];
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
     let createDone = false;
     const { ctx } = makeCtx({
       createImpl: async () => {
@@ -1035,6 +1144,8 @@ describe("executeDelegate — abort between create and prompt (post-create check
       promptImpl: async () => {
         throw new Error("prompt must NOT be called when aborted between create+prompt");
       },
+      abortImpl: abortSpy,
+      deleteImpl: deleteSpy,
       sessionStoreOverrides: {
         unregister: (sid: unknown) => {
           unregisterCalls.push(String(sid));
@@ -1051,6 +1162,13 @@ describe("executeDelegate — abort between create and prompt (post-create check
     // The producer session created just before the abort MUST be cleaned up.
     expect(unregisterCalls).toContain("sess_aborted_between");
     expect(clearCalls).toContain("sess_aborted_between");
+    // SDK teardown: abort + delete MUST be called with the producer SID.
+    expect(abortSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { id: "sess_aborted_between" } }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { id: "sess_aborted_between" } }),
+    );
   });
 });
 
