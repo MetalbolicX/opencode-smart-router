@@ -348,7 +348,9 @@ describe("executeDelegate — happy path", () => {
     expect(counters.getConfig).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls session.abort and session.delete with producer SID after happy completion", async () => {
+  // SDD fix-session-ghost-tui-jump: on happy completion, the session persists in
+  // the TUI as 'idle' — NEITHER abort NOR delete is called.
+  it("does NOT call session.abort or session.delete on happy completion (session persists)", async () => {
     const gateOk = {
       accepted: true,
       verdict: { pass: true, method: "deterministic", reasons: [] },
@@ -365,75 +367,64 @@ describe("executeDelegate — happy path", () => {
     // Extract the SID that was used in session.create
     const createdSid = "sess_1";
 
-    // SDK teardown should have been called with the producer SID
-    expect(abortSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ path: { id: createdSid } }),
-    );
-    expect(deleteSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ path: { id: createdSid } }),
-    );
+    // Happy completion: session stays alive in TUI — no abort, no delete.
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 });
 
 describe("executeDelegate — SDK teardown fail-soft", () => {
-  it("calls session.delete even when session.abort rejects", async () => {
-    const gateOk = {
-      accepted: true,
-      verdict: { pass: true, method: "deterministic", reasons: [] },
+  // SDD fix-session-ghost-tui-jump: delete is NEVER called. On failure paths,
+  // abort is called (shouldAbort=true) but delete is removed entirely.
+  it("calls session.abort on gate failure but NOT session.delete", async () => {
+    const gateFail = {
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["gate failed"] },
       dodSource: "inferred",
     };
-    acceptMock.mockResolvedValueOnce(gateOk);
+    acceptMock.mockResolvedValue(gateFail);
 
     const abortSpy = vi.fn().mockRejectedValue(new Error("abort failed"));
     const deleteSpy = vi.fn().mockResolvedValue(undefined);
     const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
 
-    // Should not throw — abort rejection is caught.
+    // Should not throw — abort rejection is caught, fail-soft.
     await expect(
       executeDelegate(ctx, { task: "say hi", tier: "fast" }),
-    ).resolves.toBeDefined();
+    ).resolves.toContain("unmet");
 
-    // delete MUST still be called even though abort failed.
-    expect(deleteSpy).toHaveBeenCalled();
-  });
-
-  it("does not propagate when session.delete rejects", async () => {
-    const gateOk = {
-      accepted: true,
-      verdict: { pass: true, method: "deterministic", reasons: [] },
-      dodSource: "inferred",
-    };
-    acceptMock.mockResolvedValueOnce(gateOk);
-
-    const abortSpy = vi.fn().mockResolvedValue(undefined);
-    const deleteSpy = vi.fn().mockRejectedValue(new Error("delete failed"));
-    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
-
-    // Should not throw — delete rejection is caught.
-    await expect(
-      executeDelegate(ctx, { task: "say hi", tier: "fast" }),
-    ).resolves.toBeDefined();
-
-    // abort was called before delete failed.
+    // abort WAS called (failure path triggers shouldAbort=true)
     expect(abortSpy).toHaveBeenCalled();
+    // delete is NEVER called in this SDD change
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
-  it("does not propagate when both session.abort and session.delete reject", async () => {
-    const gateOk = {
-      accepted: true,
-      verdict: { pass: true, method: "deterministic", reasons: [] },
+  // SDD fix-session-ghost-tui-jump: this test is removed because delete is
+  // NEVER called — session.delete has been removed from cleanupProducerSession.
+
+  // SDD fix-session-ghost-tui-jump: on gate failure, abort is called (fail-soft)
+  // but delete is NEVER called.
+  it("does not propagate when session.abort rejects on gate failure", async () => {
+    const gateFail = {
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["gate failed"] },
       dodSource: "inferred",
     };
-    acceptMock.mockResolvedValueOnce(gateOk);
+    acceptMock.mockResolvedValue(gateFail);
 
     const abortSpy = vi.fn().mockRejectedValue(new Error("abort failed"));
-    const deleteSpy = vi.fn().mockRejectedValue(new Error("delete failed"));
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
     const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
 
-    // Should not throw — both rejections are caught.
+    // Should not throw — abort rejection is caught, fail-soft.
     await expect(
       executeDelegate(ctx, { task: "say hi", tier: "fast" }),
-    ).resolves.toBeDefined();
+    ).resolves.toContain("unmet");
+
+    // abort was attempted (failure path)
+    expect(abortSpy).toHaveBeenCalled();
+    // delete is NEVER called in this SDD change
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -454,6 +445,80 @@ describe("executeDelegate — refresh fallback", () => {
     const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
     // The fallback uses getConfig() which returns the baseConfig — happy path continues.
     expect(out).toContain("[router \u2713 accepted: deterministic]");
+  });
+});
+
+// SDD fix-session-ghost-tui-jump: new session lifecycle tests.
+// REQ-3: No session.delete ever. REQ-4: Conditional session.abort.
+describe("executeDelegate — session lifecycle (fix-session-ghost-tui-jump)", () => {
+  // REQ-4: On happy completion, shouldAbort=false → session.abort NOT called.
+  // The session persists in TUI as 'idle' for developer review.
+  it("does NOT call session.abort on happy completion (session persists)", async () => {
+    const gateOk = {
+      accepted: true,
+      verdict: { pass: true, method: "deterministic", reasons: [] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValue(gateOk);
+
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("accepted");
+
+    // Happy path: session stays alive, no abort, no delete
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  // REQ-4: On gate failure, shouldAbort=true → session.abort IS called, no delete.
+  it("calls session.abort on gate failure but NOT session.delete", async () => {
+    const gateFail = {
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["gate rejected"] },
+      dodSource: "inferred",
+    };
+    acceptMock.mockResolvedValue(gateFail);
+
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({ abortImpl: abortSpy, deleteImpl: deleteSpy });
+
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("unmet");
+
+    // Failure path: abort IS called, delete is NEVER called
+    expect(abortSpy).toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  // REQ-4: On timeout, shouldAbort=true → session.abort IS called, no delete.
+  it("calls session.abort on timeout but NOT session.delete", async () => {
+    acceptMock.mockResolvedValue({
+      accepted: false,
+      verdict: { pass: false, method: "deterministic", reasons: ["empty artefact"] },
+      dodSource: "inferred",
+    });
+
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    const { ctx } = makeCtx({
+      createImpl: async () => ({ data: { id: "sess_timeout" } }),
+      promptImpl: async () => {
+        throw new Error("session.prompt timed out after 600000ms");
+      },
+      abortImpl: abortSpy,
+      deleteImpl: deleteSpy,
+    });
+
+    const out = await executeDelegate(ctx, { task: "say hi", tier: "fast" });
+    expect(out).toContain("unmet");
+
+    // Timeout path: abort IS called, delete is NEVER called
+    expect(abortSpy).toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -835,7 +900,10 @@ describe("executeDelegate — tier resolution and cost fallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeDelegate — parentSessionID propagation", () => {
-  it("forwards parentSessionID as parentID on session.create when provided", async () => {
+  // SDD fix-session-ghost-tui-jump: delegate session.create MUST NOT pass parentID.
+  // This prevents TUI ghost sessions. The depth-tracking system (isDescendant,
+  // parentMap) remains unchanged for core-created sessions.
+  it("does NOT pass parentID to session.create even when parentSessionID is provided", async () => {
     acceptMock.mockResolvedValueOnce({
       accepted: true,
       verdict: { pass: true, method: "deterministic", reasons: [] },
@@ -848,9 +916,11 @@ describe("executeDelegate — parentSessionID propagation", () => {
         return { data: { id: "sess_parent_child" } };
       },
     });
+    // parentSessionID is provided but MUST be ignored
     await executeDelegate(ctx, { task: "say hi", tier: "fast" }, "parent-sid-42");
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "parent-sid-42" } });
+    // REQ-1: No parentID on delegate session.create
+    expect(createCalls[0]).toEqual({});
   });
 
   it("passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
@@ -871,22 +941,15 @@ describe("executeDelegate — parentSessionID propagation", () => {
     expect(createCalls[0]).toEqual({});
   });
 
-  it("threads parentSessionID into buildGateDeps so the grader inherits it", async () => {
-    // Force the gate to call dispatchGrader (it would need to fail deterministic
-    // checks) by accepting with method 'grader' and making the result require
-    // an actual grader dispatch. Easier path: route dispatchGrader through the
-    // gate via a custom seam that we observe.
-    const dispatchGraderSpy = vi.fn(async () => ({ sessionID: "grader-sid", text: "ok" }));
+  // SDD fix-session-ghost-tui-jump: grader session.create MUST NOT pass parentID.
+  // REQ-2: No parentID on grader session.create.
+  it("does NOT pass parentID to session.create for the grader", async () => {
     const ctxBase = makeCtx({});
     const ctx: PluginContext = {
       ...ctxBase.ctx,
       seams: { exec: ctxBase.ctx.seams.exec, fs: ctxBase.ctx.seams.fs },
     };
-    // Build deps directly with the parent SID and exercise the closure path
-    // by mocking accept to invoke the provided dispatchGrader.
-    const { buildGateDeps, dispatchGrader } = await import("../../src/verify/dispatch");
-    // Spy on dispatchGrader by replacing ctx.client.session.create to capture
-    // the body the grader dispatch passes through.
+    const { buildGateDeps } = await import("../../src/verify/dispatch");
     const createCalls: unknown[] = [];
     const wrappedCtx: PluginContext = {
       ...ctx,
@@ -905,16 +968,16 @@ describe("executeDelegate — parentSessionID propagation", () => {
       } as any,
     };
     const deps = await buildGateDeps(wrappedCtx, "orch-sid-99");
-    // Directly call the closure to assert the parent SID is forwarded.
+    // Directly call the closure to assert the parent SID is NOT forwarded.
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
-    // Silence unused warnings
-    void dispatchGraderSpy;
-    void dispatchGrader;
+    // REQ-2: grader session.create passes {} (no parentID)
+    expect(createCalls[0]).toEqual({});
   });
 
-  it("keeps parentID on a failing delegate attempt", async () => {
+  // SDD fix-session-ghost-tui-jump: even on failure, NO parentID is passed.
+  // REQ-1: No parentID on delegate session.create (all paths).
+  it("does NOT pass parentID to session.create on a failing delegate attempt", async () => {
     acceptMock.mockImplementation(async () => ({
       accepted: false,
       verdict: { pass: false, method: "deterministic", reasons: ["boom"] },
@@ -932,9 +995,10 @@ describe("executeDelegate — parentSessionID propagation", () => {
 
     expect(out).toContain("[router status: unmet]");
     expect(createCalls.length).toBeGreaterThan(0);
+    // REQ-1: NO parentID passed, even on failure
     expect(
       createCalls.every((req) => {
-        return JSON.stringify(req) === JSON.stringify({ body: { parentID: "parent-sid-fail" } });
+        return JSON.stringify(req) === JSON.stringify({});
       }),
     ).toBe(true);
   });
@@ -1162,13 +1226,12 @@ describe("executeDelegate — abort between create and prompt (post-create check
     // The producer session created just before the abort MUST be cleaned up.
     expect(unregisterCalls).toContain("sess_aborted_between");
     expect(clearCalls).toContain("sess_aborted_between");
-    // SDK teardown: abort + delete MUST be called with the producer SID.
+    // SDK teardown: abort MUST be called (abort path), but delete is NEVER called.
     expect(abortSpy).toHaveBeenCalledWith(
       expect.objectContaining({ path: { id: "sess_aborted_between" } }),
     );
-    expect(deleteSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ path: { id: "sess_aborted_between" } }),
-    );
+    // REQ-3: session.delete is NEVER called
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 });
 

@@ -235,7 +235,7 @@ export const dispatchGrader = async (
   const cfg = await ctx.getConfig();
   const created = await withTimeout(
     ctx.plugin.client.session.create(
-      parentSessionID ? { body: { parentID: parentSessionID } } : {},
+      {},
     ) as Promise<SessionCreateResult>,
     30_000,
     "grader session.create",
@@ -278,11 +278,8 @@ export const dispatchGrader = async (
     } catch {
       // best-effort: cleanup MUST never throw out of the finally block.
     }
-    try {
-      await ctx.plugin.client.session.delete({ path: { id: sid } });
-    } catch {
-      // best-effort: cleanup MUST never throw out of the finally block.
-    }
+    // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+    // Grader sessions persist in the TUI instead of vanishing.
   }
 };
 
@@ -489,27 +486,19 @@ export const verifyTaskAfterHook = async (
       // non-fatal
     }
     if (childSessionID) {
-      // SDK teardown — removes the child session from the TUI session list.
+      // SDK teardown — attempt to abort a stuck child session.
       // Use short timeouts so a stuck SDK cleanup call cannot hang the
       // tool.execute.after hook forever. Each call is best-effort and
-      // independently wrapped so a failure from one never blocks the other,
-      // and the finally block never throws. The child has already returned
-      // its result by the time we reach here, but the timeout is a
-      // defense-in-depth in case the SDK is slow or stuck.
+      // independently wrapped so a failure never blocks the finally block.
+      // The child has already returned its result by the time we reach here,
+      // but the timeout is a defense-in-depth in case the SDK is slow or stuck.
+      // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+      // Sessions persist in the TUI for developer review.
       try {
         await withTimeout(
           ctx.plugin.client.session.abort({ path: { id: childSessionID } }),
           10_000,
           "task child session.abort",
-        );
-      } catch {
-        // best-effort: cleanup MUST never throw out of the finally block.
-      }
-      try {
-        await withTimeout(
-          ctx.plugin.client.session.delete({ path: { id: childSessionID } }),
-          10_000,
-          "task child session.delete",
         );
       } catch {
         // best-effort: cleanup MUST never throw out of the finally block.

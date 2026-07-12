@@ -54,7 +54,11 @@ export type { DelegateArgs } from "./types";
  * propagates — the contract is fail-soft. Failures are emitted as structured
  * `log.warn` events so operators have visibility without crashing the session.
  */
-const cleanupProducerSession = async (ctx: PluginContext, producerSid: string): Promise<void> => {
+const cleanupProducerSession = async (
+  ctx: PluginContext,
+  producerSid: string,
+  shouldAbort = true,
+): Promise<void> => {
   try {
     ctx.changedFileStore.clear(producerSid);
   } catch (err) {
@@ -86,7 +90,11 @@ const cleanupProducerSession = async (ctx: PluginContext, producerSid: string): 
     });
   }
   // SDK teardown — fail-soft, null-safe, independent timeouts.
-  if (producerSid) {
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+  // session.abort is conditional (shouldAbort parameter) — only called on
+  // non-success paths to avoid indefinite hangs while preserving completed
+  // sessions for developer review.
+  if (shouldAbort && producerSid) {
     try {
       await withTimeout(
         ctx.plugin.client.session.abort({ path: { id: producerSid } }),
@@ -97,20 +105,6 @@ const cleanupProducerSession = async (ctx: PluginContext, producerSid: string): 
       log.warn({
         event: "delegate.cleanup_failed",
         store: "session.abort",
-        sid: producerSid,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    try {
-      await withTimeout(
-        ctx.plugin.client.session.delete({ path: { id: producerSid } }),
-        10_000,
-        "delegate session.delete",
-      );
-    } catch (err) {
-      log.warn({
-        event: "delegate.cleanup_failed",
-        store: "session.delete",
         sid: producerSid,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -221,7 +215,6 @@ export const executeDelegate = async (
       try {
         created = await withTimeout(
           ctx.plugin.client.session.create({
-            ...(parentSessionID ? { body: { parentID: parentSessionID } } : {}),
             ...(signal ? { signal } : {}),
           }),
           30_000,
@@ -276,6 +269,8 @@ export const executeDelegate = async (
         });
       }
 
+      // SDD fix-session-ghost-tui-jump: track success to conditionally abort.
+      let attemptSucceeded = false;
       try {
         // SDD change: delegate-nonretryable-errors (fail-fast-hardening-v2).
         // Resolve the tier's model up front through the shared guard. A
@@ -468,6 +463,8 @@ export const executeDelegate = async (
         );
 
         if (action.action === "accept") {
+          // SDD fix-session-ghost-tui-jump: mark success so finally skips abort.
+          attemptSucceeded = true;
           // Accept still wins on the very last attempt even if the user
           // cancelled mid-prompt — the producer's verified text is real.
           dumpDelegateScorecard(producerSid, state, true, gateRes.verdict.method);
@@ -523,7 +520,8 @@ export const executeDelegate = async (
         // Always runs — even on timeout, abort, or throw from
         // session.prompt / gate — so a single stuck or cancelled subagent
         // cannot leak tracking entries forever.
-        await cleanupProducerSession(ctx, producerSid);
+        // SDD fix-session-ghost-tui-jump: conditionally abort based on success.
+        await cleanupProducerSession(ctx, producerSid, !attemptSucceeded);
       }
     }
   } catch (err) {

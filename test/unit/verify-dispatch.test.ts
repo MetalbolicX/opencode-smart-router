@@ -405,18 +405,13 @@ describe("dispatchGrader", () => {
   //     swallowed because cleanup is best-effort.
   // -------------------------------------------------------------------------
 
-  it("aborts and deletes the grader session on successful completion", async () => {
-    const deleteCalls: string[] = [];
+  it("aborts the grader session on successful completion", async () => {
     const abortCalls: string[] = [];
     const ctx = makeCtx({
       directory: workDir,
       promptImpl: async () => ({ data: { parts: [{ type: "text", text: "ok" }] } }),
       abortImpl: async (req: any) => {
         abortCalls.push(req?.path?.id);
-        return { data: true };
-      },
-      deleteImpl: async (req: any) => {
-        deleteCalls.push(req?.path?.id);
         return { data: true };
       },
     });
@@ -428,19 +423,16 @@ describe("dispatchGrader", () => {
     });
 
     expect(result.sessionID).toBe("sess_x");
-    // Both SDK calls must have run with the grader SID.
-    expect(deleteCalls).toContain("sess_x");
+    // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+    // Only session.abort runs to stop the grader session.
     expect(abortCalls).toContain("sess_x");
-    // Both must run exactly once (no duplicate cleanup).
-    expect(deleteCalls).toHaveLength(1);
     expect(abortCalls).toHaveLength(1);
-    // Untrack happens before abort/delete — the chat.params hook observes
+    // Untrack happens before abort — the chat.params hook observes
     // an empty `ctx.graderSessions` set on the next event.
     expect(ctx.graderSessions.has("sess_x")).toBe(false);
   });
 
-  it("aborts and deletes the grader session when the prompt call throws", async () => {
-    const deleteCalls: string[] = [];
+  it("aborts the grader session when the prompt call throws", async () => {
     const abortCalls: string[] = [];
     const ctx = makeCtx({
       directory: workDir,
@@ -451,35 +443,25 @@ describe("dispatchGrader", () => {
         abortCalls.push(req?.path?.id);
         return { data: true };
       },
-      deleteImpl: async (req: any) => {
-        deleteCalls.push(req?.path?.id);
-        return { data: true };
-      },
     });
 
     await expect(
       dispatchGrader(ctx, { tier: "fast", system: "sys", prompt: "do it" }),
     ).rejects.toThrow("prompt boom");
 
-    // The throw MUST NOT prevent abort + delete — the finally block runs.
+    // The throw MUST NOT prevent abort — the finally block runs.
+    // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
     expect(abortCalls).toContain("sess_x");
-    expect(deleteCalls).toContain("sess_x");
   });
 
-  it("still deletes the grader session when session.abort throws (best-effort isolation)", async () => {
-    const deleteCalls: string[] = [];
+  it("aborts the grader session even when session.abort throws (best-effort isolation)", async () => {
     const ctx = makeCtx({
       directory: workDir,
       promptImpl: async () => ({ data: { parts: [{ type: "text", text: "ok" }] } }),
-      // session.abort throws — the cleanup must isolate this failure so
-      // session.delete still runs. Otherwise a single SDK 5xx during abort
-      // would orphan the grader session in the TUI.
+      // session.abort throws — the cleanup must isolate this failure.
+      // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
       abortImpl: async () => {
         throw new Error("abort failed");
-      },
-      deleteImpl: async (req: any) => {
-        deleteCalls.push(req?.path?.id);
-        return { data: true };
       },
     });
 
@@ -490,8 +472,7 @@ describe("dispatchGrader", () => {
     });
 
     expect(result.sessionID).toBe("sess_x");
-    // delete MUST still run despite the abort failure.
-    expect(deleteCalls).toContain("sess_x");
+    // Abort failure is caught — the session persists in the TUI.
   });
 });
 
@@ -764,6 +745,8 @@ describe("verifyTaskAfterHook", () => {
   // SDK teardown contract.
   // -------------------------------------------------------------------------
 
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+  // Only session.abort is called on the child session.
   it("aborts and deletes the Task child session on successful verification", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     writeFileSync(join(workDir, "present.txt"), "ok");
@@ -798,10 +781,13 @@ describe("verifyTaskAfterHook", () => {
 
     await verifyTaskAfterHook(ctx, input, output);
 
+    // REQ-3: session.delete is NEVER called
     expect(abortCalls).toEqual(["child-success"]);
-    expect(deleteCalls).toEqual(["child-success"]);
+    expect(deleteCalls).toEqual([]);
   });
 
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+  // abort failure is best-effort, but delete is removed entirely.
   it("still attempts delete when task child session.abort throws (best-effort isolation)", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     writeFileSync(join(workDir, "present.txt"), "ok");
@@ -834,10 +820,11 @@ describe("verifyTaskAfterHook", () => {
 
     await verifyTaskAfterHook(ctx, input, output);
 
-    // abort failure must not block delete.
-    expect(deleteCalls).toEqual(["child-success"]);
+    // REQ-3: session.delete is NEVER called
+    expect(deleteCalls).toEqual([]);
   });
 
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
   it("aborts and deletes the Task child session even when verification rejects", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     // Missing file -> deterministic fail -> forcing note appended.
@@ -872,8 +859,9 @@ describe("verifyTaskAfterHook", () => {
 
     await verifyTaskAfterHook(ctx, input, output);
 
+    // REQ-3: session.delete is NEVER called
     expect(abortCalls).toEqual(["child-fail"]);
-    expect(deleteCalls).toEqual(["child-fail"]);
+    expect(deleteCalls).toEqual([]);
   });
 
   // -------------------------------------------------------------------------
@@ -884,6 +872,7 @@ describe("verifyTaskAfterHook", () => {
   // cleanup MUST run on every gate-skipping path.
   // -------------------------------------------------------------------------
 
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
   it("still aborts and deletes the Task child session when enforcement mode is OFF", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "0";
 
@@ -917,11 +906,13 @@ describe("verifyTaskAfterHook", () => {
 
     await verifyTaskAfterHook(ctx, input, output);
 
-    // Verification is OFF so output is not modified — but cleanup MUST still run.
+    // Verification is OFF so output is not modified — but abort MUST still run.
+    // REQ-3: session.delete is NEVER called
     expect(abortCalls).toEqual(["child-mode-off"]);
-    expect(deleteCalls).toEqual(["child-mode-off"]);
+    expect(deleteCalls).toEqual([]);
   });
 
+  // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
   it("still aborts and deletes the Task child session when verify.require is 'never'", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
 
@@ -960,8 +951,9 @@ describe("verifyTaskAfterHook", () => {
 
     await verifyTaskAfterHook(ctx, input, output);
 
+    // REQ-3: session.delete is NEVER called
     expect(abortCalls).toEqual(["child-req-never"]);
-    expect(deleteCalls).toEqual(["child-req-never"]);
+    expect(deleteCalls).toEqual([]);
   });
 
   it("does not crash when enforcement is OFF and output has no sessionId — cleanup runs unconditionally", async () => {
@@ -1091,7 +1083,9 @@ describe("verifyTaskAfterHook", () => {
     // the task-child SDK was skipped — adding a second would mean the
     // `if (childSessionID)` guard is broken.
     expect(abortCalls).toEqual(["grader-sid-3"]);
-    expect(deleteCalls).toEqual(["grader-sid-3"]);
+    // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
+    // Grader sessions persist in the TUI instead of vanishing.
+    expect(deleteCalls).toEqual([]);
     // Stores run unconditionally.
     expect(clearChangedCalls).toEqual([""]);
     expect(unregisterCalls).toEqual([""]);
@@ -1870,7 +1864,9 @@ describe("verifyTaskAfterHook — Phase 5: ambiguous verify.require end-to-end",
 // ---------------------------------------------------------------------------
 
 describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSessionID propagation", () => {
-  it("dispatchGrader forwards parentSessionID as parentID on session.create when provided", async () => {
+  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
+  // REQ-2: No parentID on grader session.create.
+  it("does NOT pass parentID to session.create even when parentSessionID is provided", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
       directory: workDir,
@@ -1886,7 +1882,8 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     );
     expect(result.sessionID).toBe("grader-sid");
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-77" } });
+    // REQ-2: grader session.create passes {} (no parentID)
+    expect(createCalls[0]).toEqual({});
   });
 
   it("dispatchGrader passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
@@ -1908,6 +1905,8 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     expect(createCalls[0]).toEqual({});
   });
 
+  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
+  // REQ-2: No parentID on grader session.create.
   it("buildGateDeps threads parentSessionID from the closure to dispatchGrader", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -1920,7 +1919,8 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     const deps = await buildGateDeps(ctx, "orch-sid-99");
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
+    // REQ-2: grader session.create passes {} (no parentID)
+    expect(createCalls[0]).toEqual({});
   });
 
   it("buildGateDeps without parentSessionID leaves dispatchGrader parentless", async () => {
@@ -1938,12 +1938,15 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     expect(createCalls[0]).toEqual({});
   });
 
+  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
+  // REQ-2: No parentID on grader session.create.
   it("verifyTaskAfterHook forwards parentSessionID from output.metadata to the grader session (orchestrator-parented grader)", async () => {
     // PR2 / Unit 2 — flipped from the pre-PR1 "parentless" assertion. The
     // contract is now metadata-first: when output.metadata.parentSessionId
     // is present, the grader session is created as a child of that
     // orchestrator/root session, NOT as a new root.
     // (SDD change: fix-task-verifier-session-parenting.)
+    // SDD fix-session-ghost-tui-jump: REQ-2 overrides this - grader NEVER gets parentID.
     process.env.MODEL_ROUTER_ENFORCE = "1";
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -1972,9 +1975,10 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     };
     await verifyTaskAfterHook(ctx, input, output);
     // DoD has no deterministic checks -> gate runs the checker path ->
-    // dispatchGrader is called once with parentID taken from metadata.
+    // dispatchGrader is called once.
+    // REQ-2: grader session.create passes {} (no parentID)
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-parent" } });
+    expect(createCalls[0]).toEqual({});
   });
 
   it("verifyTaskAfterHook leaves grader sessions parentless when metadata has no parentSessionId (fallback)", async () => {
@@ -2050,14 +2054,17 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     };
     await verifyTaskAfterHook(ctx, input, output);
     // Parent must come from metadata, NOT from input.sessionID.
+    // REQ-2: grader session.create passes {} (no parentID)
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "real-orch-parent" } });
+    expect(createCalls[0]).toEqual({});
     // Belt-and-braces: explicit non-equality with the subagent SID path.
-    expect(createCalls[0]).not.toEqual({
-      body: { parentID: "subagent-sid-NEVER-FORWARD" },
-    });
+    expect(createCalls[0]).not.toEqual(
+      { body: { parentID: "subagent-sid-NEVER-FORWARD" } },
+    );
   });
 
+  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
+  // REQ-2: No parentID on grader session.create.
   it("dispatchGrader still creates a child session when the grader prompt fails", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -2075,8 +2082,9 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
       dispatchGrader(ctx, { tier: "fast", system: "", prompt: "verify" }, "orch-sid-fail"),
     ).rejects.toThrow("grader boom");
 
+    // REQ-2: grader session.create passes {} (no parentID)
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-fail" } });
+    expect(createCalls[0]).toEqual({});
   });
 
   it("dispatchGrader rejects on timeout when session.create hangs", async () => {
