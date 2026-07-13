@@ -1860,13 +1860,19 @@ describe("verifyTaskAfterHook — Phase 5: ambiguous verify.require end-to-end",
 
 // ---------------------------------------------------------------------------
 // parentSessionID propagation — grader sessions inherit the parent's
-// sessionID so OpenCode treats them as child sessions.
+// sessionID so OpenCode treats them as child sessions. OpenCode filters
+// ctrl+x l with WHERE parent_session_id IS NULL, so without parentID the
+// grader sessions leak into the TUI session list (regression fixed by
+// restore-session-parenting). The session still completes normally — it
+// is just classified as nested, not standalone.
 // ---------------------------------------------------------------------------
 
 describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSessionID propagation", () => {
-  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
-  // REQ-2: No parentID on grader session.create.
-  it("does NOT pass parentID to session.create even when parentSessionID is provided", async () => {
+  // SDD restore-session-parenting: dispatchGrader MUST thread
+  // parentSessionID into body.parentID so the grader is a child session
+  // of the orchestrator and is hidden from the TUI session list.
+  // REQ-2: parentID on grader session.create.
+  it("passes parentID to session.create when parentSessionID is provided", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
       directory: workDir,
@@ -1882,8 +1888,8 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     );
     expect(result.sessionID).toBe("grader-sid");
     expect(createCalls).toHaveLength(1);
-    // REQ-2: grader session.create passes {} (no parentID)
-    expect(createCalls[0]).toEqual({});
+    // REQ-2: grader session.create forwards parentID as body.parentID
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-77" } });
   });
 
   it("dispatchGrader passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
@@ -1905,8 +1911,9 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     expect(createCalls[0]).toEqual({});
   });
 
-  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
-  // REQ-2: No parentID on grader session.create.
+  // SDD restore-session-parenting: dispatchGrader MUST thread
+  // parentSessionID into body.parentID.
+  // REQ-2: parentID on grader session.create.
   it("buildGateDeps threads parentSessionID from the closure to dispatchGrader", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -1919,8 +1926,8 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     const deps = await buildGateDeps(ctx, "orch-sid-99");
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
-    // REQ-2: grader session.create passes {} (no parentID)
-    expect(createCalls[0]).toEqual({});
+    // REQ-2: grader session.create forwards parentID as body.parentID
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
   });
 
   it("buildGateDeps without parentSessionID leaves dispatchGrader parentless", async () => {
@@ -1938,15 +1945,17 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     expect(createCalls[0]).toEqual({});
   });
 
-  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
-  // REQ-2: No parentID on grader session.create.
+  // SDD restore-session-parenting: dispatchGrader MUST thread
+  // parentSessionID into body.parentID when verifyTaskAfterHook provides it
+  // via output.metadata.parentSessionId.
   it("verifyTaskAfterHook forwards parentSessionID from output.metadata to the grader session (orchestrator-parented grader)", async () => {
     // PR2 / Unit 2 — flipped from the pre-PR1 "parentless" assertion. The
     // contract is now metadata-first: when output.metadata.parentSessionId
     // is present, the grader session is created as a child of that
     // orchestrator/root session, NOT as a new root.
     // (SDD change: fix-task-verifier-session-parenting.)
-    // SDD fix-session-ghost-tui-jump: REQ-2 overrides this - grader NEVER gets parentID.
+    // SDD restore-session-parenting: grader receives parentID derived from
+    // metadata so OpenCode hides the grader from ctrl+x l.
     process.env.MODEL_ROUTER_ENFORCE = "1";
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -1976,9 +1985,9 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     await verifyTaskAfterHook(ctx, input, output);
     // DoD has no deterministic checks -> gate runs the checker path ->
     // dispatchGrader is called once.
-    // REQ-2: grader session.create passes {} (no parentID)
+    // REQ-2: grader session.create forwards parentID from metadata.
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({});
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-parent" } });
   });
 
   it("verifyTaskAfterHook leaves grader sessions parentless when metadata has no parentSessionId (fallback)", async () => {
@@ -2054,17 +2063,18 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     };
     await verifyTaskAfterHook(ctx, input, output);
     // Parent must come from metadata, NOT from input.sessionID.
-    // REQ-2: grader session.create passes {} (no parentID)
+    // REQ-2: grader session.create forwards parentID from metadata only.
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({});
+    expect(createCalls[0]).toEqual({ body: { parentID: "real-orch-parent" } });
     // Belt-and-braces: explicit non-equality with the subagent SID path.
     expect(createCalls[0]).not.toEqual(
       { body: { parentID: "subagent-sid-NEVER-FORWARD" } },
     );
   });
 
-  // SDD fix-session-ghost-tui-jump: dispatchGrader MUST NOT pass parentID.
-  // REQ-2: No parentID on grader session.create.
+  // SDD restore-session-parenting: dispatchGrader MUST thread
+  // parentSessionID into body.parentID, even on grader prompt failure.
+  // REQ-2: parentID on grader session.create (all paths).
   it("dispatchGrader still creates a child session when the grader prompt fails", async () => {
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
@@ -2082,9 +2092,9 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
       dispatchGrader(ctx, { tier: "fast", system: "", prompt: "verify" }, "orch-sid-fail"),
     ).rejects.toThrow("grader boom");
 
-    // REQ-2: grader session.create passes {} (no parentID)
+    // REQ-2: grader session.create forwards parentID, even on failure
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]).toEqual({});
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-fail" } });
   });
 
   it("dispatchGrader rejects on timeout when session.create hangs", async () => {

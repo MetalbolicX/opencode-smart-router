@@ -233,9 +233,14 @@ export const dispatchGrader = async (
   parentSessionID?: string | null,
 ): Promise<{ sessionID: string; text: string }> => {
   const cfg = await ctx.getConfig();
+  // SDD restore-session-parenting: grader sessions are children of the
+  // orchestrator session when parentSessionID is available. OpenCode hides
+  // child sessions from ctrl+x l (filtered by WHERE parent_session_id IS
+  // NULL), matching the original behavior before the ghost fix. Without
+  // parentID, graders leak into the TUI session list as standalone rows.
   const created = await withTimeout(
     ctx.plugin.client.session.create(
-      {},
+      parentSessionID ? { body: { parentID: parentSessionID } } : {},
     ) as Promise<SessionCreateResult>,
     30_000,
     "grader session.create",

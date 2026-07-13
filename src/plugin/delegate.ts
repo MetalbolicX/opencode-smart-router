@@ -213,8 +213,15 @@ export const executeDelegate = async (
 
       let created: SessionCreateResult;
       try {
+        // SDD restore-session-parenting: thread parentSessionID into
+        // session.create so the producer is a child session of the orchestrator.
+        // OpenCode filters session lists with WHERE parent_session_id IS NULL,
+        // so passing parentID hides the producer from ctrl+x l (the original
+        // behavior the user expects). The session itself still completes
+        // normally — we just classify it as nested, not standalone.
         created = await withTimeout(
           ctx.plugin.client.session.create({
+            ...(parentSessionID ? { body: { parentID: parentSessionID } } : {}),
             ...(signal ? { signal } : {}),
           }),
           30_000,

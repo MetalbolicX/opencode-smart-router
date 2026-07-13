@@ -895,15 +895,18 @@ describe("executeDelegate — tier resolution and cost fallback", () => {
 
 // ---------------------------------------------------------------------------
 // parentSessionID propagation — producer sessions inherit the parent's
-// sessionID so OpenCode treats them as child sessions (root cause of the
-// "all sessions show as root" bug).
+// sessionID so OpenCode treats them as child sessions. OpenCode filters
+// ctrl+x l with WHERE parent_session_id IS NULL, so without parentID the
+// producer sessions leak into the TUI session list (regression fixed by
+// restore-session-parenting). The session still completes normally — it
+// is just classified as nested, not standalone.
 // ---------------------------------------------------------------------------
 
 describe("executeDelegate — parentSessionID propagation", () => {
-  // SDD fix-session-ghost-tui-jump: delegate session.create MUST NOT pass parentID.
-  // This prevents TUI ghost sessions. The depth-tracking system (isDescendant,
-  // parentMap) remains unchanged for core-created sessions.
-  it("does NOT pass parentID to session.create even when parentSessionID is provided", async () => {
+  // SDD restore-session-parenting: delegate session.create MUST thread
+  // parentSessionID into body.parentID so the producer is a child session
+  // of the orchestrator and is hidden from the TUI session list.
+  it("passes parentID to session.create when parentSessionID is provided", async () => {
     acceptMock.mockResolvedValueOnce({
       accepted: true,
       verdict: { pass: true, method: "deterministic", reasons: [] },
@@ -916,11 +919,11 @@ describe("executeDelegate — parentSessionID propagation", () => {
         return { data: { id: "sess_parent_child" } };
       },
     });
-    // parentSessionID is provided but MUST be ignored
     await executeDelegate(ctx, { task: "say hi", tier: "fast" }, "parent-sid-42");
     expect(createCalls).toHaveLength(1);
-    // REQ-1: No parentID on delegate session.create
-    expect(createCalls[0]).toEqual({});
+    // REQ-1: parentID is forwarded as body.parentID so OpenCode marks the
+    // session as a child of the orchestrator.
+    expect(createCalls[0]).toEqual({ body: { parentID: "parent-sid-42" } });
   });
 
   it("passes {} (no parentID) to session.create when parentSessionID is omitted", async () => {
@@ -941,9 +944,11 @@ describe("executeDelegate — parentSessionID propagation", () => {
     expect(createCalls[0]).toEqual({});
   });
 
-  // SDD fix-session-ghost-tui-jump: grader session.create MUST NOT pass parentID.
-  // REQ-2: No parentID on grader session.create.
-  it("does NOT pass parentID to session.create for the grader", async () => {
+  // SDD restore-session-parenting: grader session.create MUST thread
+  // parentSessionID into body.parentID so the grader is a child session
+  // of the orchestrator and is hidden from the TUI session list.
+  // REQ-2: parentID on grader session.create.
+  it("passes parentID to session.create for the grader", async () => {
     const ctxBase = makeCtx({});
     const ctx: PluginContext = {
       ...ctxBase.ctx,
@@ -968,16 +973,16 @@ describe("executeDelegate — parentSessionID propagation", () => {
       } as any,
     };
     const deps = await buildGateDeps(wrappedCtx, "orch-sid-99");
-    // Directly call the closure to assert the parent SID is NOT forwarded.
     await deps.checker.dispatchGrader({ tier: "fast", system: "", prompt: "x" });
     expect(createCalls).toHaveLength(1);
-    // REQ-2: grader session.create passes {} (no parentID)
-    expect(createCalls[0]).toEqual({});
+    // REQ-2: grader session.create forwards parentID as body.parentID
+    expect(createCalls[0]).toEqual({ body: { parentID: "orch-sid-99" } });
   });
 
-  // SDD fix-session-ghost-tui-jump: even on failure, NO parentID is passed.
-  // REQ-1: No parentID on delegate session.create (all paths).
-  it("does NOT pass parentID to session.create on a failing delegate attempt", async () => {
+  // SDD restore-session-parenting: parentID MUST be threaded on every
+  // delegate attempt, including failing paths. Without it the producer
+  // sessions leak into the TUI list as standalone rows.
+  it("passes parentID to session.create on a failing delegate attempt", async () => {
     acceptMock.mockImplementation(async () => ({
       accepted: false,
       verdict: { pass: false, method: "deterministic", reasons: ["boom"] },
@@ -995,10 +1000,10 @@ describe("executeDelegate — parentSessionID propagation", () => {
 
     expect(out).toContain("[router status: unmet]");
     expect(createCalls.length).toBeGreaterThan(0);
-    // REQ-1: NO parentID passed, even on failure
+    // REQ-1: parentID is forwarded on every attempt, even when failing
     expect(
       createCalls.every((req) => {
-        return JSON.stringify(req) === JSON.stringify({});
+        return JSON.stringify(req) === JSON.stringify({ body: { parentID: "parent-sid-fail" } });
       }),
     ).toBe(true);
   });
