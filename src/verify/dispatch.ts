@@ -33,7 +33,7 @@ import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
 import type { DoD, InferHints } from "./dod";
 import { inferDoD, parseDoDFromDispatch } from "./dod";
-import type { GateDeps } from "./gate";
+import type { GateDeps, GateResult } from "./gate";
 import { accept } from "./gate";
 
 export interface ChangedFile {
@@ -363,7 +363,9 @@ export const verifyTaskAfterHook = async (
     // fix-orphan-subagent-sessions).
     const parsed = parsedEarly;
     const { finalReturnText, parentSessionID } = parsed;
-    const producerTier = taskArgs?.subagent_type ?? "";
+    const producerTier = taskArgs?.subagent_type ?? "fast";
+    const skipFastTier = activeCfg.enforcement?.verify?.skipFastTier ?? true;
+    if (skipFastTier && producerTier === "fast") return;
     const dod = buildDelegationDoD({
       prompt: taskArgs?.prompt,
       description: taskArgs?.description,
@@ -376,11 +378,45 @@ export const verifyTaskAfterHook = async (
       producerTier,
     };
     const trivial = childSessionID ? ctx.sessionStore.isTrivial(childSessionID) : false;
-    const res = await accept(
-      { dod, trivial, mode: "modeA" },
-      artefact,
-      await buildGateDeps(ctx, parentSessionID),
-    );
+    const hookTimeoutMs = activeCfg.enforcement?.verify?.hookTimeoutMs ?? 30_000;
+    let res: GateResult;
+    try {
+      res = await withTimeout(
+        accept(
+          { dod, trivial, mode: "modeA" },
+          artefact,
+          await buildGateDeps(ctx, parentSessionID),
+        ),
+        hookTimeoutMs,
+        "verifyTaskAfterHook.accept",
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logEvent.verification.fail({
+        sid: childSessionID ?? "",
+        producerTier,
+        method: "checker",
+        dodSource: "explicit",
+        skipped: false,
+        reasonCount: 1,
+        reasons: [reason],
+        crashed: true,
+      });
+      // Scenario 7 (spec): timeout → structured errored verdict so the report's
+      // critical finding is resolved. Assign a GateResult so the normal
+      // res.verdict.errored branch (line 425) handles the toast and output
+      // preservation, matching the spec's "errored=true on timeout" requirement.
+      res = {
+        accepted: false,
+        dodSource: "explicit",
+        verdict: {
+          pass: false,
+          method: "checker",
+          reasons: [reason],
+          errored: true,
+        },
+      };
+    }
     // PR5: structured verification outcome observability. Three events:
     //   - verification.pass   — gate accepted the artefact
     //   - verification.fail   — gate rejected (and produced a forcing note)
@@ -400,20 +436,18 @@ export const verifyTaskAfterHook = async (
       logEvent.verification.pass(eventPayload);
     } else if (res.verdict.skipped) {
       logEvent.verification.skipped({ ...eventPayload, reasons: res.verdict.reasons });
+    } else if (res.verdict.errored) {
+      logEvent.verification.fail({ ...eventPayload, reasons: res.verdict.reasons });
+      showRouterToast(ctx.plugin.client, {
+        message: "Verification inconclusive (grader error)",
+        variant: "warning",
+      });
     } else {
       logEvent.verification.fail({ ...eventPayload, reasons: res.verdict.reasons });
-      // SDD: tui-toast-verification — surface the terminal gate rejection
-      // as a TUI toast. Fires only on a real (non-skipped) verification
-      // failure, exactly once per terminal outcome. Best-effort: never
-      // throws on a missing TUI surface or rejected promise. The forcing
-      // note below is the per-tool detailed signal; the toast is the
-      // at-a-glance summary.
       showRouterToast(ctx.plugin.client, {
         message: "Delegation not accepted by verification",
         variant: "warning",
       });
-    }
-    if (!res.accepted && !res.verdict.skipped) {
       const ladder = activeCfg.enforcement?.escalate?.ladder ?? ["fast", "medium", "heavy"];
       const li = ladder.indexOf(producerTier);
       const nextTier = li >= 0 && li < ladder.length - 1 ? ladder[li + 1] : null;

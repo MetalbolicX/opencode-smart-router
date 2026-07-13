@@ -10,6 +10,8 @@ export interface Verdict {
   evidence?: string;
   /** true when nothing was actually verified (SKIPPED != PASS) */
   skipped?: boolean;
+  /** true when verification could not run due to infrastructure failure (dispatch error, parse failure, timeout) */
+  errored?: boolean;
 }
 
 export interface ExecResult {

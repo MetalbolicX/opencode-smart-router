@@ -76,6 +76,10 @@ export interface EnforcementConfig {
     graderPolicy?: "atLeastProducerTier";
     graderTemperature?: number;
     minGraderTier?: string;
+    /** Skip grader verification for @fast producer tasks. Defaults to true. */
+    skipFastTier?: boolean;
+    /** Timeout in ms for the after-hook grader call. Defaults to 30000. */
+    hookTimeoutMs?: number;
   };
   escalate?: {
     floorTier?: string | null;

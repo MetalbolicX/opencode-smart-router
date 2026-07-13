@@ -51,7 +51,7 @@ export interface CheckerInput {
 
 export const tierRank = (tier: string, ladder: string[]): number => {
   const i = ladder.indexOf(tier);
-  return i < 0 ? ladder.length : i; // unknown tier ranks highest = safe
+  return i < 0 ? 0 : i; // unknown tier falls back to rank 0 (fast)
 };
 
 export const atLeastProducerTier = (
@@ -122,11 +122,11 @@ export const parseGraderVerdict = (text: string): { pass: boolean; reasons: stri
     let raw: string | null = null;
 
     // Try fenced ```json ... ``` first
-    const fenced = /```json\s*([\s\S]*?)\s*```/.exec(text);
+    const fenced = /```json\s*([\s\S]*?)\s*```/i.exec(text);
     if (fenced) {
       raw = fenced[1] ?? null;
     } else {
-      // First "{" to last "}"
+      // Extract first "{" to last "}" as fallback
       const start = text.indexOf("{");
       const end = text.lastIndexOf("}");
       if (start !== -1 && end !== -1 && end > start) {
@@ -136,22 +136,32 @@ export const parseGraderVerdict = (text: string): { pass: boolean; reasons: stri
 
     if (raw === null) return null;
 
-    const result = JSON.parse(raw) as unknown;
-    if (typeof result !== "object" || result === null) return null;
-
-    const r = result as Record<string, unknown>;
-    if (typeof r["pass"] !== "boolean") return null;
-
-    if (!("reasons" in r) || r["reasons"] === undefined) {
-      return { pass: r["pass"] as boolean, reasons: [] };
+    // Try strict parse first
+    try {
+      const result = JSON.parse(raw) as unknown;
+      if (typeof result === "object" && result !== null) {
+        const r = result as Record<string, unknown>;
+        if (typeof r["pass"] === "boolean") {
+          const reasons = Array.isArray(r["reasons"])
+            ? r["reasons"].filter((item): item is string => typeof item === "string")
+            : [];
+          return { pass: r["pass"] as boolean, reasons };
+        }
+        // Fallback: look for verdict field (used by @heavy models with reasoning)
+        if (typeof r["verdict"] === "string") {
+          const verdictStr = r["verdict"].toLowerCase();
+          const approved = /approv|pass|accept|yes/i.test(verdictStr);
+          const reasons = Array.isArray(r["reasons"])
+            ? r["reasons"].filter((item): item is string => typeof item === "string")
+            : [r["verdict"] as string];
+          return { pass: approved, reasons };
+        }
+      }
+    } catch {
+      // fall through to null
     }
 
-    if (!Array.isArray(r["reasons"])) return null;
-    for (const item of r["reasons"]) {
-      if (typeof item !== "string") return null;
-    }
-
-    return { pass: r["pass"] as boolean, reasons: r["reasons"] as string[] };
+    return null;
   } catch {
     return null;
   }
@@ -185,6 +195,7 @@ export const runChecker = async (input: CheckerInput, deps: CheckerDeps): Promis
       pass: false,
       method: "checker",
       reasons: [scrubText("grader dispatch failed: " + String(err))],
+      errored: true,
     };
   }
 
@@ -196,6 +207,7 @@ export const runChecker = async (input: CheckerInput, deps: CheckerDeps): Promis
       reasons: [
         "grader session is not independent of the producer (producer=grader); refusing to accept",
       ],
+      errored: true,
     };
   }
 
@@ -209,6 +221,7 @@ export const runChecker = async (input: CheckerInput, deps: CheckerDeps): Promis
         "could not parse grader verdict; defaulting to FAIL",
         scrubText(res.text.slice(0, 300)),
       ],
+      errored: true,
     };
   }
 

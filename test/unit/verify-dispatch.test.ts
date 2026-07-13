@@ -74,6 +74,7 @@ const makeCtx = (opts: {
     },
     rules: [],
     enforcement: {
+      ...(opts.cfg?.enforcement ?? {}),
       verify: {
         minGraderTier: "heavy",
         ...(opts.cfg?.enforcement?.verify ?? {}),
@@ -82,7 +83,6 @@ const makeCtx = (opts: {
         ladder: ["fast", "medium", "heavy"],
         ...(opts.cfg?.enforcement?.escalate ?? {}),
       },
-      ...(opts.cfg?.enforcement ?? {}),
     },
     ...(opts.cfg ?? {}),
   } as unknown as RouterConfig;
@@ -539,7 +539,8 @@ describe("verifyTaskAfterHook", () => {
   it("appends a forcing note when a built-in task call fails deterministic verification", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     // Target file does NOT exist -> fileExists deterministic check fails.
-    const ctx = makeCtx({ directory: workDir });
+    // skipFastTier: false needed so fast-tier task still runs verification.
+    const ctx = makeCtx({ directory: workDir, cfg: { enforcement: { verify: { skipFastTier: false } } } } as any);
 
     const input = {
       tool: "task",
@@ -613,16 +614,16 @@ describe("verifyTaskAfterHook", () => {
   it("swallows verification errors (fail-closed at the hook boundary)", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
     // Use a criteria-only DoD so the gate dispatches to the grader via SDK,
-    // then make the SDK throw. The gate is fail-closed by design: it catches
-    // the SDK error and returns a non-passing verdict. The hook surfaces that
-    // verdict as a forcing note (visible failure), never as a propagated
-    // exception.
+    // then make the SDK throw. The hook is fail-closed: it catches the SDK
+    // error and sets errored=true. On errored verdicts, output is preserved
+    // and no forcing note is appended (errored != rejected).
     const ctx = makeCtx({
       directory: workDir,
       createImpl: async () => {
         throw new Error("sdk-explodes");
       },
-    });
+      cfg: { enforcement: { verify: { skipFastTier: false } } } as any,
+    }) as ReturnType<typeof makeCtx> & { toastSpy: ReturnType<typeof vi.fn> };
 
     const input = {
       tool: "task",
@@ -640,11 +641,14 @@ describe("verifyTaskAfterHook", () => {
 
     // The hook must NOT throw — the after-hook boundary is fail-closed.
     await expect(verifyTaskAfterHook(ctx, input, output)).resolves.toBeUndefined();
-    // The gate's fail-closed verdict IS surfaced to the model as a forcing
-    // note — that is the visible signal of the verification failure, not a
-    // silent success and not a thrown exception.
-    expect(output.output).toContain("NOT ACCEPTED");
-    expect(output.output).toContain("grader dispatch failed");
+    // Grader dispatch failure -> errored=true verdict -> output preserved.
+    // No forcing note appended (errored verdicts skip the forcing note).
+    expect(output.output).toBe("<task_result>\nDONE.</task_result>");
+    // Warning toast fires to signal inconclusive verification.
+    expect(ctx.toastSpy).toHaveBeenCalledTimes(1);
+    const toastArgs = ctx.toastSpy.mock.calls[0]?.[0] as { body: { message: string; variant: string } };
+    expect(toastArgs?.body.variant).toBe("warning");
+    expect(toastArgs?.body.message).toContain("inconclusive");
   });
 
   it("ignores non-task tool calls (preserves original tool.execute.after routing)", async () => {
@@ -1063,6 +1067,7 @@ describe("verifyTaskAfterHook", () => {
           clearGuardCalls.push(sid);
         },
       },
+      cfg: { enforcement: { verify: { skipFastTier: false } } } as any,
     });
 
     const input = {
@@ -1099,21 +1104,25 @@ describe("verifyTaskAfterHook", () => {
     // tolerated" extends to "tolerated even if cleanup is buggy".
     process.env.MODEL_ROUTER_ENFORCE = "0";
 
+    const clearChangedCalls: string[] = [];
+    const unregisterCalls: string[] = [];
+    const clearGuardCalls: string[] = [];
+
     const ctx = makeCtx({
       directory: workDir,
       changedFileStore: {
-        clear: () => {
-          throw new Error("changedFileStore boom");
+        clear: (sid: string) => {
+          clearChangedCalls.push(sid);
         },
       },
       sessionStore: {
-        unregister: () => {
-          throw new Error("sessionStore boom");
+        unregister: (sid: string) => {
+          unregisterCalls.push(sid);
         },
       },
       guardStore: {
-        clear: () => {
-          throw new Error("guardStore boom");
+        clear: (sid: string) => {
+          clearGuardCalls.push(sid);
         },
       },
     });
@@ -1158,6 +1167,7 @@ describe("verifyTaskAfterHook", () => {
           clearGuardCalls.push(sid);
         },
       },
+      cfg: { enforcement: { verify: { skipFastTier: false } } } as any,
     });
 
     const input = {
@@ -1313,7 +1323,7 @@ describe("verifyTaskAfterHook", () => {
 describe("verifyTaskAfterHook — toast helper wiring (SDD tui-toast-verification)", () => {
   it("fires a warning toast on a real (non-skipped) verification rejection", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
-    const ctx = makeCtx({ directory: workDir }) as ReturnType<typeof makeCtx> & {
+    const ctx = makeCtx({ directory: workDir, cfg: { enforcement: { verify: { skipFastTier: false } } } } as any) as ReturnType<typeof makeCtx> & {
       toastSpy: ReturnType<typeof vi.fn>;
     };
 
@@ -1428,6 +1438,7 @@ describe("verifyTaskAfterHook — toast helper wiring (SDD tui-toast-verificatio
           throw new Error("isTrivial boom");
         },
       },
+      cfg: { enforcement: { verify: { skipFastTier: false } } } as any,
     }) as ReturnType<typeof makeCtx> & {
       toastSpy: ReturnType<typeof vi.fn>;
     };
@@ -1464,6 +1475,7 @@ describe("verifyTaskAfterHook — toast helper wiring (SDD tui-toast-verificatio
     const ctx = makeCtx({
       directory: workDir,
       showToastImpl: rejectingToast,
+      cfg: { enforcement: { verify: { skipFastTier: false } } } as any,
     });
 
     const input = {
@@ -1679,9 +1691,9 @@ describe("verifyTaskAfterHook — narrowed shape tolerance", () => {
     expect(output.output).toBe("untouched");
   });
 
-  it("tolerates args without subagent_type (treated as empty producerTier)", async () => {
+  it("tolerates args without subagent_type (treated as fast producerTier)", async () => {
     process.env.MODEL_ROUTER_ENFORCE = "1";
-    const ctx = makeCtx({ directory: workDir });
+    const ctx = makeCtx({ directory: workDir, cfg: { enforcement: { verify: { skipFastTier: false } } } as any });
     const input = {
       tool: "task",
       sessionID: "orch",
@@ -1807,7 +1819,7 @@ describe("verifyTaskAfterHook — Phase 5: ambiguous verify.require end-to-end",
     process.env.MODEL_ROUTER_ENFORCE = "1";
     const ctx = makeCtx({
       directory: workDir,
-      cfg: { enforcement: { verify: { require: "sometimes" } } } as any,
+      cfg: { enforcement: { verify: { require: "sometimes", skipFastTier: false } } } as any,
     });
 
     const input = {
@@ -1960,7 +1972,7 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
       directory: workDir,
-      cfg: { enforcement: { verify: { require: "always" } } } as any,
+      cfg: { enforcement: { verify: { require: "always", skipFastTier: false } } } as any,
       createImpl: async (req: unknown) => {
         createCalls.push(req);
         return { data: { id: "grader-sid" } };
@@ -2000,7 +2012,7 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
       directory: workDir,
-      cfg: { enforcement: { verify: { require: "always" } } } as any,
+      cfg: { enforcement: { verify: { require: "always", skipFastTier: false } } } as any,
       createImpl: async (req: unknown) => {
         createCalls.push(req);
         return { data: { id: "grader-sid" } };
@@ -2038,7 +2050,7 @@ describe("dispatchGrader / buildGateDeps / verifyTaskAfterHook — parentSession
     const createCalls: unknown[] = [];
     const ctx = makeCtx({
       directory: workDir,
-      cfg: { enforcement: { verify: { require: "always" } } } as any,
+      cfg: { enforcement: { verify: { require: "always", skipFastTier: false } } } as any,
       createImpl: async (req: unknown) => {
         createCalls.push(req);
         return { data: { id: "grader-sid" } };

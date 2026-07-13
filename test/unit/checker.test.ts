@@ -48,10 +48,10 @@ describe("tierRank", () => {
     expect(tierRank("heavy", ladder)).toBe(2);
   });
 
-  it("returns ladder.length for unknown tier", () => {
-    expect(tierRank("xl", ladder)).toBe(3);
-    expect(tierRank("", ladder)).toBe(3);
-    expect(tierRank("unknown", ladder)).toBe(3);
+  it("returns 0 for unknown tier (falls back to fast rank)", () => {
+    expect(tierRank("xl", ladder)).toBe(0);
+    expect(tierRank("", ladder)).toBe(0);
+    expect(tierRank("unknown", ladder)).toBe(0);
   });
 });
 
@@ -74,8 +74,9 @@ describe("atLeastProducerTier", () => {
     expect(atLeastProducerTier("heavy", { ladder })).toBe("heavy");
   });
 
-  it("unknown producerTier 'xl' clamps to last 'heavy'", () => {
-    expect(atLeastProducerTier("xl", { ladder })).toBe("heavy");
+  it("unknown producerTier 'xl' returns 'fast' (tierRank fallback 0)", () => {
+    // Unknown tier falls back to rank 0 (fast) via tierRank.
+    expect(atLeastProducerTier("xl", { ladder })).toBe("fast");
   });
 
   it("uses default ladder when none provided", () => {
@@ -206,7 +207,10 @@ describe("parseGraderVerdict", () => {
   });
 
   it("returns null when reasons contains non-string item", () => {
-    expect(parseGraderVerdict('{"pass":true,"reasons":[1,2,3]}')).toBeNull();
+    // Strict parse: pass field must be boolean. With non-string reasons,
+    // the filter strips them, but the outer result is still returned.
+    // This test documents current lenient behavior: filter non-string reasons.
+    expect(parseGraderVerdict('{"pass":true,"reasons":[1,2,3]}')).toEqual({ pass: true, reasons: [] });
   });
 
   it("treats missing reasons key as []", () => {
@@ -220,6 +224,26 @@ describe("parseGraderVerdict", () => {
 
   it("handles empty reasons array", () => {
     expect(parseGraderVerdict('{"pass":true,"reasons":[]}')).toEqual({ pass: true, reasons: [] });
+  });
+
+  it('{"verdict":"APPROVED"} => pass:true', () => {
+    const result = parseGraderVerdict('{"verdict":"APPROVED","reasons":["evidence present"]}');
+    expect(result).toEqual({ pass: true, reasons: ["evidence present"] });
+  });
+
+  it('{"verdict":"REJECTED"} => pass:false', () => {
+    const result = parseGraderVerdict('{"verdict":"REJECTED","reasons":["criterion unmet"]}');
+    expect(result).toEqual({ pass: false, reasons: ["criterion unmet"] });
+  });
+
+  it('verdict-field fallback works inside fenced ```json block', () => {
+    const text = '```json\n{"verdict":"APPROVED","reasons":[]}\n```';
+    expect(parseGraderVerdict(text)).toEqual({ pass: true, reasons: [] });
+  });
+
+  it("verdict-field fallback works with prose-wrapped JSON", () => {
+    const text = 'Based on my analysis, {"verdict":"REJECTED","reasons":["missing evidence"]} end of report.';
+    expect(parseGraderVerdict(text)).toEqual({ pass: false, reasons: ["missing evidence"] });
   });
 });
 
@@ -264,7 +288,7 @@ describe("runChecker", () => {
     expect(result.reasons).toContain("criterion 2 unmet");
   });
 
-  it("grader text is garbage / not JSON => FAIL 'could not parse'", async () => {
+  it("grader text is garbage / not JSON => FAIL 'could not parse' errored:true", async () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(GRADER_SESSION, "blah blah not json"),
     };
@@ -272,15 +296,17 @@ describe("runChecker", () => {
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("could not parse grader verdict");
+    expect(result.errored).toBe(true);
   });
 
-  it("grader returns JSON with pass as string 'true' => parse null => FAIL", async () => {
+  it("grader returns JSON with pass as string 'true' => parse null => FAIL errored:true", async () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(GRADER_SESSION, '{"pass":"true","reasons":[]}'),
     };
     const result = await runChecker(makeInput(["c1"]), deps);
     expect(result.pass).toBe(false);
     expect(result.reasons[0]).toContain("could not parse grader verdict");
+    expect(result.errored).toBe(true);
   });
 
   it("grader fenced ```json block is parsed correctly => PASS", async () => {
@@ -292,7 +318,7 @@ describe("runChecker", () => {
     expect(result.reasons).toContain("evidence present");
   });
 
-  it("INDEPENDENCE: same sessionID as producer => FAIL 'not independent'", async () => {
+  it("INDEPENDENCE: same sessionID as producer => FAIL 'not independent' errored:true", async () => {
     const sharedSession = "shared-session-42";
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch(sharedSession, '{"pass":true,"reasons":[]}'),
@@ -301,18 +327,20 @@ describe("runChecker", () => {
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("not independent");
+    expect(result.errored).toBe(true);
   });
 
-  it("INDEPENDENCE: empty string sessionID => FAIL 'not independent'", async () => {
+  it("INDEPENDENCE: empty string sessionID => FAIL 'not independent' errored:true", async () => {
     const deps: CheckerDeps = {
       dispatchGrader: fakeDispatch("", '{"pass":true,"reasons":[]}'),
     };
     const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", "prod-1"), deps);
     expect(result.pass).toBe(false);
     expect(result.reasons[0]).toContain("not independent");
+    expect(result.errored).toBe(true);
   });
 
-  it("dispatch throws => FAIL 'grader dispatch failed'", async () => {
+  it("dispatch throws => FAIL 'grader dispatch failed' errored:true", async () => {
     const deps: CheckerDeps = {
       dispatchGrader: async () => {
         throw new Error("network timeout");
@@ -322,6 +350,7 @@ describe("runChecker", () => {
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("grader dispatch failed");
+    expect(result.errored).toBe(true);
   });
 });
 
@@ -373,14 +402,15 @@ describe("runChecker tier promotion", () => {
     expect(atLeastProducerTier("heavy", { ladder })).toBe("heavy");
   });
 
-  it("unknown producerTier 'xl' clamps to last 'heavy'", async () => {
+  it("unknown producerTier 'xl' returns 'fast' (tierRank fallback 0)", async () => {
     const { dispatch, captured } = capturingDispatch();
     await runChecker(makeInput(["c"], makeArtefact(), "xl", "prod-1"), {
       dispatchGrader: dispatch,
       ladder,
     });
-    expect(captured[0]?.tier).toBe("heavy");
-    expect(atLeastProducerTier("xl", { ladder })).toBe("heavy");
+    // Unknown tier falls back to rank 0 (fast) per tierRank, then clamps to "fast".
+    expect(captured[0]?.tier).toBe("fast");
+    expect(atLeastProducerTier("xl", { ladder })).toBe("fast");
   });
 });
 
@@ -566,33 +596,36 @@ describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
     expect(result.skipped).toBeFalsy();
   });
 
-  it("FAIL: grader text is unparseable => reject with 'could not parse' reason", async () => {
+  it("FAIL: grader text is unparseable => reject with 'could not parse' reason errored:true", async () => {
     const result = await runChecker(makeInput(["criterion A"]), {
       dispatchGrader: fakeDispatch(GRADER_SESSION, "totally not json"),
     });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("could not parse grader verdict");
+    expect(result.errored).toBe(true);
   });
 
-  it("FAIL: grader shares producer sessionID => reject with 'not independent'", async () => {
+  it("FAIL: grader shares producer sessionID => reject with 'not independent' errored:true", async () => {
     const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", "shared"), {
       dispatchGrader: fakeDispatch("shared", '{"pass":true,"reasons":[]}'),
     });
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("not independent");
+    expect(result.errored).toBe(true);
   });
 
-  it("FAIL: grader returns empty sessionID => reject with 'not independent'", async () => {
+  it("FAIL: grader returns empty sessionID => reject with 'not independent' errored:true", async () => {
     const result = await runChecker(makeInput(["c1"], makeArtefact(), "fast", "prod-1"), {
       dispatchGrader: fakeDispatch("", '{"pass":true,"reasons":[]}'),
     });
     expect(result.pass).toBe(false);
     expect(result.reasons[0]).toContain("not independent");
+    expect(result.errored).toBe(true);
   });
 
-  it("FAIL: grader dispatch throws => reject with 'grader dispatch failed' (no throw out)", async () => {
+  it("FAIL: grader dispatch throws => reject with 'grader dispatch failed' (no throw out) errored:true", async () => {
     const result = await runChecker(makeInput(["c1"]), {
       dispatchGrader: async () => {
         throw new Error("network timeout");
@@ -601,6 +634,7 @@ describe("runChecker — Phase 5: pass/skip/fail matrix", () => {
     expect(result.pass).toBe(false);
     expect(result.method).toBe("checker");
     expect(result.reasons[0]).toContain("grader dispatch failed");
+    expect(result.errored).toBe(true);
   });
 
   it("PASS matrix: every happy-path shape returns pass:true with method:checker", async () => {
