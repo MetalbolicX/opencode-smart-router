@@ -482,10 +482,10 @@
         ]
       },
       "light": {
-        "model": "opencode-go/mimo-v2.5",
+        "model": "opencode-go/deepseek-v4-flash",
         "variant": "high",
         "costRatio": 2,
-        "description": "Mimo v2.5 high for localized edits and small fixes",
+        "description": "DeepSeek V4 Flash high for localized edits and small fixes",
         "steps": 40,
         "capability": {
           "kind": "discrete",
@@ -503,15 +503,12 @@
         ]
       },
       "medium": {
-        "model": "minimax-coding-plan/MiniMax-M3",
-        "variant": "thinking",
+        "model": "minimax-coding-plan/MiniMax-M2.7",
         "costRatio": 5,
-        "description": "MiniMax M3 for implementation, refactoring, and tests",
+        "description": "MiniMax M2.7 for implementation, refactoring, and tests",
         "steps": 50,
         "capability": {
-          "kind": "binary",
-          "field": "variant",
-          "elevated": "thinking"
+          "kind": "none"
         },
         "whenToUse": [
           "Feature implementation",
@@ -539,17 +536,14 @@
         ]
       },
       "heavy": {
-        "model": "openai/gpt-5.4",
+        "model": "zai-coding-plan/glm-5.2",
+        "variant": "high",
         "costRatio": 20,
-        "description": "GPT-5.4 for architecture, complex debugging, and security",
+        "description": "GLM 5.2 high for architecture, complex debugging, and security",
         "steps": 120,
-        "reasoning": {
-          "effort": "high",
-          "summary": "detailed"
-        },
         "capability": {
           "kind": "discrete",
-          "field": "reasoning.effort",
+          "field": "variant",
           "levels": [
             "low",
             "medium",
