@@ -78,6 +78,8 @@ export interface EnforcementConfig {
     minGraderTier?: string;
     /** Skip grader verification for @fast producer tasks. Defaults to true. */
     skipFastTier?: boolean;
+    /** Skip verification for the listed producer tiers. skipFastTier=true skips only 'fast'. */
+    skipTiers?: string[];
     /** Timeout in ms for the after-hook grader call. Defaults to 30000. */
     hookTimeoutMs?: number;
   };

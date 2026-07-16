@@ -43,55 +43,56 @@ ceiling = firstAttemptCostUnits × escalate.costCeiling.multiple
 ```
 
 `firstAttemptCostUnits` is the `costRatio` of the tier the **first** attempt ran on.
-With the default `anthropic` preset the tier cost ratios are:
+Multi-provider preset cost ratios (5-tier, costRatio ascending):
 
-| tier   | model                       | costRatio |
-|--------|-----------------------------|-----------|
-| fast   | `claude-haiku-4-5`          | 1         |
-| medium | `claude-sonnet-4-6` (max)   | 5         |
-| heavy  | `claude-opus-4-8` (max)     | 20        |
+| tier    | model                         | costRatio |
+|---------|-------------------------------|-----------|
+| fast    | `opencode-go/mimo-v2.5` (med) | 1         |
+| light   | `opencode-go/mimo-v2.5` (high)| 2         |
+| medium  | `minimax-coding-plan/MiniMax-M3` (thinking) | 5   |
+| focused | `minimax-coding-plan/MiniMax-M3` (thinking) | 10  |
+| heavy   | `openai/gpt-5.4`              | 20        |
 
 Because the cheapest tier has `costRatio = 1`, **a ladder that starts at `fast` with
-a small `multiple` is intentionally shallow**. Worked example with the default
-`multiple: 4` starting at `fast` (ceiling `= 1 × 4 = 4`):
+a small `multiple` is intentionally shallow**. Worked example with `multiple: 4`
+starting at `fast` (ceiling `= 1 × 4 = 4`):
 
 ```
 attempt 1  fast    cumulative 1   (≤ 4, continue)
 attempt 2  fast    cumulative 2   (≤ 4, continue)   ← retry same tier
-attempt 3  medium  cumulative 7   (> 4, STOP)       ← escalates, verifies once, then give_up
+attempt 3  light   cumulative 4   (≤ 4, continue)   ← escalates once
+attempt 4  light   cumulative 6   (> 4, STOP)       ← cost ceiling exceeded
 ```
 
-So the effective shape is **[fast ×2, medium ×1] → give-up**; `heavy` is never
-reached from a `fast` start at `multiple: 4`. The two knobs that deepen the ladder:
+So the effective shape is **[fast ×2, light ×2] → give-up**; `medium` and above are
+never reached from a `fast` start at `multiple: 4`. The two knobs that deepen the
+ladder:
 
 - **`escalate.costCeiling.multiple`** — raise it to allow more / more expensive
   attempts before give-up.
 - **`escalate.floorTier`** — pin the *minimum* starting tier so cheap rungs are
   skipped and `firstAttemptCostUnits` (and therefore the ceiling) is larger. E.g.
   `floorTier: "medium"` makes `firstAttemptCostUnits = 5`, so `multiple: 6` gives a
-  ceiling of `30` — enough to escalate `medium → heavy` once.
-
-Tune `multiple` and `floorTier` together to get the ladder depth you want; the
-presets below pick sensible pairings per routing mode.
+  ceiling of `30` — enough to escalate `medium → focused → heavy`.
 
 ## Per-mode presets
 
 Add **one** of the following as a top-level `"enforcement"` key in `tiers.json`.
 All are additive and fully optional; every field has a safe default if omitted.
 
-### `normal` — balanced (routing defaultTier: `medium`)
+### `normal` — balanced (routing defaultTier: `focused`)
 
-Advisory for `fast` (surfaces guidance, never hard-blocks cheap exploration),
-enforced for `medium`/`heavy` (where real implementation happens). Verifies only
-when a DoD is present or auto-inferred.
+Advisory for `fast`/`light` (surfaces guidance, never hard-blocks cheap exploration),
+enforced for `medium`/`focused`/`heavy` (where real implementation happens). Verifies
+only when a DoD is present or auto-inferred.
 
 ```jsonc
 "enforcement": {
   "mode": "advisory",
-  "perTier": { "fast": "advisory", "medium": "enforced", "heavy": "enforced" },
+  "perTier": { "fast": "advisory", "light": "advisory", "medium": "enforced", "focused": "enforced", "heavy": "enforced" },
   "guard": { "budget": 25, "readDraftCap": 3, "sameOpRetryCap": 1, "blockSelfScript": true, "deliverableFirst": true },
   "verify": { "require": "whenDoDPresent", "preferDeterministic": true, "graderPolicy": "atLeastProducerTier", "graderTemperature": 0 },
-  "escalate": { "ladder": ["fast", "medium", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 4, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 4 } },
+  "escalate": { "ladder": ["fast", "light", "medium", "focused", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 4, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 4 } },
   "proportional": { "trivialBypass": true }
 }
 ```
@@ -105,27 +106,28 @@ advisory everywhere except `heavy` so grader calls stay rare.
 ```jsonc
 "enforcement": {
   "mode": "advisory",
-  "perTier": { "fast": "advisory", "medium": "advisory", "heavy": "enforced" },
+  "perTier": { "fast": "advisory", "light": "advisory", "medium": "advisory", "focused": "advisory", "heavy": "enforced" },
   "guard": { "budget": 15, "readDraftCap": 2, "sameOpRetryCap": 1, "blockSelfScript": true, "deliverableFirst": true },
   "verify": { "require": "whenDoDPresent", "preferDeterministic": true, "graderTemperature": 0 },
-  "escalate": { "ladder": ["fast", "medium", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 3, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 2 } },
+  "escalate": { "ladder": ["fast", "light", "medium", "focused", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 3, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 2 } },
   "proportional": { "trivialBypass": true }
 }
 ```
 
-### `quality` — quality-first (routing defaultTier: `medium`)
+### `quality` — quality-first (routing defaultTier: `focused`)
 
 Fully enforced; verifies **always** (auto-infers a DoD when none is supplied); the
-grader is never weaker than `medium` (`minGraderTier`); deeper ladder
-(`multiple: 6`, `maxTotalAttempts: 5`) so a `medium` start can escalate to `heavy`.
+grader is never weaker than `focused` (`minGraderTier`); deeper ladder
+(`multiple: 6`, `maxTotalAttempts: 5`) so a `medium` start can escalate through
+`focused` to `heavy`.
 
 ```jsonc
 "enforcement": {
   "mode": "enforced",
-  "perTier": { "fast": "enforced", "medium": "enforced", "heavy": "enforced" },
+  "perTier": { "fast": "enforced", "light": "enforced", "medium": "enforced", "focused": "enforced", "heavy": "enforced" },
   "guard": { "budget": 30, "readDraftCap": 4, "sameOpRetryCap": 1, "blockSelfScript": true, "deliverableFirst": true },
-  "verify": { "require": "always", "preferDeterministic": true, "graderPolicy": "atLeastProducerTier", "minGraderTier": "medium", "graderTemperature": 0 },
-  "escalate": { "ladder": ["fast", "medium", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 5, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 6 } },
+  "verify": { "require": "always", "preferDeterministic": true, "graderPolicy": "atLeastProducerTier", "minGraderTier": "focused", "graderTemperature": 0 },
+  "escalate": { "ladder": ["fast", "light", "medium", "focused", "heavy"], "maxAttemptsPerTier": 1, "maxTotalAttempts": 5, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 6 } },
   "proportional": { "trivialBypass": true }
 }
 ```
@@ -139,10 +141,10 @@ large), `multiple: 8` and `maxAttemptsPerTier: 2` allow several strong attempts,
 ```jsonc
 "enforcement": {
   "mode": "enforced",
-  "perTier": { "medium": "enforced", "heavy": "enforced" },
+  "perTier": { "medium": "enforced", "focused": "enforced", "heavy": "enforced" },
   "guard": { "budget": 40, "readDraftCap": 5, "sameOpRetryCap": 1, "blockSelfScript": true, "deliverableFirst": true },
-  "verify": { "require": "always", "preferDeterministic": true, "graderPolicy": "atLeastProducerTier", "minGraderTier": "medium", "graderTemperature": 0 },
-  "escalate": { "floorTier": "medium", "ladder": ["fast", "medium", "heavy"], "maxAttemptsPerTier": 2, "maxTotalAttempts": 6, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 8 } },
+  "verify": { "require": "always", "preferDeterministic": true, "graderPolicy": "atLeastProducerTier", "minGraderTier": "focused", "graderTemperature": 0 },
+  "escalate": { "floorTier": "medium", "ladder": ["fast", "light", "medium", "focused", "heavy"], "maxAttemptsPerTier": 2, "maxTotalAttempts": 6, "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 8 } },
   "proportional": { "trivialBypass": false }
 }
 ```
@@ -166,7 +168,7 @@ These are the in-code defaults (`buildGuardPolicy`, `buildEscalatePolicy`,
 | `verify.preferDeterministic` | `true` |
 | `verify.graderPolicy` | `atLeastProducerTier` |
 | `verify.graderTemperature` | `0` |
-| `escalate.ladder` | `["fast","medium","heavy"]` |
+| `escalate.ladder` | `["fast","light","medium","focused","heavy"]` |
 | `escalate.floorTier` | `null` |
 | `escalate.maxAttemptsPerTier` | `1` |
 | `escalate.maxTotalAttempts` | `4` |

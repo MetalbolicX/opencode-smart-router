@@ -498,6 +498,9 @@ describe("buildGateDeps", () => {
         enforcement: {
           mode: "advisory",
           verify: { minGraderTier: "ultra", require: "always" },
+          // NOTE: makeCtx fixture bug — opts.cfg spread overwrites enforcement,
+          // so we must set escalate.ladder explicitly here for resolveLadder.
+          escalate: { ladder: ["fast", "medium", "heavy"] },
         } as any,
       },
     });
@@ -528,6 +531,48 @@ describe("buildGateDeps", () => {
     expect(result.text).toBe("from-grader");
     expect(capturedReq.body.system).toBe("system-msg");
     expect(capturedReq.body.parts[0].text).toBe("prompt-msg");
+  });
+
+  // PR 1 extension: five-tier ladder via resolveLadder — requires real project config (PR 2)
+  // Skipped here; covered by integration tests once five-tier project config exists.
+
+  it("ladder is resolved via resolveLadder for a three-tier preset", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: {
+        presets: {
+          default: {
+            fast: { model: "a/f", description: "f", whenToUse: [], costRatio: 1 },
+            medium: { model: "a/m", description: "m", whenToUse: [], costRatio: 5 },
+            heavy: { model: "a/h", description: "h", whenToUse: [], costRatio: 20 },
+          },
+        },
+      } as any,
+    });
+
+    const deps = await buildGateDeps(ctx);
+    expect(deps.checker.ladder).toEqual(["fast", "medium", "heavy"]);
+  });
+
+  it("explicit enforcement.escalate.ladder wins over preset costRatio", async () => {
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: {
+        presets: {
+          default: {
+            fast: { model: "a/f", description: "f", whenToUse: [], costRatio: 1 },
+            light: { model: "a/l", description: "l", whenToUse: [], costRatio: 2 },
+            medium: { model: "a/m", description: "m", whenToUse: [], costRatio: 5 },
+          },
+        },
+        enforcement: {
+          escalate: { ladder: ["medium", "fast"] },
+        },
+      } as any,
+    });
+
+    const deps = await buildGateDeps(ctx);
+    expect(deps.checker.ladder).toEqual(["medium", "fast"]);
   });
 });
 
@@ -560,6 +605,33 @@ describe("verifyTaskAfterHook", () => {
 
     expect(output.output).toContain("NOT ACCEPTED");
     expect(output.output).toContain("[router");
+  });
+
+  it("skips verification for a tier listed in skipTiers", async () => {
+    process.env.MODEL_ROUTER_ENFORCE = "1";
+    const ctx = makeCtx({
+      directory: workDir,
+      cfg: { enforcement: { verify: { skipTiers: ["light"] } } } as any,
+    });
+
+    const input = {
+      tool: "task",
+      sessionID: "orch",
+      args: {
+        subagent_type: "light",
+        prompt:
+          "Create the report.\n[acceptance]\ncheck: fileExists path=missing.txt\n[/acceptance]",
+      },
+    };
+    const output = {
+      output: "<task_result>\nDONE.\n</task_result>",
+      metadata: { sessionId: "child-light" },
+    };
+    const original = output.output;
+
+    await verifyTaskAfterHook(ctx, input, output);
+
+    expect(output.output).toBe(original);
   });
 
   it("does NOT modify output when the deterministic check PASSES", async () => {

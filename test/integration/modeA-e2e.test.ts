@@ -105,10 +105,12 @@ describe("Mode A end-to-end enforcement loop", () => {
   const fakeCtx = { sessionID: "sess_modeA", abort: new AbortController().signal };
 
   // -------------------------------------------------------------------------
-  // T1: auto-inferred DoD; false-finish then escalate fast->fast->medium
+  // T1: auto-inferred DoD; false-finish then escalate fast->light->light (5-tier)
+  // With costMultiple=4 and firstAttemptCost=1, ceiling=4. After fast+light
+  // cumulative cost=3<4 so light retried; light passes on 2nd light attempt.
   // -------------------------------------------------------------------------
 
-  it("Mode A: auto-inferred DoD; false-finish then escalate fast->fast->medium => accepted", async () => {
+  it("Mode A: auto-inferred DoD; false-finish then escalate fast->light->light => accepted", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
     const graderQueue = [
       '{"pass":false,"reasons":["nope"]}',
@@ -130,8 +132,9 @@ describe("Mode A end-to-end enforcement loop", () => {
 
     expect(result).toContain("[router ✓ accepted:");
     expect(result).not.toContain("status: unmet");
+    // 5-tier: fast fail -> light fail -> light pass (3 calls, cost ceiling blocks medium)
     expect(producerCalls.length).toBe(3);
-    expect(producerCalls[2]!.tier).toBe("medium");
+    expect(producerCalls[2]!.tier).toBe("light");
     expect(producerCalls[1]!.text).toContain("[router escalation]");
     expect(producerCalls[2]!.text).toContain("[router escalation]");
   });
@@ -162,12 +165,13 @@ describe("Mode A end-to-end enforcement loop", () => {
   });
 
   // -------------------------------------------------------------------------
-  // T3: producer never produces + grader all-FAIL => honest give_up
+  // T3: producer never produces + grader all-FAIL => honest give_up (5-tier)
+  // maxTotalAttempts=4 limits to 4 calls before exhausting the ladder.
   // -------------------------------------------------------------------------
 
   it("Mode A: producer never produces + grader all-FAIL => honest give_up", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
-    const graderQueue = Array(6).fill('{"pass":false,"reasons":["bad"]}');
+    const graderQueue = Array(10).fill('{"pass":false,"reasons":["bad"]}');
 
     const hooks: any = await ModelRouterPlugin(
       makeCtxWithQueues(dir, producerCalls, graderQueue, undefined, "") as any,
@@ -184,7 +188,8 @@ describe("Mode A end-to-end enforcement loop", () => {
     expect(result).toContain("[router status: unmet]");
     expect(result).toContain("attempt(s)");
     expect(result).not.toContain("[router ✓ accepted:");
-    expect(producerCalls.length).toBe(3);
+    // maxTotalAttempts=4 limits to 4 calls before give_up
+    expect(producerCalls.length).toBe(4);
   });
 
   // -------------------------------------------------------------------------

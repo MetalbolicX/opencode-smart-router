@@ -60,12 +60,12 @@
     "@opencode-ai/plugin": ">=1.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
-    "@types/node": "^26.1.0",
+    "@biomejs/biome": "^2.5.4",
+    "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "cross-env": "^10.1.0",
-    "rolldown": "^1.1.4",
-    "typescript": "^6.0.3",
+    "rolldown": "^1.2.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }

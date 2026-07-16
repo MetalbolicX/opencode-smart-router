@@ -25,6 +25,7 @@ import {
 } from "../plugin/types";
 import type { RouterConfig } from "../router/config";
 import { resolveEnforcementMode } from "../router/enforcement";
+import { resolveLadder } from "../router/tier-ladder";
 import { getActiveTiers } from "../router/protocol";
 import { WRITE_TOOLS } from "../router/tools";
 import { logEvent } from "../utils/observability";
@@ -305,7 +306,7 @@ export const buildGateDeps = async (
     },
     checker: {
       dispatchGrader: (req) => dispatchGrader(ctx, req, parentSessionID),
-      ladder: ["fast", "medium", "heavy"],
+      ladder: resolveLadder(cfg),
       minGraderTier: cfg.enforcement?.verify?.minGraderTier ?? null,
     },
     require: cfg.enforcement?.verify?.require,
@@ -364,8 +365,9 @@ export const verifyTaskAfterHook = async (
     const parsed = parsedEarly;
     const { finalReturnText, parentSessionID } = parsed;
     const producerTier = taskArgs?.subagent_type ?? "fast";
-    const skipFastTier = activeCfg.enforcement?.verify?.skipFastTier ?? true;
-    if (skipFastTier && producerTier === "fast") return;
+    const verifyCfg = activeCfg.enforcement?.verify;
+    const skipTiers = verifyCfg?.skipTiers ?? (verifyCfg?.skipFastTier ?? true ? ["fast"] : []);
+    if (skipTiers.includes(producerTier)) return;
     const dod = buildDelegationDoD({
       prompt: taskArgs?.prompt,
       description: taskArgs?.description,
@@ -448,7 +450,7 @@ export const verifyTaskAfterHook = async (
         message: "Delegation not accepted by verification",
         variant: "warning",
       });
-      const ladder = activeCfg.enforcement?.escalate?.ladder ?? ["fast", "medium", "heavy"];
+      const ladder = resolveLadder(activeCfg);
       const li = ladder.indexOf(producerTier);
       const nextTier = li >= 0 && li < ladder.length - 1 ? ladder[li + 1] : null;
       const note = scrubText(buildForcingNote(res.verdict.reasons, { producerTier, nextTier }));

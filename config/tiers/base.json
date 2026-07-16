@@ -3,7 +3,9 @@
   "activeMode": "normal",
   "tierCaps": {
     "fast": 8,
+    "light": 7,
     "medium": 5,
+    "focused": 4,
     "heavy": 3
   },
   "defaultTier": "medium",

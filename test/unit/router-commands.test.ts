@@ -11,6 +11,7 @@ import {
   buildRouterOutput,
   buildTiersOutput,
   handleCommandBefore,
+  registerRouterCommands,
 } from "../../src/router/commands";
 import type { Preset, RouterConfig, TierConfig } from "../../src/router/config";
 import { readState } from "../../src/router/config";
@@ -577,5 +578,68 @@ describe("handleCommandBefore — /model-router-reasoning branch", () => {
     expect(output.parts[0].text).not.toContain("not implemented");
     const state = await readState();
     expect(state.reasoningMode).toBe("adaptive");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Five-tier: /tiers output and annotate-plan (PR 2)
+// ---------------------------------------------------------------------------
+
+describe("buildTiersOutput — five-tier output", () => {
+  it("renders all five tiers when preset has five tiers", () => {
+    const cfg = makeConfig() as any;
+    cfg.presets.anthropic = {
+      fast: { model: "anthropic/claude-haiku-4-5", description: "Fast", steps: 30, whenToUse: ["a"] },
+      light: { model: "anthropic/claude-haiku-4-5", description: "Light", steps: 40, whenToUse: ["b"] },
+      medium: { model: "anthropic/claude-sonnet-4-6", description: "Medium", steps: 50, whenToUse: ["c"] },
+      focused: { model: "anthropic/claude-haiku-4-5", description: "Focused", steps: 80, whenToUse: ["d"] },
+      heavy: { model: "anthropic/claude-opus-4-8", description: "Heavy", steps: 120, whenToUse: ["e"] },
+    } as Preset;
+    const out = buildTiersOutput(cfg);
+    expect(out).toContain("## @fast");
+    expect(out).toContain("## @light");
+    expect(out).toContain("## @medium");
+    expect(out).toContain("## @focused");
+    expect(out).toContain("## @heavy");
+  });
+
+  it("renders light and focused thinking metadata when present", () => {
+    const cfg = makeConfig() as any;
+    cfg.presets.anthropic = {
+      fast: { model: "anthropic/claude-haiku-4-5", description: "Fast", steps: 30, whenToUse: ["a"] },
+      light: { model: "openai/gpt-5.5-fast", description: "Light", steps: 40, whenToUse: ["b"], thinking: { budgetTokens: 2048 } },
+      medium: { model: "anthropic/claude-sonnet-4-6", description: "Medium", steps: 50, whenToUse: ["c"] },
+      focused: { model: "openai/gpt-5.5-fast", description: "Focused", steps: 80, whenToUse: ["d"], reasoning: { effort: "high" } },
+      heavy: { model: "anthropic/claude-opus-4-8", description: "Heavy", steps: 120, whenToUse: ["e"] },
+    } as Preset;
+    const out = buildTiersOutput(cfg);
+    expect(out).toContain("## @light");
+    expect(out).toContain("## @focused");
+    expect(out).toContain("thinking: 2048 tokens");
+    expect(out).toContain("reasoning: effort=high");
+  });
+});
+
+describe("registerRouterCommands — annotate-plan with five tiers", () => {
+  it("annotate-plan template includes light and focused tier directives", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerRouterCommands(opencodeConfig);
+    const template = opencodeConfig.command?.["annotate-plan"]?.template ?? "";
+    expect(template).toContain("[tier:fast]");
+    expect(template).toContain("[tier:medium]");
+    expect(template).toContain("[tier:heavy]");
+    // PR 2: light and focused must appear in the template
+    expect(template).toContain("[tier:light]");
+    expect(template).toContain("[tier:focused]");
+  });
+
+  it("annotate-plan template describes light and focused routing scope", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerRouterCommands(opencodeConfig);
+    const template = opencodeConfig.command?.["annotate-plan"]?.template ?? "";
+    // light: localized/simple implementation
+    expect(template).toContain("light");
+    // focused: deep single-system analysis
+    expect(template).toContain("focused");
   });
 });

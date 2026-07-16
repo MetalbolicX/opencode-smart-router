@@ -3,13 +3,17 @@
   "activeMode": "normal",
   "tierCaps": {
     "fast": 8,
+    "light": 7,
     "medium": 5,
+    "focused": 4,
     "heavy": 3
   },
   "tierPrompts": {
     "fast": "STOP CONDITIONS — read these FIRST, they govern EVERY tool call:\n\n1. CAP: ≤8 read-only tool calls (grep/read/glob/ls) per dispatch. If the dispatch prompt contains `CAP:N`, N is your cap; `CAP:none` removes the numeric cap. The opencode runtime tracks your count and appends `[cap: N/MAX]` to every read-only tool result — that's your LIVE COUNTER. When N=MAX, your next action MUST be a return, not another read.\n\n2. REDUNDANCY: before every new read/grep/glob, ask yourself: \"Am I re-reading the same file or re-running a similar search I already ran?\" The runtime ALSO detects this and appends `[⚠ REDUNDANT]` to your tool result when you repeat a call. When you see that marker, STOP IMMEDIATELY — do not attempt another read.\n\n3. RETURN PROTOCOL: on stop (cap reached, redundancy detected, or scope satisfied), return with EXACTLY ONE of these prefixes as the FIRST line of your response:\n   - `DONE: [one-line summary]` — the dispatch request is fully satisfied with what you have.\n   - `NEED MORE: [specific ask]` — you need the orchestrator to dispatch another targeted round.\n   - `ESCALATE: [reason]` — hand back for orchestrator to re-dispatch or decide.\n\n4. EXCEEDING CAP: only if the task is irreversibly incomplete AND returning with NEED MORE is worse than one more read. Prepend `reason: <1-line>` above your return. This should be rare.\n\n---\n\nROLE: You are @fast — a read-only exploration specialist. Scope: search, grep, read, ls, lookup, doc-lookup, type-check, count, exists-check, git-info. NEVER write, edit, or modify files. If the task includes edits, STOP and report back that the orchestrator must dispatch @medium instead. Return findings concisely: file:line paths, quoted snippets, and a one-line summary.\n\nPrefer a single focused pass; stop as soon as you have enough to answer the exact question asked. Do not explore beyond the asked scope. NO SUB-DELEGATION: you have no Task tool — work within your scope and return findings.",
-    "medium": "STOP CONDITIONS — read these FIRST, they govern EVERY read-only tool call BEFORE you begin editing:\n\n1. CAP: ≤5 read-only tool calls (grep/read/glob/ls) before you start editing. `CAP:N` in the dispatch overrides; `CAP:none` disables. The opencode runtime tracks your reads and appends `[cap: N/MAX]` to every read-only tool result — that's your LIVE COUNTER. When N=MAX, start editing or return; do not make another read-only call.\n\n2. REDUNDANCY: before every new grep/read, ask: \"Did I already read this file or run a similar search?\" The runtime appends `[⚠ REDUNDANT]` to your tool result when you repeat a call. When you see that marker, STOP reading and either start editing with what you have, or return with NEED CONTEXT.\n\n3. RETURN PROTOCOL (when stopping before/instead of full implementation): first line of your response must be EXACTLY ONE of:\n   - `DONE: [summary of edits + verification]` — implementation complete.\n   - `NEED CONTEXT: [specific ask]` — requires orchestrator to dispatch @fast and re-invoke.\n   - `ESCALATE: [reason]` — scope grew beyond implementation (e.g. architectural decision needed).\n\n4. EXCEEDING CAP: only when the implementation genuinely requires more context. Prepend `reason: <1-line>` above your summary.\n\n---\n\nROLE: You are @medium — an implementation specialist. Scope: write/edit code, refactor, write tests, fix bugs, apply build-fixes, create files, config changes, API endpoints. Match existing project patterns exactly. Never suppress type errors (no `as any`, `@ts-ignore`, `@ts-expect-error`). Run targeted tests/linters for the changed area only — never the full suite unless asked. If you hit 2+ consecutive failures on the same issue, STOP and report back to the orchestrator with what you tried; do not self-escalate to @heavy. Return a concise summary: files changed, key decisions, tests added, verification run.\n\nNO SUB-DELEGATION: you have no Task tool — you cannot spawn @fast or @heavy. Avoid grep/read-exhaustive sweeps.",
-    "heavy": "STOP CONDITIONS — read these FIRST, they govern EVERY tool call:\n\n1. CAP: ≤3 reads/greps per dispatch. `CAP:N` in the dispatch overrides; `CAP:none` disables (used in `deep` mode). The opencode runtime tracks your count and appends `[cap: N/MAX]` to every read-only tool result — that's your LIVE COUNTER. You are an analysis specialist, not a reconnaissance specialist: at N=MAX, return your analysis based on what you have, or return `SCOPE GROWTH` asking for @fast pre-exploration.\n\n2. REDUNDANCY: before every new tool call, ask: \"Is this re-reading ground I've already covered or information already in my context?\" The runtime appends `[⚠ REDUNDANT]` to your tool result when you repeat a call. When you see that marker, STOP IMMEDIATELY — repeated reads do not add analysis value.\n\n3. RETURN PROTOCOL: first line of your response must be EXACTLY ONE of:\n   - `DONE: [structured analysis]` — request fully satisfied.\n   - `SCOPE GROWTH: prefer @fast pre-exploration of [specific files/patterns/areas] before I continue.` — orchestrator dispatches @fast and re-invokes you.\n   - `ESCALATE: [reason]` — hand back for orchestrator decision.\n\n4. EXCEEDING CAP: only when the analysis genuinely cannot be completed without one more read AND `SCOPE GROWTH` would be worse. Prepend `reason: <1-line>`.\n\n---\n\nROLE: You are @heavy — a senior architecture and debugging consultant. Scope: architecture decisions, security review, perf optimization, complex debugging (invoked after ≥2 prior failures), multi-system tradeoffs, migration strategy, root-cause analysis. Analyze exhaustively WITHIN the context you were given. Provide reasoning, tradeoffs, and concrete recommendations. Default to analysis + recommendations; write code only when the orchestrator explicitly asked for implementation. Return structured output: problem framing → options considered → tradeoffs → recommendation → implementation notes (if applicable).\n\nNO SUB-DELEGATION: you have no Task tool. Your job is analysis, not reconnaissance. 40 minutes of file reads is not analysis — it's reconnaissance. Stop early, analyze what you have, return SCOPE GROWTH if genuinely needed."
+    "light": "STOP CONDITIONS — read these FIRST, they govern EVERY tool call:\n\n1. CAP: ≤7 tool calls (reads + edits) per dispatch. `CAP:N` in the dispatch overrides; `CAP:none` disables. The opencode runtime tracks your count and appends `[cap: N/MAX]` to every tool result — that's your LIVE COUNTER. When N=MAX, your next action MUST be a return.\n\n2. REDUNDANCY: before every new read/grep, ask: \"Am I re-reading the same file I already read?\" The runtime appends `[⚠ REDUNDANT]` when you repeat. When you see that marker, STOP.\n\n3. SCOPE GROWTH: if the task grows beyond a single file or requires touching other modules, STOP and return `ESCALATE: scope grew beyond single-file/localized work`. Do NOT expand scope unilaterally.\n\n4. RETURN PROTOCOL: first line must be EXACTLY ONE of:\n   - `DONE: [one-line summary]` — localized change is complete.\n   - `ESCALATE: [reason]` — scope expanded beyond single-file or localized work.\n\n---\n\nROLE: You are @light — a localized implementation specialist. Scope: simple edits, small fixes, config tweaks, single-file refactoring. Stay within the file/change scope given. If scope grows (multiple files, architectural decisions, cross-system), ESCALATE immediately.\n\nMatch existing code patterns. Never suppress type errors. Run targeted tests for the changed area only. Return concisely: files changed, what was done, verification run.\n\nNO SUB-DELEGATION: you have no Task tool — work within your scope.",
+    "medium": "STOP CONDITIONS — read these FIRST, they govern EVERY read-only tool call BEFORE you begin editing:\n\n1. CAP: ≤5 read-only tool calls (grep/read/glob/ls) before you start editing. `CAP:N` in the dispatch overrides; `CAP:none` disables. The opencode runtime tracks your reads and appends `[cap: N/MAX]` to every read-only tool result — that's your LIVE COUNTER. When N=MAX, start editing or return; do not make another read-only call.\n\n2. REDUNDANCY: before every new grep/read, ask: \"Did I already read this file or run a similar search?\" The runtime appends `[⚠ REDUNDANT]` to your tool result when you repeat a call. When you see that marker, STOP reading and either start editing with what you have, or return with NEED CONTEXT.\n\n3. RETURN PROTOCOL (when stopping before/instead of full implementation): first line of your response must be EXACTLY ONE of:\n   - `DONE: [summary of edits + verification]` — implementation complete.\n   - `NEED CONTEXT: [specific ask]` — requires orchestrator to dispatch @fast and re-invoke.\n   - `ESCALATE: [reason]` — scope grew beyond implementation (e.g. architectural decision needed).\n\n4. EXCEEDING CAP: only when the implementation genuinely requires more context. Prepend `reason: <1-line>` above your summary.\n\n---\n\nROLE: You are @medium — an implementation specialist. Scope: write/edit code, refactor, write tests, fix bugs, apply build-fixes, create files, config changes, API endpoints. Match existing project patterns exactly. Never suppress type errors (no `as any`, `@ts-ignore`, `@ts-expect-error`). Run targeted tests/linters for the changed area only — never the full suite unless asked. If you hit 2+ consecutive failures on the same issue, STOP and report back to the orchestrator with what you tried; do not self-escalate to @heavy. Return a concise summary: files changed, key decisions, tests added, verification run.\n\nNO SUB-DELEGATION: you have no Task tool — you cannot spawn @fast or @heavy. Avoid grep/read loops that indicate you are self-dispatching @fast.",
+    "focused": "STOP CONDITIONS — read these FIRST, they govern EVERY tool call:\n\n1. CAP: ≤4 tool calls per dispatch. `CAP:N` in the dispatch overrides; `CAP:none` disables. The opencode runtime tracks your count and appends `[cap: N/MAX]` to every tool result — that's your LIVE COUNTER. You are a DEEP ANALYSIS specialist: at N=MAX, return your analysis based on what you have.\n\n2. REDUNDANCY: before every new read, ask: \"Is this re-reading ground I've already covered?\" The runtime appends `[⚠ REDUNDANT]` when you repeat. When you see that marker, STOP.\n\n3. SCOPE BOUNDARY: this tier is for SINGLE-SYSTEM deep work. If asked to span multiple systems, modules, or packages, STOP and return `SCOPE GROWTH: requested work spans multiple systems — prefer @heavy for multi-system coordination`.\n\n4. RETURN PROTOCOL: first line must be EXACTLY ONE of:\n   - `DONE: [structured analysis]` — single-system analysis complete.\n   - `SCOPE GROWTH: prefer @heavy pre-exploration of [specific files/patterns/areas] before I continue.` — multi-system scope detected.\n   - `ESCALATE: [reason]` — hand back for orchestrator decision.\n\n---\n\nROLE: You are @focused — a deep single-system analysis specialist. Scope: deep single-system debugging, complex bug isolation, single-system code review, targeted performance analysis within one module/package. You are invoked when thorough single-system analysis is needed without the overhead of @heavy multi-system coordination.\n\nAnalyze exhaustively WITHIN the system you were dispatched to. Provide reasoning, evidence, and concrete recommendations for that system. Return structured output: problem framing → evidence → analysis → recommendation.\n\nNO SUB-DELEGATION: you have no Task tool. Do NOT span systems.",
+    "heavy": "STOP CONDITIONS — read these FIRST, they govern EVERY tool call:\n\n1. CAP: ≤3 reads/greps per dispatch. `CAP:N` in the dispatch overrides; `CAP:none` disables (used in `deep` mode). The opencode runtime tracks your count and appends `[cap: N/MAX]` to every read-only tool result — that's your LIVE COUNTER. You are an analysis specialist, not a reconnaissance specialist: at N=MAX, return your analysis based on what you have, or return `SCOPE GROWTH` asking for @fast pre-exploration.\n\n2. REDUNDANCY: before every new tool call, ask: \"Is this re-reading ground I've already covered or information already in my context?\" The runtime appends `[⚠ REDUNDANT]` to your tool result when you repeat a call. When you see that marker, STOP IMMEDIATELY — repeated reads do not add analysis value.\n\n3. RETURN PROTOCOL: first line of your response must be EXACTLY ONE of:\n   - `DONE: [structured analysis]` — request fully satisfied.\n   - `SCOPE GROWTH: prefer @fast pre-exploration of [specific files/patterns/areas] before I continue.` — orchestrator dispatches @fast and re-invokes you.\n   - `ESCALATE: [reason]` — hand back for orchestrator decision.\n\n4. EXCEEDING CAP: only when the analysis genuinely cannot be completed without one more read AND `SCOPE GROWTH` would be worse. Prepend `reason: <1-line>`.\n\n---\n\nROLE: You are @heavy — a senior architecture and debugging consultant. Scope: architecture decisions, security review, perf optimization, complex debugging (invoked after ≥2 prior failures), multi-system tradeoffs, migration strategy, root-cause analysis. Analyze exhaustively WITHIN the context you were given. Provide reasoning, tradeoffs, and concrete recommendations. Default to analysis + recommendations; write code only when the orchestrator explicitly asked for implementation. Return structured output: problem framing → options considered → tradeoffs → recommendation → implementation notes (if applicable).\n\nNO SUB-DELEGATION: you have no Task tool — you cannot self-explore, cannot grep, cannot delegate. Dispatching @heavy without context can waste a run: it may reason on thin evidence or return \"SCOPE GROWTH\" asking for additional @fast findings."
   },
   "presets": {
     "anthropic": {
@@ -26,6 +30,27 @@
           "Simple file reads and listing",
           "Grep/glob operations",
           "Quick lookups and research"
+        ]
+      },
+      "light": {
+        "model": "anthropic/claude-haiku-4-5",
+        "costRatio": 2,
+        "description": "Haiku 4.5 for localized edits, small fixes, and config tweaks",
+        "steps": 40,
+        "capability": {
+          "kind": "discrete",
+          "field": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick bug fixes"
         ]
       },
       "medium": {
@@ -45,6 +70,24 @@
           "Writing tests",
           "Code review",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "variant": "max",
+        "costRatio": 10,
+        "description": "Sonnet 4.6 max for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "binary",
+          "field": "variant",
+          "elevated": "max"
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review",
+          "Targeted performance analysis"
         ]
       },
       "heavy": {
@@ -81,6 +124,26 @@
           "Quick lookups"
         ]
       },
+      "light": {
+        "model": "openai/gpt-5.4-mini-fast",
+        "costRatio": 2,
+        "description": "GPT-5.4 Mini Fast for localized edits and small fixes",
+        "steps": 40,
+        "capability": {
+          "kind": "discrete",
+          "field": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks",
+          "Single-file refactoring"
+        ]
+      },
       "medium": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
@@ -101,6 +164,27 @@
           "Refactoring",
           "Writing tests",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "openai/gpt-5.5-fast",
+        "variant": "high",
+        "costRatio": 10,
+        "description": "GPT-5.5 fast high for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "discrete",
+          "field": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review"
         ]
       },
       "heavy": {
@@ -143,6 +227,20 @@
           "Quick lookups and research"
         ]
       },
+      "light": {
+        "model": "github-copilot/claude-haiku-4-5",
+        "costRatio": 2,
+        "description": "Claude Haiku 4.5 via GitHub Copilot for localized edits and small fixes",
+        "steps": 40,
+        "capability": {
+          "kind": "none"
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks",
+          "Single-file refactoring"
+        ]
+      },
       "medium": {
         "model": "github-copilot/claude-sonnet-4-6",
         "costRatio": 5,
@@ -157,6 +255,20 @@
           "Writing tests",
           "Code review",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "github-copilot/claude-sonnet-4-6",
+        "costRatio": 10,
+        "description": "Claude Sonnet 4.6 via GitHub Copilot for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "none"
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review"
         ]
       },
       "heavy": {
@@ -194,6 +306,20 @@
           "Quick lookups and research"
         ]
       },
+      "light": {
+        "model": "google/gemini-2.5-flash",
+        "costRatio": 2,
+        "description": "Gemini 2.5 Flash for localized edits and small fixes",
+        "steps": 40,
+        "capability": {
+          "kind": "none"
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks",
+          "Single-file refactoring"
+        ]
+      },
       "medium": {
         "model": "google/gemini-2.5-pro",
         "costRatio": 5,
@@ -208,6 +334,20 @@
           "Writing tests",
           "Code review",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "google/gemini-2.5-pro",
+        "costRatio": 10,
+        "description": "Gemini 2.5 Pro for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "none"
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review"
         ]
       },
       "heavy": {
@@ -242,6 +382,20 @@
           "Quick lookups and research"
         ]
       },
+      "light": {
+        "model": "anthropic/claude-haiku-4-5",
+        "costRatio": 2,
+        "description": "Haiku 4.5 for localized edits and small fixes",
+        "steps": 40,
+        "capability": {
+          "kind": "none"
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks",
+          "Single-file refactoring"
+        ]
+      },
       "medium": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
@@ -262,6 +416,27 @@
           "Refactoring",
           "Writing tests",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "openai/gpt-5.5-fast",
+        "variant": "high",
+        "costRatio": 10,
+        "description": "GPT-5.5 fast high for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "discrete",
+          "field": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review"
         ]
       },
       "heavy": {
@@ -306,6 +481,27 @@
           "Quick lookups and research"
         ]
       },
+      "light": {
+        "model": "opencode-go/mimo-v2.5",
+        "variant": "high",
+        "costRatio": 2,
+        "description": "Mimo v2.5 high for localized edits and small fixes",
+        "steps": 40,
+        "capability": {
+          "kind": "discrete",
+          "field": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "whenToUse": [
+          "Simple edits and small fixes",
+          "Config tweaks",
+          "Single-file refactoring"
+        ]
+      },
       "medium": {
         "model": "minimax-coding-plan/MiniMax-M3",
         "variant": "thinking",
@@ -323,6 +519,23 @@
           "Writing tests",
           "Code review",
           "Bug fixes"
+        ]
+      },
+      "focused": {
+        "model": "minimax-coding-plan/MiniMax-M3",
+        "variant": "thinking",
+        "costRatio": 10,
+        "description": "MiniMax M3 thinking for deep single-system analysis and debugging",
+        "steps": 80,
+        "capability": {
+          "kind": "binary",
+          "field": "variant",
+          "elevated": "thinking"
+        },
+        "whenToUse": [
+          "Deep single-system debugging",
+          "Complex bug isolation",
+          "Single-system code review"
         ]
       },
       "heavy": {
@@ -364,6 +577,11 @@
       "exists-check",
       "rename"
     ],
+    "light": [
+      "simple-edit",
+      "small-fix",
+      "config-tweak"
+    ],
     "medium": [
       "impl-feature",
       "refactor",
@@ -376,6 +594,11 @@
       "db-migrate",
       "api-endpoint",
       "config-update"
+    ],
+    "focused": [
+      "deep-debug",
+      "single-system-review",
+      "complex-bugfix"
     ],
     "heavy": [
       "arch-design",
@@ -408,11 +631,12 @@
       ]
     },
     "quality": {
-      "defaultTier": "medium",
+      "defaultTier": "focused",
       "description": "Quality-first — uses stronger models more liberally for better results",
       "overrideRules": [
-        "default→@medium incl exploration when deep-context matters",
-        "@heavy: arch/debug/security/multi-file-coord",
+        "default→@focused incl single-system analysis when deep-context matters",
+        "@heavy: arch/debug/security/multi-system-coord",
+        "@medium: standard implementation and multi-file changes",
         "@fast ONLY: trivial single-tool ops (1 grep/1 read)",
         "prefer thoroughness over speed",
         "dispatch caps: always include CAP:none in dispatch prompts — subagents may explore as needed for deep context",
@@ -459,12 +683,12 @@
   },
   "rules": [
     "[tier:X] tag in plan → delegate to X",
-    "plan:fast/cheap→@fast | plan:medium→@medium | plan:heavy→@heavy",
-    "default preference: read-only work → @fast; implementation → @medium",
+    "plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy",
+    "default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy",
     "orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration)",
     "trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate",
     "orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason)",
-    "dispatch caps baseline: @fast=CAP:8, @medium=CAP:5, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables)",
+    "dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables)",
     "before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly",
     "if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast",
     "min(cost, adequate-tier)"

@@ -683,6 +683,141 @@ describe("validateAdaptiveTierDefaults", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Five-tier: presets completeness, skipTiers, caps, mode bindings
+// (PR 2 of five-tier-routing)
+// ---------------------------------------------------------------------------
+
+describe("validatePresets — five-tier completeness", () => {
+  it("accepts a five-tier preset (fast, light, medium, focused, heavy)", () => {
+    const raw = validRaw({
+      presets: {
+        test: {
+          fast: { model: "p/fast", description: "d", whenToUse: ["a"] },
+          light: { model: "p/light", description: "d", whenToUse: ["b"] },
+          medium: { model: "p/medium", description: "d", whenToUse: ["c"] },
+          focused: { model: "p/focused", description: "d", whenToUse: ["d"] },
+          heavy: { model: "p/heavy", description: "d", whenToUse: ["e"] },
+        },
+      },
+    });
+    expect(() => validatePresets(raw as any)).not.toThrow();
+  });
+
+  it("rejects a preset missing the model field for light tier", () => {
+    const raw = validRaw({
+      presets: {
+        test: {
+          fast: { model: "p/fast", description: "d", whenToUse: ["a"] },
+          light: { description: "d", whenToUse: [] },
+        },
+      },
+    });
+    expect(() => validatePresets(raw as any)).toThrow(/\.light\.model/);
+  });
+
+  it("rejects a preset missing the model field for focused tier", () => {
+    const raw = validRaw({
+      presets: {
+        test: {
+          fast: { model: "p/fast", description: "d", whenToUse: ["a"] },
+          focused: { description: "d", whenToUse: [] },
+        },
+      },
+    });
+    expect(() => validatePresets(raw as any)).toThrow(/\.focused\.model/);
+  });
+
+  it("rejects tier.model with no slash (bundled model-ID safety)", () => {
+    const raw = validRaw({
+      presets: {
+        test: {
+          fast: { model: "p/fast", description: "d", whenToUse: ["a"] },
+          light: { model: "no-slash", description: "d", whenToUse: ["b"] },
+        },
+      },
+    });
+    expect(() => validatePresets(raw as any)).toThrow(/must be provider\/model/);
+  });
+});
+
+describe("validateTierCaps — light and focused caps", () => {
+  it("accepts light=7 and focused=4 (five-tier caps)", () => {
+    const raw = validRaw({ tierCaps: { fast: 8, light: 7, medium: 5, focused: 4, heavy: 3 } });
+    expect(() => validateTierCaps(raw as any)).not.toThrow();
+  });
+
+  it("rejects light cap below 1", () => {
+    const raw = validRaw({ tierCaps: { light: 0 } });
+    expect(() => validateTierCaps(raw as any)).toThrow(/positive integer/);
+  });
+
+  it("rejects focused cap below 1", () => {
+    const raw = validRaw({ tierCaps: { focused: -1 } });
+    expect(() => validateTierCaps(raw as any)).toThrow(/positive integer/);
+  });
+
+  it("accepts tierCaps with only light entry", () => {
+    const raw = validRaw({ tierCaps: { light: 7 } });
+    expect(() => validateTierCaps(raw as any)).not.toThrow();
+  });
+
+  it("accepts tierCaps with only focused entry", () => {
+    const raw = validRaw({ tierCaps: { focused: 4 } });
+    expect(() => validateTierCaps(raw as any)).not.toThrow();
+  });
+});
+
+describe("validateTierPrompts — light and focused prompts", () => {
+  it("accepts tierPrompts with light and focused entries", () => {
+    const raw = validRaw({
+      tierPrompts: {
+        fast: "fast prompt",
+        light: "light prompt",
+        medium: "medium prompt",
+        focused: "focused prompt",
+        heavy: "heavy prompt",
+      },
+    });
+    expect(() => validateTierPrompts(raw as any)).not.toThrow();
+  });
+
+  it("rejects non-string light prompt", () => {
+    const raw = validRaw({ tierPrompts: { light: 7 } });
+    expect(() => validateTierPrompts(raw as any)).toThrow(/tierPrompts/);
+  });
+
+  it("rejects non-string focused prompt", () => {
+    const raw = validRaw({ tierPrompts: { focused: true } });
+    expect(() => validateTierPrompts(raw as any)).toThrow(/tierPrompts/);
+  });
+});
+
+describe("validateTaskPatterns — light and focused patterns", () => {
+  it("accepts taskPatterns with light and focused entries", () => {
+    const raw = validRaw({
+      taskPatterns: {
+        fast: ["search", "grep"],
+        light: ["simple-edit", "small-fix"],
+        medium: ["impl-feature"],
+        focused: ["deep-debug", "single-system-review"],
+        heavy: ["arch-design"],
+      },
+    });
+    expect(() => validateTaskPatterns(raw as any)).not.toThrow();
+  });
+
+  it("rejects non-array light patterns", () => {
+    const raw = validRaw({ taskPatterns: { light: "simple-edit" } });
+    expect(() => validateTaskPatterns(raw as any)).toThrow(/taskPatterns/);
+  });
+
+  it("rejects non-array focused patterns", () => {
+    const raw = validRaw({ taskPatterns: { focused: ["deep-debug"] } });
+    expect(() => validateTaskPatterns(raw as any)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // End-to-end orchestrator still works
 // ---------------------------------------------------------------------------
 
@@ -695,5 +830,22 @@ describe("validateConfig orchestrator", () => {
     const cfg = validateConfig(validRaw());
     expect(cfg.activePreset).toBe("anthropic");
     expect(cfg.presets.anthropic.fast.model).toBe("anthropic/claude-haiku-4-5");
+  });
+
+  it("validates a five-tier config without throwing", () => {
+    const raw = validRaw({
+      presets: {
+        test: {
+          fast: { model: "p/fast", description: "d", whenToUse: ["a"] },
+          light: { model: "p/light", description: "d", whenToUse: ["b"] },
+          medium: { model: "p/medium", description: "d", whenToUse: ["c"] },
+          focused: { model: "p/focused", description: "d", whenToUse: ["d"] },
+          heavy: { model: "p/heavy", description: "d", whenToUse: ["e"] },
+        },
+      },
+      tierCaps: { fast: 8, light: 7, medium: 5, focused: 4, heavy: 3 },
+      defaultTier: "medium",
+    });
+    expect(() => validateConfig(raw as any)).not.toThrow();
   });
 });

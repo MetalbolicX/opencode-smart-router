@@ -44,7 +44,7 @@ Returns the scrubbed best producer text and scrubbed failure reasons. Never a fa
 
 | field | default |
 |-------|---------|
-| `ladder` | `["fast","medium","heavy"]` |
+| `ladder` | `["fast","light","medium","focused","heavy"]` |
 | `floorTier` | `null` |
 | `maxAttemptsPerTier` | `1` |
 | `maxTotalAttempts` | `4` |
@@ -58,19 +58,20 @@ Returns the scrubbed best producer text and scrubbed failure reasons. Never a fa
 ceiling = firstAttemptCostUnits × costCeiling.multiple
 ```
 
-Default Anthropic cost ratios: `fast=1 / medium=5 / heavy=20`.
+Multi-provider cost ratios: `fast=1 / light=2 / medium=5 / focused=10 / heavy=20`.
 
 Starting at `fast` with `multiple: 4` → ceiling `= 1 × 4 = 4`:
 
 ```
 attempt 1  fast    cumulative 1   (≤ 4, continue)
 attempt 2  fast    cumulative 2   (≤ 4, continue)   ← retry same tier
-attempt 3  medium  cumulative 7   (> 4, STOP)       ← escalates once, then give_up
+attempt 3  light   cumulative 4   (≤ 4, continue)  ← escalates once
+attempt 4  light   cumulative 6   (> 4, STOP)       ← cost ceiling exceeded
 ```
 
-Effective shape: **[fast ×2, medium ×1] → give-up**. `heavy` is never reached from a `fast` start at `multiple: 4`.
+Effective shape: **[fast ×2, light ×2] → give-up**. `medium` and above are never reached from a `fast` start at `multiple: 4`.
 
-To reach `heavy`: raise `costCeiling.multiple`, or set `floorTier: "medium"` (`firstAttemptCostUnits = 5`; `multiple: 6` → ceiling `30` covers `medium → heavy`).
+To reach `medium`: raise `costCeiling.multiple` to `6` (`1×6=6` covers fast→light→medium), or set `floorTier: "medium"`. To reach `heavy`: `multiple: 20` or `floorTier: "focused"`.
 
 See [ENFORCEMENT_PRESETS.md](./ENFORCEMENT_PRESETS.md) for per-mode configurations that pair `floorTier` and `multiple`.
 

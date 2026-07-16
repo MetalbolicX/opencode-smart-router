@@ -131,7 +131,7 @@ describe("Layer-3 escalation ladder wiring", () => {
   });
 
   // -------------------------------------------------------------------------
-  // CASE B: exhaust fast retries, escalate to medium, then pass
+  // CASE B: exhaust fast retries, escalate through light, then pass on medium
   // -------------------------------------------------------------------------
 
   it("CASE B: escalate -> PASS", async () => {
@@ -139,6 +139,7 @@ describe("Layer-3 escalation ladder wiring", () => {
     const graderQueue = [
       '{"pass":false,"reasons":["a"]}',
       '{"pass":false,"reasons":["b"]}',
+      '{"pass":false,"reasons":["c"]}',
       '{"pass":true,"reasons":[]}',
     ];
 
@@ -157,18 +158,21 @@ describe("Layer-3 escalation ladder wiring", () => {
 
     expect(result).toContain("[router ✓ accepted:");
     expect(result).not.toContain("status: unmet");
-    expect(producerCalls.length).toBe(3);
-    expect(producerCalls[2]!.tier).toBe("medium");
+    // 5-tier ladder: fast → light → medium → light → (pass)
+    // With 4-cost ceiling and firstAttemptCost=1, medium (cost=5) exceeds ceiling.
+    // The 4th call (light) consumes the pass verdict and accepts.
+    expect(producerCalls.length).toBe(4);
+    expect(producerCalls[3]!.tier).toBe("light");
   });
 
   // -------------------------------------------------------------------------
-  // CASE C: exhaust all attempts, give_up
+  // CASE C: exhaust all attempts, give_up (5-tier ladder)
   // -------------------------------------------------------------------------
 
   it("CASE C: give_up after maxTotalAttempts", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
     // Provide more than enough failures to ensure the queue never runs dry.
-    const graderQueue = Array<string>(6).fill('{"pass":false,"reasons":["bad"]}');
+    const graderQueue = Array<string>(10).fill('{"pass":false,"reasons":["bad"]}');
 
     const hooks: any = await ModelRouterPlugin(
       makeCtxWithQueues(dir, producerCalls, graderQueue) as any,
@@ -186,8 +190,8 @@ describe("Layer-3 escalation ladder wiring", () => {
     expect(result).toContain("[router status: unmet]");
     expect(result).toContain("attempt(s)");
     expect(result).not.toContain("[router ✓ accepted:");
-    // fast(1)+fast(1)+medium(5)=7 > firstAttemptCost(1)*costMultiple(4)=4 → cost ceiling
-    // fires after 3 attempts, not 4.
-    expect(producerCalls.length).toBe(3);
+    // 5-tier ladder: fast(1)+fast(1)+light(2)+medium(5)=9 > firstAttemptCost(1)*costMultiple(4)=4
+    // cost ceiling fires after 4 attempts: fast, fast, light, medium.
+    expect(producerCalls.length).toBe(4);
   });
 });

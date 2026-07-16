@@ -95,6 +95,47 @@ describe("atLeastProducerTier", () => {
 });
 
 // ---------------------------------------------------------------------------
+// atLeastProducerTier — five-tier ladder scenarios (PR 1 extension)
+// ---------------------------------------------------------------------------
+
+describe("atLeastProducerTier — five-tier ladder", () => {
+  const fiveTierLadder = ["fast", "light", "medium", "focused", "heavy"];
+
+  it("producerTier light => light", () => {
+    expect(atLeastProducerTier("light", { ladder: fiveTierLadder })).toBe("light");
+  });
+
+  it("producerTier light + minGraderTier medium => medium", () => {
+    expect(atLeastProducerTier("light", { ladder: fiveTierLadder, minGraderTier: "medium" })).toBe("medium");
+  });
+
+  it("producerTier focused => focused", () => {
+    expect(atLeastProducerTier("focused", { ladder: fiveTierLadder })).toBe("focused");
+  });
+
+  it("producerTier focused + minGraderTier heavy => heavy", () => {
+    expect(atLeastProducerTier("focused", { ladder: fiveTierLadder, minGraderTier: "heavy" })).toBe("heavy");
+  });
+
+  it("producerTier heavy => heavy (five-tier)", () => {
+    expect(atLeastProducerTier("heavy", { ladder: fiveTierLadder })).toBe("heavy");
+  });
+
+  it("producerTier fast => fast (five-tier)", () => {
+    expect(atLeastProducerTier("fast", { ladder: fiveTierLadder })).toBe("fast");
+  });
+
+  it("minGraderTier light promotes fast => light", () => {
+    expect(atLeastProducerTier("fast", { ladder: fiveTierLadder, minGraderTier: "light" })).toBe("light");
+  });
+
+  it("producerTier medium clamps to heavy when minGraderTier is above top", () => {
+    // minGraderTier heavy is index 4, producer medium is index 2, max is 4
+    expect(atLeastProducerTier("medium", { ladder: fiveTierLadder, minGraderTier: "heavy" })).toBe("heavy");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildGradingPrompt
 // ---------------------------------------------------------------------------
 

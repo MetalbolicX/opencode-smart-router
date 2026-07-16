@@ -1,4 +1,5 @@
 import type { RouterConfig } from "../router/config";
+import { resolveLadder } from "../router/tier-ladder";
 import { writeTrajectoryLog } from "../utils/log";
 import { logEvent } from "../utils/observability";
 
@@ -171,7 +172,7 @@ export const advance = (state: LadderState, action: LadderAction): LadderState =
 export const buildEscalatePolicy = (cfg: RouterConfig): EscalatePolicy => {
   const esc = cfg.enforcement?.escalate;
   return {
-    ladder: esc?.ladder ?? ["fast", "medium", "heavy"],
+    ladder: esc?.ladder ?? resolveLadder(cfg),
     floorTier: esc?.floorTier ?? null,
     maxAttemptsPerTier: esc?.maxAttemptsPerTier ?? 1,
     maxTotalAttempts: esc?.maxTotalAttempts ?? 4,

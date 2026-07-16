@@ -11,6 +11,11 @@
       "exists-check",
       "rename"
     ],
+    "light": [
+      "simple-edit",
+      "small-fix",
+      "config-tweak"
+    ],
     "medium": [
       "impl-feature",
       "refactor",
@@ -23,6 +28,11 @@
       "db-migrate",
       "api-endpoint",
       "config-update"
+    ],
+    "focused": [
+      "deep-debug",
+      "single-system-review",
+      "complex-bugfix"
     ],
     "heavy": [
       "arch-design",
@@ -55,11 +65,12 @@
       ]
     },
     "quality": {
-      "defaultTier": "medium",
+      "defaultTier": "focused",
       "description": "Quality-first — uses stronger models more liberally for better results",
       "overrideRules": [
-        "default→@medium incl exploration when deep-context matters",
-        "@heavy: arch/debug/security/multi-file-coord",
+        "default→@focused incl single-system analysis when deep-context matters",
+        "@heavy: arch/debug/security/multi-system-coord",
+        "@medium: standard implementation and multi-file changes",
         "@fast ONLY: trivial single-tool ops (1 grep/1 read)",
         "prefer thoroughness over speed",
         "dispatch caps: always include CAP:none in dispatch prompts — subagents may explore as needed for deep context",
@@ -106,12 +117,12 @@
   },
   "rules": [
     "[tier:X] tag in plan → delegate to X",
-    "plan:fast/cheap→@fast | plan:medium→@medium | plan:heavy→@heavy",
-    "default preference: read-only work → @fast; implementation → @medium",
+    "plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy",
+    "default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy",
     "orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration)",
     "trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate",
     "orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason)",
-    "dispatch caps baseline: @fast=CAP:8, @medium=CAP:5, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables)",
+    "dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables)",
     "before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly",
     "if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast",
     "min(cost, adequate-tier)"

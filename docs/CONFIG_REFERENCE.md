@@ -53,7 +53,7 @@ Top-level `tiers.json` fields. All blocks are optional and additive; omitting a 
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `floorTier` | `string \| null` | `null` | Pin the minimum starting tier; skips cheaper rungs. Must be string or `null`. |
-| `ladder` | `string[]` | `["fast","medium","heavy"]` | Ordered list of tier names to escalate through. Must be an array of strings. |
+| `ladder` | `string[]` | `["fast","light","medium","focused","heavy"]` | Ordered list of tier names to escalate through. Must be an array of strings. |
 | `maxAttemptsPerTier` | `number` | `1` | Max attempts at each rung before advancing. Must be integer ≥ 0. |
 | `maxTotalAttempts` | `number` | `4` | Hard ceiling across all tiers and retries. Must be integer ≥ 1. |
 | `costCeiling.base` | `string` | `"firstAttemptCostUnits"` | Reference point for cost ceiling. `"firstAttemptCostUnits"` = cost of the first producing attempt. |
@@ -204,7 +204,7 @@ Three independent mechanisms; env gate always wins:
     },
     "escalate": {
       "floorTier": null,
-      "ladder": ["fast", "medium", "heavy"],
+      "ladder": ["fast", "light", "medium", "focused", "heavy"],
       "maxAttemptsPerTier": 1,
       "maxTotalAttempts": 4,
       "costCeiling": { "base": "firstAttemptCostUnits", "multiple": 4 }

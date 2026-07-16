@@ -428,3 +428,63 @@ describe("integration — manual mode patch merges into agent def", () => {
     expect(opencodeConfig.agent.fast).toEqual(baseline);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Five-tier: five Claude prefixes (PR 2)
+// ---------------------------------------------------------------------------
+
+describe("registerTierAgents — five tiers with five Claude prefixes", () => {
+  const fiveTierPreset = makePreset({
+    fast: makeTier({ model: "anthropic/claude-haiku-4-5", prompt: "fast prompt" }),
+    light: makeTier({ model: "anthropic/claude-sonnet-4-6", variant: "max", prompt: "light prompt" }),
+    medium: makeTier({ model: "anthropic/claude-sonnet-4-6", prompt: "medium prompt" }),
+    focused: makeTier({ model: "anthropic/claude-haiku-4-5", variant: "thinking", prompt: "focused prompt" }),
+    heavy: makeTier({ model: "anthropic/claude-opus-4-8", prompt: "heavy prompt" }),
+  });
+  const fiveTierCfg = makeConfig();
+
+  it("registers all five tier agents", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
+    expect(Object.keys(opencodeConfig.agent ?? {})).toHaveLength(5);
+    expect(opencodeConfig.agent).toHaveProperty("fast");
+    expect(opencodeConfig.agent).toHaveProperty("light");
+    expect(opencodeConfig.agent).toHaveProperty("medium");
+    expect(opencodeConfig.agent).toHaveProperty("focused");
+    expect(opencodeConfig.agent).toHaveProperty("heavy");
+  });
+
+  it("applies light Claude prefix to light-tier Claude model", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
+    const expectedPrefix = `${CLAUDE_TIER_PREFIX["light"]}\n\n${CLAUDE_ANTI_NARRATION}`;
+    expect(opencodeConfig.agent?.light?.prompt).toContain(expectedPrefix);
+  });
+
+  it("applies focused Claude prefix to focused-tier Claude model", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
+    const expectedPrefix = `${CLAUDE_TIER_PREFIX["focused"]}\n\n${CLAUDE_ANTI_NARRATION}`;
+    expect(opencodeConfig.agent?.focused?.prompt).toContain(expectedPrefix);
+  });
+
+  it("does NOT apply Claude prefix to non-Claude light tier", () => {
+    const nonClaudePreset = makePreset({
+      light: makeTier({ model: "openai/gpt-5.5-fast", prompt: "non-claude light prompt" }),
+    });
+    const opencodeConfig: Record<string, any> = {};
+    registerTierAgents(opencodeConfig, nonClaudePreset, fiveTierCfg);
+    expect(opencodeConfig.agent?.light?.prompt).not.toContain("SCOPE NOTE");
+    expect(opencodeConfig.agent?.light?.prompt).toBe("non-claude light prompt");
+  });
+
+  it("each agent def includes variant only when tier.variant is present (five-tier)", () => {
+    const opencodeConfig: Record<string, any> = {};
+    registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
+    expect(opencodeConfig.agent?.light?.variant).toBe("max");
+    expect(opencodeConfig.agent?.focused?.variant).toBe("thinking");
+    expect(opencodeConfig.agent?.fast?.variant).toBeUndefined();
+    expect(opencodeConfig.agent?.medium?.variant).toBeUndefined();
+    expect(opencodeConfig.agent?.heavy?.variant).toBeUndefined();
+  });
+});

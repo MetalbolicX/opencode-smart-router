@@ -138,7 +138,7 @@ describe("Mode B end-to-end (plan-annotation)", () => {
   // B2: plan task escalates fast->medium through the same ladder, then accepted
   // -------------------------------------------------------------------------
 
-  it("Mode B: a plan task escalates fast->medium through the same ladder, then accepted", async () => {
+  it("Mode B: a plan task escalates fast->light->light through 5-tier ladder, then accepted", async () => {
     const producerCalls: Array<{ tier: string; text: string }> = [];
     const graderQueue = [
       '{"pass":false,"reasons":["no"]}',
@@ -162,8 +162,9 @@ describe("Mode B end-to-end (plan-annotation)", () => {
     );
 
     expect(result).toContain("[router ✓ accepted:");
+    // 5-tier: fast fail -> light fail -> light pass (cost ceiling blocks medium)
     expect(producerCalls.length).toBe(3);
-    expect(producerCalls[2]!.tier).toBe("medium");
+    expect(producerCalls[2]!.tier).toBe("light");
     expect(producerCalls[1]!.text).toContain("[router escalation]");
   });
 

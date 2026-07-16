@@ -10,6 +10,7 @@ import {
   buildDoDProtocolSection,
   buildFallbackInstructions,
   buildTaskTaxonomy,
+  CLAUDE_TIER_PREFIX,
   getActiveMode,
   getActiveTiers,
   isClaudeModel,
@@ -191,5 +192,100 @@ describe("buildDoDProtocolSection", () => {
     const out = buildDoDProtocolSection(cfg);
     expect(out).toContain("REQUIRED");
     expect(out).not.toContain("auto-inferred");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Five-tier: light and focused role contracts and routing rules (PR 2)
+// ---------------------------------------------------------------------------
+
+describe("CLAUDE_TIER_PREFIX — five tier keys", () => {
+  it("has entries for fast, medium, heavy (existing)", () => {
+    expect(CLAUDE_TIER_PREFIX).toHaveProperty("fast");
+    expect(CLAUDE_TIER_PREFIX).toHaveProperty("medium");
+    expect(CLAUDE_TIER_PREFIX).toHaveProperty("heavy");
+  });
+
+  it("has entries for light and focused (PR 2)", () => {
+    expect(CLAUDE_TIER_PREFIX).toHaveProperty("light");
+    expect(CLAUDE_TIER_PREFIX).toHaveProperty("focused");
+  });
+
+  it("light prefix is a non-empty string", () => {
+    expect(typeof CLAUDE_TIER_PREFIX["light"]).toBe("string");
+    expect(CLAUDE_TIER_PREFIX["light"].length).toBeGreaterThan(0);
+  });
+
+  it("focused prefix is a non-empty string", () => {
+    expect(typeof CLAUDE_TIER_PREFIX["focused"]).toBe("string");
+    expect(CLAUDE_TIER_PREFIX["focused"].length).toBeGreaterThan(0);
+  });
+});
+
+describe("buildDelegationProtocol — light and focused contracts", () => {
+  const fiveTierCfg = {
+    activePreset: "multi-provider",
+    activeMode: "normal",
+    presets: {
+      "multi-provider": {
+        fast: tier("opencode-go/mimo-v2.5", { costRatio: 1 }),
+        light: tier("opencode-go/mimo-v2.5", { costRatio: 2, variant: "high" }),
+        medium: tier("minimax-coding-plan/MiniMax-M3", { costRatio: 5 }),
+        focused: tier("minimax-coding-plan/MiniMax-M3", { costRatio: 10, variant: "thinking" }),
+        heavy: tier("openai/gpt-5.4", { costRatio: 20 }),
+      },
+    },
+    rules: ["r1"],
+    defaultTier: "medium",
+    modes: {
+      normal: { defaultTier: "medium", description: "d" },
+    },
+    taskPatterns: {
+      fast: ["search"],
+      light: ["simple-edit"],
+      medium: ["impl-feature"],
+      focused: ["deep-debug"],
+      heavy: ["arch-design"],
+    },
+  } as unknown as RouterConfig;
+
+  it("renders light tier in the tier line", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    expect(out).toContain("@light");
+  });
+
+  it("renders focused tier in the tier line", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    expect(out).toContain("@focused");
+  });
+
+  it("contains ### @light contract section", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    expect(out).toContain("### @light contract");
+  });
+
+  it("contains ### @focused contract section", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    expect(out).toContain("### @focused contract");
+  });
+
+  it("contains HARD ROUTING rule for light tier", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    // light is for localized/simple implementation
+    expect(out).toContain("@light");
+  });
+
+  it("contains HARD ROUTING rule for focused tier", () => {
+    const out = buildDelegationProtocol(fiveTierCfg);
+    // focused is for deep single-system debugging/review
+    expect(out).toContain("@focused");
+  });
+
+  it("buildTaskTaxonomy includes light and focused patterns", () => {
+    const out = buildTaskTaxonomy(fiveTierCfg);
+    expect(out).toContain("@light");
+    expect(out).toContain("@focused");
+    expect(out).toContain("simple-edit");
+    expect(out).toContain("deep-debug");
   });
 });
