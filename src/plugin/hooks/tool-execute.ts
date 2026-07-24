@@ -1,104 +1,31 @@
 // ---------------------------------------------------------------------------
-// src/plugin/hooks.ts — Hook adapter functions for the plugin runtime.
+// src/plugin/hooks/tool-execute.ts — Tool execute hook handlers.
 //
-// Each handler is a verbatim extraction of the corresponding hook closure
-// from `src/index.ts`. Bodies are unchanged — same call order, same
-// fail-soft semantics, same mutations on `output`. The only mechanical
-// change is that handlers take `ctx: PluginContext` as their first argument
-// instead of closing over plugin-scoped locals.
+// Carries the two tool execute hooks: `handleToolExecuteBefore` (nested-
+// delegation guard, reasoning patch, subagent guard) and
+// `handleToolExecuteAfter` (cap banners, changed-file tracking, baseline
+// restore, verify dispatch).
 //
-// All hook payloads use narrow runtime DTOs from `src/plugin/types.ts`
-// (`HookPayload` / `HookEventPayload`) instead of `any`.
+// In Phase 1 the bodies are verbatim copies from the original
+// `src/plugin/hooks.ts` monolith. Phase 2 extracts the three tool-guards
+// (`assertNestedDelegationAllowed`, `applyOrchestratorReasoningPatch`,
+// `runSubagentGuard`) into `tool-guards.ts` and refactors
+// `handleToolExecuteBefore` into a thin dispatcher. `handleToolExecuteAfter`
+// stays as-is.
 // ---------------------------------------------------------------------------
 
-import {
-  type BeforeResult,
-  formatScorecard,
-  guardAfterCall,
-  guardBeforeCall,
-} from "../guard/enforce";
-import { detectNarration } from "../guard/narration";
-import { type AdaptiveSignals, selectAdaptiveLevel } from "../reasoning/adaptive.js";
-import { normalizeSignalText } from "../reasoning/match.js";
-import { resolveReasoningOverride } from "../reasoning/policy.js";
-import { applyReasoningPatch, registerTierAgents, restoreAgentBaseline } from "../router/agents";
-import { registerRouterCommands } from "../router/commands";
-import type { Preset } from "../router/config";
-import { resolveEnforcementMode } from "../router/enforcement";
-import { assembleSystemPrompt, getActiveTiers } from "../router/protocol";
-import { READ_ONLY_TOOLS } from "../router/tools";
-import { writeTrajectoryLog } from "../utils/log";
-import { log } from "../utils/observability";
-import { resolveTierModelGuard } from "../utils/tier-model-guard";
-import { verifyTaskAfterHook } from "../verify/dispatch";
-import type { PluginContext } from "./context";
-import type { HookEventPayload, HookPayload } from "./types";
-import { asChatMessageInput, asTaskToolArgs, asToolCallInput } from "./types";
-
-// ---------------------------------------------------------------------------
-// session.created — parentID extraction helper.
-// ---------------------------------------------------------------------------
-
-/**
- * Extracts the parentID from a session.created event's properties.
- * Returns null if the event has no info.parentID (root session).
- * Safe to call on any event shape — returns null on missing fields.
- */
-const extractParentID = (props: Record<string, unknown> | undefined): string | null => {
-  const info = props?.info as Record<string, unknown> | undefined;
-  const pid = info?.parentID;
-  if (typeof pid === "string") return pid;
-  return null;
-};
-
-// ---------------------------------------------------------------------------
-// chat.params — temperature override for open grader sessions.
-// ---------------------------------------------------------------------------
-
-export const handleChatParams = async (
-  ctx: PluginContext,
-  input: HookPayload,
-  output: HookPayload,
-): Promise<void> => {
-  try {
-    const sessionID = input?.sessionID as string | undefined;
-    if (sessionID && ctx.graderSessions.has(sessionID)) {
-      const cfg = await ctx.getConfig();
-      output.temperature = cfg.enforcement?.verify?.graderTemperature ?? 0;
-    }
-  } catch {
-    // best-effort: never crash a real session
-  }
-};
-
-// ---------------------------------------------------------------------------
-// chat.message — register tier info and initialise trajectory scorecard.
-//
-// IMPORTANT: must run BEFORE system.transform so the subagent registry is
-// populated when system.transform asks `sessionStore.isSubagent(sessionID)`.
-// ---------------------------------------------------------------------------
-
-export const handleChatMessage = async (
-  ctx: PluginContext,
-  input: HookPayload,
-  output: HookPayload,
-): Promise<void> => {
-  if (ctx.state.bypassed) return;
-  // Re-read cfg so /preset switches take effect without restart.
-  // getFreshConfig() tries a forced refresh and falls back to the cached
-  // value on read failure.
-  const cfg = await ctx.getFreshConfig();
-  const tierNames = Object.keys(getActiveTiers(cfg));
-  const chatInput = asChatMessageInput(input);
-  if (!chatInput) return; // fail-soft: malformed payload
-  ctx.sessionStore.registerFromChatMessage(chatInput, output, cfg, tierNames);
-
-  // Record-only: initialise a trajectory scorecard for tracked subagents.
-  const sid = chatInput.sessionID;
-  if (ctx.sessionStore.isSubagent(sid)) {
-    ctx.trajectoryStore.ensure(sid, chatInput.agent ?? null);
-  }
-};
+import { type BeforeResult, guardAfterCall, guardBeforeCall } from "../../guard/enforce";
+import { type AdaptiveSignals, selectAdaptiveLevel } from "../../reasoning/adaptive.js";
+import { normalizeSignalText } from "../../reasoning/match.js";
+import { resolveReasoningOverride } from "../../reasoning/policy.js";
+import { applyReasoningPatch, restoreAgentBaseline } from "../../router/agents";
+import { getActiveTiers } from "../../router/protocol";
+import { READ_ONLY_TOOLS } from "../../router/tools";
+import { log } from "../../utils/observability";
+import { resolveTierModelGuard } from "../../utils/tier-model-guard";
+import { verifyTaskAfterHook } from "../../verify/dispatch";
+import type { PluginContext } from "../context";
+import { asTaskToolArgs, asToolCallInput, type HookPayload } from "../types";
 
 // ---------------------------------------------------------------------------
 // tool.execute.before — Layer 1 guard check; throws to abort when blocked.
@@ -447,146 +374,4 @@ export const handleToolExecuteAfter = async (
   // the grader parent — grader creation simply stays parentless instead
   // (SDD change: fix-task-verifier-session-parenting).
   await verifyTaskAfterHook(ctx, input, output);
-};
-
-// ---------------------------------------------------------------------------
-// experimental.text.complete — narration detection on completed text parts.
-// ---------------------------------------------------------------------------
-
-export const handleTextComplete = async (
-  ctx: PluginContext,
-  _input: HookPayload,
-  output: HookPayload,
-): Promise<void> => {
-  if (ctx.state.bypassed) return;
-  const text = output?.text;
-  if (typeof text !== "string" || text.length < 20) return;
-
-  const found = detectNarration(text);
-  if (found.length === 0) return;
-
-  const quoted = found.map((m) => `"${m.slice(0, 60)}${m.length > 60 ? "…" : ""}"`).join(", ");
-  output.text = `${text}\n\n[⚠ narration detected: ${quoted}]`;
-};
-
-// ---------------------------------------------------------------------------
-// event (session.idle) — record-only scorecard + opt-in trajectory dump.
-// ---------------------------------------------------------------------------
-
-export const handleSessionIdle = async (
-  ctx: PluginContext,
-  payload: HookEventPayload,
-): Promise<void> => {
-  const event = payload?.event;
-
-  // Plan 020: handle session.created — record parentID so depth is available
-  // before the child's first tool call.
-  if (event?.type === "session.created") {
-    const props = event?.properties as Record<string, unknown> | undefined;
-    const sid = props?.sessionID as string | undefined;
-    if (typeof sid !== "string") return;
-    const parentID = extractParentID(props);
-    // Only call registerFromSessionCreated if the store exposes it (defensive:
-    // it may not exist in older store implementations).
-    if (typeof ctx.sessionStore.registerFromSessionCreated === "function") {
-      try {
-        ctx.sessionStore.registerFromSessionCreated({ sessionID: sid, parentID });
-      } catch {
-        // best-effort: store registration must never crash a real session
-      }
-    }
-    return;
-  }
-
-  if (event?.type !== "session.idle") return;
-  const props = event?.properties as Record<string, unknown> | undefined;
-  const sid = props?.sessionID as string | undefined;
-  if (typeof sid !== "string") return;
-
-  // Per-delegation scorecard: only when enforcement was active (guard state exists).
-  try {
-    const gstate = ctx.guardStore.get(sid);
-    if (gstate) {
-      const line = formatScorecard(gstate, ctx.sessionStore.getTier(sid));
-      writeTrajectoryLog(sid, line, "scorecard");
-    }
-  } catch {
-    // best-effort: a scorecard must never crash a real session
-  }
-
-  // Opt-in full trajectory dump (unchanged gating).
-  if (process.env.MODEL_ROUTER_TRAJECTORY_DEBUG !== "1") return;
-  const dump = ctx.trajectoryStore.dump(sid);
-  if (!dump) return;
-  writeTrajectoryLog(sid, dump);
-};
-
-// ---------------------------------------------------------------------------
-// experimental.chat.system.transform — inject delegation protocol for the
-// primary orchestrator only (never for tracked subagents).
-// ---------------------------------------------------------------------------
-
-export const handleSystemTransform = async (
-  ctx: PluginContext,
-  _input: HookPayload,
-  output: HookPayload,
-): Promise<void> => {
-  if (ctx.state.bypassed) return;
-  // getFreshConfig() returns the refreshed config and falls back to the
-  // cached value if the file read fails.
-  const cfg = await ctx.getFreshConfig();
-
-  // Skip injection for child (subagent) sessions.
-  // Child sessions are detected via session.created events with a parentID.
-  const sessionID = _input?.sessionID as string | undefined;
-  if (sessionID && ctx.sessionStore.isSubagent(sessionID)) return;
-
-  // For Claude-backed orchestrators, prepend an adversarial opener that
-  // revokes the cached "Claude Code explorer" priming for the routing
-  // role. Detection is by orchestrator model, not preset.
-  const model = _input?.model as { providerID?: string; modelID?: string } | undefined;
-  const providerID = model?.providerID ?? "";
-  const modelID = model?.modelID ?? "";
-  const orchestratorModel = providerID && modelID ? `${providerID}/${modelID}` : modelID;
-
-  let enfOn = false;
-  try {
-    enfOn = resolveEnforcementMode({ config: cfg, env: process.env }).mode !== "off";
-  } catch (err) {
-    log.warn({ event: "enforcement.resolve_failed", error: String(err) });
-  }
-  (output.system as string[]).push(assembleSystemPrompt(cfg, orchestratorModel, enfOn));
-};
-
-// ---------------------------------------------------------------------------
-// config — register tier agents and router commands at load time.
-// ---------------------------------------------------------------------------
-
-export const handleConfig = async (
-  ctx: PluginContext,
-  activeTiersAtLoad: Preset,
-  opencodeConfig: any,
-): Promise<void> => {
-  // The config() hook runs once at plugin load time, so the load-time
-  // snapshot is the right cfg here (matches the original behaviour where
-  // `cfg` was initialised from loadConfig() once at factory start).
-  registerTierAgents(opencodeConfig, activeTiersAtLoad, ctx.initialConfig);
-  registerRouterCommands(opencodeConfig);
-
-  // PR 2 of adaptive-reasoning: capture the baseline agent def per tier so
-  // the runtime `tool.execute.after` hook can restore exactly the shape
-  // `registerTierAgents` produced. We snapshot AFTER registration so the
-  // baseline is the post-static-build output (including any prompt / color /
-  // variant / options the static config emitted). Same-tier patches are
-  // serialised by the per-tier in-flight owner in
-  // `ctx.reasoningStore.acquireTierOwner` — see `src/reasoning/store.ts`.
-  ctx.opencodeConfig = opencodeConfig;
-  const agentMap = opencodeConfig?.agent as Record<string, Record<string, unknown>> | undefined;
-  if (agentMap) {
-    for (const [tierName, agentDef] of Object.entries(agentMap)) {
-      // Deep enough to survive a shallow `restoreAgentBaseline` replace —
-      // a structuredClone covers nested options/variant objects.
-      ctx.reasoningStore.setBaseline(tierName, structuredClone(agentDef));
-    }
-  }
 };
