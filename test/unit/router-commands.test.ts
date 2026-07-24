@@ -20,36 +20,36 @@ let tmpHome: string;
 let origHOME: string | undefined;
 let origUSERPROFILE: string | undefined;
 let origXDG_CONFIG_HOME: string | undefined;
-const savedEnvGate = process.env["MODEL_ROUTER_ENFORCE"];
+const savedEnvGate = process.env.MODEL_ROUTER_ENFORCE;
 
 beforeEach(async () => {
-  origHOME = process.env["HOME"];
-  origUSERPROFILE = process.env["USERPROFILE"];
-  origXDG_CONFIG_HOME = process.env["XDG_CONFIG_HOME"];
+  origHOME = process.env.HOME;
+  origUSERPROFILE = process.env.USERPROFILE;
+  origXDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
   tmpHome = join(
     tmpdir(),
     `oc-test-cmd-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   mkdirSync(tmpHome, { recursive: true });
-  process.env["HOME"] = tmpHome;
-  process.env["USERPROFILE"] = tmpHome;
+  process.env.HOME = tmpHome;
+  process.env.USERPROFILE = tmpHome;
   // Tests must exercise the legacy `$HOME/.config/...` fallback so they
   // do not leak across users who have `XDG_CONFIG_HOME` set globally.
-  delete process.env["XDG_CONFIG_HOME"];
-  delete process.env["MODEL_ROUTER_ENFORCE"];
+  delete process.env.XDG_CONFIG_HOME;
+  delete process.env.MODEL_ROUTER_ENFORCE;
   const { __resetPathsForTest } = await import("../../src/router/config-paths");
   __resetPathsForTest();
 });
 
 afterEach(async () => {
-  if (origHOME === undefined) delete process.env["HOME"];
-  else process.env["HOME"] = origHOME;
-  if (origUSERPROFILE === undefined) delete process.env["USERPROFILE"];
-  else process.env["USERPROFILE"] = origUSERPROFILE;
-  if (origXDG_CONFIG_HOME === undefined) delete process.env["XDG_CONFIG_HOME"];
-  else process.env["XDG_CONFIG_HOME"] = origXDG_CONFIG_HOME;
-  if (savedEnvGate === undefined) delete process.env["MODEL_ROUTER_ENFORCE"];
-  else process.env["MODEL_ROUTER_ENFORCE"] = savedEnvGate;
+  if (origHOME === undefined) delete process.env.HOME;
+  else process.env.HOME = origHOME;
+  if (origUSERPROFILE === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUSERPROFILE;
+  if (origXDG_CONFIG_HOME === undefined) delete process.env.XDG_CONFIG_HOME;
+  else process.env.XDG_CONFIG_HOME = origXDG_CONFIG_HOME;
+  if (savedEnvGate === undefined) delete process.env.MODEL_ROUTER_ENFORCE;
+  else process.env.MODEL_ROUTER_ENFORCE = savedEnvGate;
   const { __resetPathsForTest } = await import("../../src/router/config-paths");
   __resetPathsForTest();
 });
@@ -307,7 +307,7 @@ describe("buildPresetOutput", () => {
 // buildReasoningOutput (PR 2 of adaptive-reasoning)
 // ---------------------------------------------------------------------------
 
-const makeReasoningCtx = (cfg: RouterConfig, sid = "sess-test"): PluginContext =>
+const makeReasoningCtx = (cfg: RouterConfig, _sid = "sess-test"): PluginContext =>
   ({
     plugin: { directory: tmpHome, client: {} as any } as any,
     initialConfig: cfg,
@@ -348,8 +348,13 @@ describe("buildReasoningOutput", () => {
     const ctx = makeReasoningCtx(cfg);
     ctx.reasoningStore.setOverride("sess-1", "elevated");
     expect(ctx.reasoningStore.getOverride("sess-1")).toBe("elevated");
-    const out = await buildReasoningOutput(cfg, "off", ctx, "sess-1");
-    expect(out).toContain("Reasoning override cleared");
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "off", sessionID: "sess-1" },
+      output,
+    );
+    expect(output.parts[0].text).toContain("Reasoning override cleared");
     expect(ctx.reasoningStore.getOverride("sess-1")).toBeUndefined();
   });
 
@@ -370,9 +375,14 @@ describe("buildReasoningOutput", () => {
     // policy mode; the runtime honors `mode === "manual"` at task dispatch.
     const cfg = makeConfig({ reasoningPolicy: { mode: "static" } });
     const ctx = makeReasoningCtx(cfg);
-    const out = await buildReasoningOutput(cfg, "elevated", ctx, "sess-1");
-    expect(out).toContain("Reasoning override set to **elevated**");
-    expect(out).not.toContain("will NOT be applied");
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "elevated", sessionID: "sess-1" },
+      output,
+    );
+    expect(output.parts[0].text).toContain("Reasoning override set to **elevated**");
+    expect(output.parts[0].text).not.toContain("will NOT be applied");
     expect(ctx.reasoningStore.getOverride("sess-1")).toBe("elevated");
   });
 
@@ -381,18 +391,38 @@ describe("buildReasoningOutput", () => {
       reasoningPolicy: { mode: "manual" },
     });
     const ctx = makeReasoningCtx(cfg);
-    await buildReasoningOutput(cfg, "max", ctx, "sess-1");
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "max", sessionID: "sess-1" },
+      output,
+    );
     expect(ctx.reasoningStore.getOverride("sess-1")).toBe("max");
   });
 
   it("two sessions are isolated — one session's override does not affect another", async () => {
     const cfg = makeConfig({ reasoningPolicy: { mode: "manual" } });
     const ctx = makeReasoningCtx(cfg);
-    await buildReasoningOutput(cfg, "max", ctx, "sess-A");
-    await buildReasoningOutput(cfg, "minimal", ctx, "sess-B");
+    const outputA: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "max", sessionID: "sess-A" },
+      outputA,
+    );
+    const outputB: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "minimal", sessionID: "sess-B" },
+      outputB,
+    );
     expect(ctx.reasoningStore.getOverride("sess-A")).toBe("max");
     expect(ctx.reasoningStore.getOverride("sess-B")).toBe("minimal");
-    await buildReasoningOutput(cfg, "off", ctx, "sess-A");
+    const outputClear: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "off", sessionID: "sess-A" },
+      outputClear,
+    );
     expect(ctx.reasoningStore.getOverride("sess-A")).toBeUndefined();
     expect(ctx.reasoningStore.getOverride("sess-B")).toBe("minimal");
   });
@@ -473,28 +503,48 @@ describe("buildReasoningOutput — `mode` subcommand", () => {
 
   it("`mode static` persists and reports the static description", async () => {
     const cfg = makeConfig({ reasoningPolicy: { mode: "manual" } });
-    const out = await buildReasoningOutput(cfg, "mode static", makeReasoningCtx(cfg), "sess-1");
-    expect(out).toContain("Reasoning policy mode set to **static** and persisted");
-    expect(out).toContain("Per-tier defaults");
+    const ctx = makeReasoningCtx(cfg);
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "mode static", sessionID: "sess-1" },
+      output,
+    );
+    expect(output.parts[0].text).toContain("Reasoning policy mode set to **static** and persisted");
+    expect(output.parts[0].text).toContain("Per-tier defaults");
     const state = await readState();
     expect(state.reasoningMode).toBe("static");
   });
 
   it("`mode manual` persists and reports the manual description", async () => {
     const cfg = makeConfig({ reasoningPolicy: { mode: "static" } });
-    const out = await buildReasoningOutput(cfg, "mode manual", makeReasoningCtx(cfg), "sess-1");
-    expect(out).toContain("Reasoning policy mode set to **manual** and persisted");
-    expect(out).toContain("Per-session overrides are enabled");
+    const ctx = makeReasoningCtx(cfg);
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "mode manual", sessionID: "sess-1" },
+      output,
+    );
+    expect(output.parts[0].text).toContain("Reasoning policy mode set to **manual** and persisted");
+    expect(output.parts[0].text).toContain("Per-session overrides are enabled");
     const state = await readState();
     expect(state.reasoningMode).toBe("manual");
   });
 
   it("`mode adaptive` is accepted and persisted (PR 3 wires the selector)", async () => {
     const cfg = makeConfig({ reasoningPolicy: { mode: "static" } });
-    const out = await buildReasoningOutput(cfg, "mode adaptive", makeReasoningCtx(cfg), "sess-1");
-    expect(out).toContain("Reasoning policy mode set to **adaptive** and persisted");
-    expect(out).toContain("Adaptive selector picks the level from task signals");
-    expect(out).not.toContain("not implemented");
+    const ctx = makeReasoningCtx(cfg);
+    const output: { parts: any[] } = { parts: [] };
+    await handleCommandBefore(
+      ctx,
+      { command: "model-router-reasoning", arguments: "mode adaptive", sessionID: "sess-1" },
+      output,
+    );
+    expect(output.parts[0].text).toContain(
+      "Reasoning policy mode set to **adaptive** and persisted",
+    );
+    expect(output.parts[0].text).toContain("Adaptive selector picks the level from task signals");
+    expect(output.parts[0].text).not.toContain("not implemented");
     // Verify adaptive DID write through to the state overlay.
     const state = await readState();
     expect(state.reasoningMode).toBe("adaptive");
@@ -589,11 +639,36 @@ describe("buildTiersOutput — five-tier output", () => {
   it("renders all five tiers when preset has five tiers", () => {
     const cfg = makeConfig() as any;
     cfg.presets.anthropic = {
-      fast: { model: "anthropic/claude-haiku-4-5", description: "Fast", steps: 30, whenToUse: ["a"] },
-      light: { model: "anthropic/claude-haiku-4-5", description: "Light", steps: 40, whenToUse: ["b"] },
-      medium: { model: "anthropic/claude-sonnet-4-6", description: "Medium", steps: 50, whenToUse: ["c"] },
-      focused: { model: "anthropic/claude-haiku-4-5", description: "Focused", steps: 80, whenToUse: ["d"] },
-      heavy: { model: "anthropic/claude-opus-4-8", description: "Heavy", steps: 120, whenToUse: ["e"] },
+      fast: {
+        model: "anthropic/claude-haiku-4-5",
+        description: "Fast",
+        steps: 30,
+        whenToUse: ["a"],
+      },
+      light: {
+        model: "anthropic/claude-haiku-4-5",
+        description: "Light",
+        steps: 40,
+        whenToUse: ["b"],
+      },
+      medium: {
+        model: "anthropic/claude-sonnet-4-6",
+        description: "Medium",
+        steps: 50,
+        whenToUse: ["c"],
+      },
+      focused: {
+        model: "anthropic/claude-haiku-4-5",
+        description: "Focused",
+        steps: 80,
+        whenToUse: ["d"],
+      },
+      heavy: {
+        model: "anthropic/claude-opus-4-8",
+        description: "Heavy",
+        steps: 120,
+        whenToUse: ["e"],
+      },
     } as Preset;
     const out = buildTiersOutput(cfg);
     expect(out).toContain("## @fast");
@@ -606,11 +681,38 @@ describe("buildTiersOutput — five-tier output", () => {
   it("renders light and focused thinking metadata when present", () => {
     const cfg = makeConfig() as any;
     cfg.presets.anthropic = {
-      fast: { model: "anthropic/claude-haiku-4-5", description: "Fast", steps: 30, whenToUse: ["a"] },
-      light: { model: "openai/gpt-5.5-fast", description: "Light", steps: 40, whenToUse: ["b"], thinking: { budgetTokens: 2048 } },
-      medium: { model: "anthropic/claude-sonnet-4-6", description: "Medium", steps: 50, whenToUse: ["c"] },
-      focused: { model: "openai/gpt-5.5-fast", description: "Focused", steps: 80, whenToUse: ["d"], reasoning: { effort: "high" } },
-      heavy: { model: "anthropic/claude-opus-4-8", description: "Heavy", steps: 120, whenToUse: ["e"] },
+      fast: {
+        model: "anthropic/claude-haiku-4-5",
+        description: "Fast",
+        steps: 30,
+        whenToUse: ["a"],
+      },
+      light: {
+        model: "openai/gpt-5.5-fast",
+        description: "Light",
+        steps: 40,
+        whenToUse: ["b"],
+        thinking: { budgetTokens: 2048 },
+      },
+      medium: {
+        model: "anthropic/claude-sonnet-4-6",
+        description: "Medium",
+        steps: 50,
+        whenToUse: ["c"],
+      },
+      focused: {
+        model: "openai/gpt-5.5-fast",
+        description: "Focused",
+        steps: 80,
+        whenToUse: ["d"],
+        reasoning: { effort: "high" },
+      },
+      heavy: {
+        model: "anthropic/claude-opus-4-8",
+        description: "Heavy",
+        steps: 120,
+        whenToUse: ["e"],
+      },
     } as Preset;
     const out = buildTiersOutput(cfg);
     expect(out).toContain("## @light");

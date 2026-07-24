@@ -1,17 +1,30 @@
-import type { PluginContext } from "../plugin/context";
-import type { ReasoningCapability, ReasoningLevel } from "../reasoning/capability.js";
-import { inferCapability } from "../reasoning/capability.js";
-import { translateLevel } from "../reasoning/translate.js";
-import type { RouterConfig } from "./config";
-import {
-  resolvePresetName,
-  saveActiveMode,
-  saveActivePreset,
-  saveEnforcementMode,
-  saveReasoningMode,
-} from "./config";
-import { resolveEnforcementMode } from "./enforcement";
-import { getActiveTiers } from "./protocol";
+// ---------------------------------------------------------------------------
+// src/router/commands/builders.ts — Pure renderers for the router commands.
+//
+// Each builder is a PURE function: it reads the cfg + args (and the optional
+// `resolved` state from the dispatcher), renders text, and returns it.
+// The builders NEVER call `save*` from `./config` and NEVER mutate
+// `ctx.reasoningStore.setOverride/clearOverride` — those side effects are
+// the dispatcher's job (see `./dispatch.ts`).
+//
+// When `resolved` is present, the builder trusts it as the source of truth
+// for the just-performed action (e.g. `resolved.enforceMode === "off"`) and
+// renders the "set to X" message accordingly. When `resolved` is absent
+// (legacy direct-test calls that remain untouched), the builder falls back
+// to inferring the action from `args` — this is the parity path that keeps
+// the existing 7+ direct builder tests green without modification.
+//
+// See sdd/plugin-decomposition/design § Phase 3 for the full rationale.
+// ---------------------------------------------------------------------------
+
+import type { PluginContext } from "../../plugin/context";
+import type { ReasoningCapability, ReasoningLevel } from "../../reasoning/capability.js";
+import { inferCapability } from "../../reasoning/capability.js";
+import { translateLevel } from "../../reasoning/translate.js";
+import type { RouterConfig } from "../config";
+import { resolvePresetName } from "../config";
+import { resolveEnforcementMode } from "../enforcement";
+import { getActiveTiers } from "../protocol";
 
 const REASONING_LEVELS: ReadonlySet<ReasoningLevel> = new Set([
   "minimal",
@@ -24,13 +37,16 @@ const REASONING_LEVELS: ReadonlySet<ReasoningLevel> = new Set([
 // /router command output
 // ---------------------------------------------------------------------------
 
-export const buildRouterOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
+export const buildRouterOutput = async (
+  cfg: RouterConfig,
+  args: string,
+  _resolved?: { enforceMode?: "off" | "advisory" | "enforced" },
+): Promise<string> => {
   const tokens = (args ?? "").trim().split(/\s+/).filter(Boolean);
   const sub = (tokens[0] ?? "").toLowerCase();
   if (sub === "enforce") {
     const mode = (tokens[1] ?? "").toLowerCase();
     if (mode === "off" || mode === "advisory" || mode === "enforced") {
-      await saveEnforcementMode(mode);
       const desc =
         mode === "off"
           ? "Hard-block guard disabled (default routing behaviour)."
@@ -97,7 +113,11 @@ export const buildTiersOutput = (cfg: RouterConfig): string => {
 // /budget command output
 // ---------------------------------------------------------------------------
 
-export const buildBudgetOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
+export const buildBudgetOutput = async (
+  cfg: RouterConfig,
+  args: string,
+  _resolved?: { mode?: string },
+): Promise<string> => {
   const modes = cfg.modes;
   if (!modes || Object.keys(modes).length === 0) {
     return 'No modes configured in tiers.json. Add a "modes" section to enable budget mode.';
@@ -121,7 +141,6 @@ export const buildBudgetOutput = async (cfg: RouterConfig, args: string): Promis
 
   // Switch mode
   if (modes[requested]) {
-    await saveActiveMode(requested);
     const mode = modes[requested];
     return [
       `Routing mode switched to **${requested}**.`,
@@ -143,7 +162,11 @@ export const buildBudgetOutput = async (cfg: RouterConfig, args: string): Promis
 // /preset command output
 // ---------------------------------------------------------------------------
 
-export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promise<string> => {
+export const buildPresetOutput = async (
+  cfg: RouterConfig,
+  args: string,
+  resolved?: { preset?: string },
+): Promise<string> => {
   const requestedPreset = args.trim();
 
   // No args: show available presets
@@ -161,10 +184,12 @@ export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promis
   }
 
   // Switch preset
-  const resolvedPreset = resolvePresetName(cfg, requestedPreset);
+  const resolvedPreset = resolved?.preset ?? resolvePresetName(cfg, requestedPreset);
   if (resolvedPreset) {
-    await saveActivePreset(resolvedPreset);
-    const tiers = cfg.presets[resolvedPreset]!;
+    const tiers = cfg.presets[resolvedPreset];
+    if (!tiers) {
+      return `Unknown preset: "${requestedPreset}". Available: ${Object.keys(cfg.presets).join(", ")}`;
+    }
     const models = Object.entries(tiers)
       .map(([tier, t]) => `  @${tier} -> ${t.model}`)
       .join("\n");
@@ -186,16 +211,13 @@ export const buildPresetOutput = async (cfg: RouterConfig, args: string): Promis
 // /model-router-reasoning command output (PR 3 of adaptive-reasoning-engine).
 //
 // Two responsibilities, parsed from the first token:
-//   1. `mode <static|manual|adaptive>` — persist a runtime policy-mode switch
-//      via `saveReasoningMode()`. With no mode argument, show the current mode
-//      and usage. This is a PERSISTED config overlay that survives restarts.
+//   1. `mode <static|manual|adaptive>` — persist a runtime policy-mode switch.
+//      The PERSIST call (saveReasoningMode) is in the dispatcher; the builder
+//      only renders.
 //   2. `<level>` (one of `minimal|normal|elevated|max`, or `off`) — set /
 //      clear the per-session override on `ctx.reasoningStore`. The override
-//      is stored regardless of the current policy mode; whether the runtime
-//      applies it at task dispatch is controlled by the resolved
-//      `reasoningPolicy.mode` at that moment. The previous "edit tiers.json"
-//      redirect for static mode was removed in favour of this `mode`
-//      subcommand.
+//      mutation (setOverride/clearOverride) is in the dispatcher; the builder
+//      only renders.
 //
 // Honors `reasoningPolicy.surfaceLimits`: when true, emits an advisory note
 // describing any collapse (e.g. `normal` and `elevated` both mapping to
@@ -262,8 +284,9 @@ const detectCollapse = (cap: ReasoningCapability, level: ReasoningLevel): string
 export const buildReasoningOutput = async (
   cfg: RouterConfig,
   args: string,
-  ctx: PluginContext,
-  sessionID: string,
+  _ctx: PluginContext,
+  _sessionID: string,
+  _resolved?: { policyMode?: "static" | "manual" | "adaptive" },
 ): Promise<string> => {
   const surfaceLimits = cfg.reasoningPolicy?.surfaceLimits === true;
   const policyMode = cfg.reasoningPolicy?.mode ?? "static";
@@ -307,7 +330,6 @@ export const buildReasoningOutput = async (
       ].join("\n");
     }
     if (modeArg === "static" || modeArg === "manual" || modeArg === "adaptive") {
-      await saveReasoningMode(modeArg);
       const desc =
         modeArg === "static"
           ? "Per-tier defaults are in effect — per-session overrides are ignored at task dispatch."
@@ -327,7 +349,6 @@ export const buildReasoningOutput = async (
 
   // --- per-session override flow (minimal|normal|elevated|max|off) ---
   if (sub === "off") {
-    if (sessionID) ctx.reasoningStore.clearOverride(sessionID);
     return [
       "Reasoning override cleared.",
       "",
@@ -338,11 +359,6 @@ export const buildReasoningOutput = async (
   if (!REASONING_LEVELS.has(sub as ReasoningLevel)) {
     return `Unknown level: "${sub}". Use one of: minimal, normal, elevated, max (or "off" to clear). Run '/model-router-reasoning mode' to switch the policy.`;
   }
-
-  // The override is stored regardless of the current policy mode. The runtime
-  // is responsible for honoring `reasoningPolicy.mode === "manual"` at task
-  // dispatch — this command is no longer the gatekeeper.
-  if (sessionID) ctx.reasoningStore.setOverride(sessionID, sub as ReasoningLevel);
 
   // Per-tier acknowledgement: which tiers can actually satisfy the level,
   // which collapse, and which can't (none capability → silent no-op unless
@@ -387,169 +403,4 @@ export const buildReasoningOutput = async (
   }
   lines.push("", "Takes effect on the next `task` dispatch in this session.");
   return lines.join("\n");
-};
-
-// ---------------------------------------------------------------------------
-// Register router commands on the opencode config object
-// ---------------------------------------------------------------------------
-
-/**
- * Populate `opencodeConfig.command` with the router-owned command set:
- * `/tiers`, `/preset`, `/budget`, `/bypass`, `/annotate-plan`, `/router`,
- * and `/model-router-reasoning`. Mirrors the block that lived in
- * `src/index.ts`'s `config()` hook.
- *
- * Side-effect only — the returned void matches the original inline block.
- */
-export const registerRouterCommands = (opencodeConfig: {
-  command?: Record<string, { template: string; description: string }>;
-}): void => {
-  opencodeConfig.command ??= {};
-  opencodeConfig.command["tiers"] = {
-    template: "",
-    description: "Show model delegation tiers and rules",
-  };
-  opencodeConfig.command["preset"] = {
-    template: "$ARGUMENTS",
-    description: "Show or switch model presets (e.g., /preset openai)",
-  };
-  opencodeConfig.command["budget"] = {
-    template: "$ARGUMENTS",
-    description: "Show or switch routing mode (e.g., /budget, /budget budget, /budget quality)",
-  };
-  opencodeConfig.command["bypass"] = {
-    template: "$ARGUMENTS",
-    description: "Toggle model-router bypass (disables delegation protocol for this session)",
-  };
-  opencodeConfig.command["annotate-plan"] = {
-    template: [
-      "Annotate the plan with tier directives for model delegation.",
-      "",
-      'Plan file: "$ARGUMENTS"',
-      "If no file was specified, search for the active plan: PLAN.md, plan.md, or the most recent .md with 'plan' in the name in the current directory or project root.",
-      "",
-      "## Available tiers",
-      "- `[tier:fast]` — Fast/cheap model: exploration, search, file reads, grep, listing, research. Agent does NOT edit code.",
-      "- `[tier:light]` — Localized specialist: simple edits, small fixes, config tweaks, single-file refactoring. CAP≤7.",
-      "- `[tier:medium]` — Balanced model: implementation, refactoring, tests, code review, bug fixes, standard coding tasks.",
-      "- `[tier:focused]` — Deep single-system specialist: single-system debugging, complex bug isolation, single-system review. CAP≤4.",
-      "- `[tier:heavy]` — Most capable model: architecture, complex debugging (after failures), security, performance, multi-system tradeoffs.",
-      "",
-      "## Annotation rules",
-      "1. Place `[tier:X]` at the START of each step, before the description",
-      "2. Research/exploration -> `[tier:fast]` (preferred)",
-      "3. Localized/simple changes -> `[tier:light]` (simple edits, small fixes, config tweaks)",
-      "4. Implementation/code -> `[tier:medium]` (preferred for standard coding tasks)",
-      "5. Deep single-system analysis -> `[tier:focused]` (single-system debugging, isolation, review)",
-      "6. Architecture/security/multi-system/hard debugging -> `[tier:heavy]`",
-      "7. If a step mixes exploration AND implementation, prefer splitting it into two steps when it improves delegation clarity",
-      "8. Verification (run tests, build) -> `[tier:medium]`",
-      "9. Trivial (single grep or file read) -> `[tier:fast]`",
-      "10. Final review of the complete plan -> `[tier:heavy]`",
-      "",
-      "## Output",
-      "Rewrite the entire plan in the file with the tags. Do not change the substance — only add tags, and split mixed steps when useful for clearer delegation.",
-      "",
-      "## Acceptance blocks (for enforcement)",
-      "For each NON-TRIVIAL task, append an acceptance block immediately after the step so the router can verify the work:",
-      "[acceptance]",
-      'check: <testsPass | buildPasses | lintClean | fileExists path=... | run command="..." expect=...>',
-      "criteria: <plain-language success condition, when no deterministic check applies>",
-      "deliverable: <path or short description>",
-      "[/acceptance]",
-      "Prefer deterministic checks (testsPass/buildPasses/fileExists). Use a criteria line for design/explanatory tasks. Trivial read-only steps need no acceptance block.",
-    ].join("\n"),
-    description: "Annotate a plan with [tier:fast/light/medium/focused/heavy] delegation tags",
-  };
-  opencodeConfig.command["router"] = {
-    template: "$ARGUMENTS",
-    description: "Model-router controls (e.g., /router enforce off|advisory|enforced)",
-  };
-  opencodeConfig.command["model-router-reasoning"] = {
-    template: "$ARGUMENTS",
-    description:
-      "Reasoning control: /model-router-reasoning mode <static|manual|adaptive> (persists) | /model-router-reasoning minimal|normal|elevated|max (set) | /model-router-reasoning off (clear)",
-  };
-};
-
-// ---------------------------------------------------------------------------
-// command.execute.before dispatch
-// ---------------------------------------------------------------------------
-
-/**
- * Dispatch handler for the `command.execute.before` hook. Pushes a text
- * part onto `output.parts` for `/tiers`, `/preset`, `/budget`, `/router`,
- * and `/model-router-reasoning`, and toggles `ctx.state.bypassed` for
- * `/bypass`. Mirrors the block that lived inline in `src/index.ts`.
- *
- * The function is async because the hook itself was async; the body performs
- * no asynchronous work (the await was structural). Errors in `refreshConfig()`
- * are swallowed (we fall back to the cached cfg) — same fail-soft semantics.
- */
-export const handleCommandBefore = async (
-  ctx: PluginContext,
-  input: { command: string; arguments?: string; sessionID?: string },
-  // The SDK's `command.execute.before` output is `{ parts: Part[] }` where
-  // `Part` is a discriminated union of text/reasoning/file/tool/etc. We only
-  // push text parts, so a structural supertype is sufficient.
-  output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
-): Promise<void> => {
-  if (input.command === "tiers") {
-    const cfg = await ctx.getFreshConfig();
-    output.parts.push({
-      type: "text" as const,
-      text: buildTiersOutput(cfg),
-    });
-  }
-
-  if (input.command === "preset") {
-    const cfg = await ctx.getFreshConfig();
-    output.parts.push({
-      type: "text" as const,
-      text: await buildPresetOutput(cfg, input.arguments ?? ""),
-    });
-  }
-
-  if (input.command === "bypass") {
-    const arg = (input.arguments ?? "").trim().toLowerCase();
-    if (arg === "on") {
-      ctx.state.bypassed = true;
-    } else if (arg === "off") {
-      ctx.state.bypassed = false;
-    } else {
-      ctx.state.bypassed = !ctx.state.bypassed;
-    }
-    const status = ctx.state.bypassed ? "ON" : "OFF";
-    const desc = ctx.state.bypassed
-      ? "Model-router is **bypassed**. Delegation protocol, cap enforcement, and narration detection are disabled. The model will run without routing rules until you run `/bypass off` or restart OpenCode."
-      : "Model-router is **active**. Delegation protocol and all enforcement rules are in effect.";
-    output.parts.push({
-      type: "text" as const,
-      text: `# Bypass: ${status}\n\n${desc}`,
-    });
-  }
-
-  if (input.command === "budget") {
-    const cfg = await ctx.getFreshConfig();
-    output.parts.push({
-      type: "text" as const,
-      text: await buildBudgetOutput(cfg, input.arguments ?? ""),
-    });
-  }
-
-  if (input.command === "router") {
-    const cfg = await ctx.getFreshConfig();
-    output.parts.push({
-      type: "text" as const,
-      text: await buildRouterOutput(cfg, input.arguments ?? ""),
-    });
-  }
-
-  if (input.command === "model-router-reasoning") {
-    const cfg = await ctx.getFreshConfig();
-    output.parts.push({
-      type: "text" as const,
-      text: await buildReasoningOutput(cfg, input.arguments ?? "", ctx, input.sessionID ?? ""),
-    });
-  }
 };
