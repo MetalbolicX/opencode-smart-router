@@ -27,11 +27,11 @@
 // ---------------------------------------------------------------------------
 
 import type { MatchMode } from "../reasoning/match.js";
-import {
-  type EnforcementConfig,
-  isPlainObject,
-  type ReasoningLevel,
-  type RouterConfig,
+import { isPlainObject } from "./config-loader";
+import type {
+  EnforcementConfig,
+  ReasoningLevel,
+  RouterConfig,
 } from "./config.types";
 import { ENFORCEMENT_MODES, GRADER_POLICIES, VERIFY_REQUIRE_MODES } from "./config-resolve";
 

@@ -25,8 +25,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { log } from "../utils/observability";
 import type { ConfigLayer, RouterConfig, RouterState } from "./config.types";
-import { isPlainObject } from "./config.types";
 import { RouterConfigError } from "./config-errors";
+
+/** Type guard: true iff `v` is a plain non-null Object (not Array, not Date, etc.) */
+export const isPlainObject = (v: unknown): v is Record<string, unknown> => {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+};
 import { globalConfigPath, resolveConfigPaths } from "./config-paths";
 import { resolvePresetName } from "./config-resolve";
 import { readState } from "./config-state";
