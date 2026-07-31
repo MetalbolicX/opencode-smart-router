@@ -68,6 +68,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
+    "@rescript/core": "^1.6.1",
     "@rescript/runtime": "12.3.0",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",

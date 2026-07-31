@@ -13,5 +13,8 @@
   "suffix": ".res.mjs",
   "warnings": {
     "error": "+101+102+5+7"
-  }
+  },
+  "dependencies": [
+    "rescript-test"
+  ]
 }
