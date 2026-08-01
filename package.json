@@ -11,7 +11,6 @@
     "build:copy-res": "node scripts/copy-res.mjs",
     "build": "pnpm run res:build && pnpm run build:tiers && pnpm exec -- tsc --project tsconfig.build.json && pnpm exec -- rolldown --config rolldown.config.js build && pnpm run build:copy-res",
     "build:tiers": "node --experimental-strip-types scripts/build-tiers-config.ts",
-    "prebuild": "node --experimental-strip-types scripts/build-tiers-config.ts",
     "prepublishOnly": "pnpm run build",
     "test": "vitest run",
     "test:watch": "vitest",
