@@ -193,3 +193,62 @@ declare module "*TierModelGuard.res.mjs" {
     tierName: string,
   ) => TierModelGuardResult;
 }
+
+// ---------------------------------------------------------------------------
+// Ladder (src/escalate/Ladder.res)
+// Pure state machine — depends on RouterConfig from TS boundary.
+// ---------------------------------------------------------------------------
+declare module "*Ladder.res.mjs" {
+  export type EscalatePolicy = {
+    ladder: string[];
+    floorTier: string | null;
+    maxAttemptsPerTier: number;
+    maxTotalAttempts: number;
+    costMultiple: number;
+  };
+
+  export type LadderState = {
+    currentTier: string;
+    attemptsThisTier: number;
+    totalAttempts: number;
+    escalations: number;
+    firstAttemptCost: number | null;
+    cumulativeCost: number;
+  };
+
+  export type LadderVerdict = {
+    pass: boolean;
+    reasons: string[] | null;
+  };
+
+  export type LadderActionKind = "accept" | "retry" | "escalate" | "give_up";
+
+  export type LadderAction = {
+    action: LadderActionKind;
+    tier?: string;
+    forcingMessage?: string;
+    reason?: string;
+  };
+
+  export const tierRank: (tier: string, ladder: string[]) => number;
+  export const resolveStartTier: (producerTier: string, policy: EscalatePolicy) => string;
+  export const newLadderState: (producerTier: string, policy: EscalatePolicy) => LadderState;
+  export const recordAttempt: (state: LadderState, costUnits?: number) => LadderState;
+  export const nextTierAfter: (currentTier: string, policy: EscalatePolicy) => string | null;
+  export const buildLadderForcingMessage: (reasons: string[]) => string;
+  export const nextAction: (
+    state: LadderState,
+    verdict: LadderVerdict | null | undefined,
+    policy: EscalatePolicy,
+    signal?: { aborted: boolean },
+  ) => LadderAction;
+  export const advance: (state: LadderState, action: LadderAction) => LadderState;
+  export const buildEscalatePolicy: (
+    cfg: import("../router/config.types").RouterConfig,
+  ) => EscalatePolicy;
+  export const formatLadderScorecard: (
+    state: LadderState,
+    accepted: boolean,
+    method: string,
+  ) => string;
+}
