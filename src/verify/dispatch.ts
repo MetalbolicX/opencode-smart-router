@@ -29,7 +29,7 @@ import { resolveLadder } from "../router/TierLadder.res.mjs";
 import { getActiveTiers } from "../router/protocol";
 import { WRITE_TOOLS } from "../router/tools";
 import { logEvent } from "../utils/observability";
-import { resolveTierModelGuard } from "../utils/tier-model-guard";
+import { resolveTierModelGuard } from "../utils/TierModelGuard.res.mjs";
 import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
 import type { DoD, InferHints } from "./dod";

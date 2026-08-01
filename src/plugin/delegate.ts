@@ -27,7 +27,7 @@ import type { Preset } from "../router/config";
 import { getActiveTiers } from "../router/protocol";
 import { classifyPromptError } from "../utils/error-classify";
 import { log, logEvent } from "../utils/observability";
-import { resolveTierModelGuard } from "../utils/tier-model-guard";
+import { resolveTierModelGuard } from "../utils/TierModelGuard.res.mjs";
 import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
 import {
