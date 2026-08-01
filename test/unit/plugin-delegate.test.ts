@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
 import { executeDelegate } from "../../src/plugin/delegate";
 import type { RouterConfig } from "../../src/router/config";
-import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
+import { resolveTierModelGuard } from "../../src/utils/TierModelGuard.res.mjs";
 
 // ---------------------------------------------------------------------------
 // Delegate-execution parity tests.

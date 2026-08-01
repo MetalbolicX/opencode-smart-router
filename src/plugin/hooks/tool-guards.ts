@@ -34,7 +34,7 @@ import { applyReasoningPatch } from "../../router/agents";
 import { getActiveTiers } from "../../router/protocol";
 import { READ_ONLY_TOOLS } from "../../router/tools";
 import { log } from "../../utils/observability";
-import { resolveTierModelGuard } from "../../utils/tier-model-guard";
+import { resolveTierModelGuard } from "../../utils/TierModelGuard.res.mjs";
 import type { PluginContext } from "../context";
 import { asTaskToolArgs, type HookPayload } from "../types";
 

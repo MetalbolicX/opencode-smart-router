@@ -169,3 +169,27 @@ declare module "*TierLadder.res.mjs" {
     cfg: import("../router/config.types").RouterConfig,
   ) => string[];
 }
+
+// ---------------------------------------------------------------------------
+// TierModelGuard (src/utils/TierModelGuard.res)
+// Shared tier-resolution guard — resolves a tier name to {providerID, modelID}.
+// Uses the broader TS RouterConfig (optional fields) at the boundary.
+// ---------------------------------------------------------------------------
+declare module "*TierModelGuard.res.mjs" {
+  export type TierModelGuardModel = {
+    providerID: string;
+    modelID: string;
+  };
+
+  // Mirrors the original TS interface with optional properties for structural compat
+  export type TierModelGuardResult = {
+    ok: boolean;
+    model?: TierModelGuardModel;
+    reason?: "invalid model or provider configuration";
+  };
+
+  export const resolveTierModelGuard: (
+    cfg: import("../router/config.types").RouterConfig,
+    tierName: string,
+  ) => TierModelGuardResult;
+}
