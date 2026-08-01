@@ -155,3 +155,17 @@ declare module "Config.res.mjs" {
   export type RouterConfig = Config;
   export type TierDefs = Preset;
 }
+
+// ---------------------------------------------------------------------------
+// TierLadder (src/router/TierLadder.res)
+// Pure tier-ladder resolution — depends on Config.
+// Accepts the broader TS RouterConfig (which uses optional fields, not null).
+// The ReScript implementation only reads `enforcement.escalate.ladder` and
+// `presets[activePreset]`, both of which are safe with undefined-aware access.
+// ---------------------------------------------------------------------------
+declare module "*TierLadder.res.mjs" {
+  export const defaultTierNames: string[];
+  export const resolveLadder: (
+    cfg: import("../router/config.types").RouterConfig,
+  ) => string[];
+}

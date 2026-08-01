@@ -953,6 +953,19 @@ function decodeEscalate(obj) {
   if (match$1 === undefined) {
     return;
   }
+  let json$1 = Js_dict.get(match$1, "ladder");
+  let ladder;
+  if (json$1 !== undefined) {
+    let arr = Js_json.decodeArray(json$1);
+    if (arr !== undefined) {
+      let decoded = decodeStringArray(arr);
+      ladder = decoded !== undefined ? decoded : undefined;
+    } else {
+      ladder = undefined;
+    }
+  } else {
+    ladder = undefined;
+  }
   let floorTierJson = Js_dict.get(match$1, "floorTier");
   if (floorTierJson !== undefined) {
     let match$2 = Js_json.decodeNull(floorTierJson);
@@ -962,7 +975,7 @@ function decodeEscalate(obj) {
       if (costCeiling !== undefined) {
         return Primitive_option.some({
           floorTier: undefined,
-          ladder: undefined,
+          ladder: ladder,
           maxAttemptsPerTier: undefined,
           maxTotalAttempts: undefined,
           costCeiling: Primitive_option.valFromOption(costCeiling)
@@ -978,7 +991,7 @@ function decodeEscalate(obj) {
     if (costCeiling$1 !== undefined) {
       return Primitive_option.some({
         floorTier: Primitive_option.some(match$3),
-        ladder: undefined,
+        ladder: ladder,
         maxAttemptsPerTier: undefined,
         maxTotalAttempts: undefined,
         costCeiling: Primitive_option.valFromOption(costCeiling$1)
@@ -991,7 +1004,7 @@ function decodeEscalate(obj) {
   if (costCeiling$2 !== undefined) {
     return Primitive_option.some({
       floorTier: undefined,
-      ladder: undefined,
+      ladder: ladder,
       maxAttemptsPerTier: undefined,
       maxTotalAttempts: undefined,
       costCeiling: Primitive_option.valFromOption(costCeiling$2)

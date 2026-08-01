@@ -1,5 +1,5 @@
 import type { RouterConfig } from "../router/config";
-import { resolveLadder } from "../router/tier-ladder";
+import { resolveLadder } from "../router/TierLadder.res.mjs";
 import { writeTrajectoryLog } from "../utils/log";
 import { logEvent } from "../utils/observability";
 

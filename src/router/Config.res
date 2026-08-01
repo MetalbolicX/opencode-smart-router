@@ -819,13 +819,27 @@ let decodeEscalate = (obj: dict<Js.Json.t>): option<option<enforcementEscalate>>
     switch (Js.Json.decodeNull(json), Js.Json.decodeObject(json)) {
     | (Some(_), _) => Some(None)
     | (None, Some(escObj)) =>
+      // Decode ladder first
+      let ladder: option<array<string>> = switch Js.Dict.get(escObj, "ladder") {
+      | None => None
+      | Some(json) =>
+        switch Js.Json.decodeArray(json) {
+        | Some(arr) =>
+          switch decodeStringArray(arr) {
+          | Some(decoded) => Some(decoded)
+          | None => None
+          }
+        | None => None
+        }
+      }
+
       switch Js.Dict.get(escObj, "floorTier") {
       | None =>
         switch decodeCostCeiling(escObj) {
         | Some(costCeiling) =>
           Some(Some({
             floorTier: None,
-            ladder: None,
+            ladder,
             maxAttemptsPerTier: None,
             maxTotalAttempts: None,
             costCeiling,
@@ -839,7 +853,7 @@ let decodeEscalate = (obj: dict<Js.Json.t>): option<option<enforcementEscalate>>
           | Some(costCeiling) =>
             Some(Some({
               floorTier: None,
-              ladder: None,
+              ladder,
               maxAttemptsPerTier: None,
               maxTotalAttempts: None,
               costCeiling,
@@ -851,7 +865,7 @@ let decodeEscalate = (obj: dict<Js.Json.t>): option<option<enforcementEscalate>>
           | Some(costCeiling) =>
             Some(Some({
               floorTier: Some(Some(floorTier)),
-              ladder: None,
+              ladder,
               maxAttemptsPerTier: None,
               maxTotalAttempts: None,
               costCeiling,

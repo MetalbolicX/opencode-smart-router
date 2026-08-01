@@ -25,7 +25,7 @@ import {
 } from "../plugin/types";
 import type { RouterConfig } from "../router/config";
 import { resolveEnforcementMode } from "../router/enforcement";
-import { resolveLadder } from "../router/tier-ladder";
+import { resolveLadder } from "../router/TierLadder.res.mjs";
 import { getActiveTiers } from "../router/protocol";
 import { WRITE_TOOLS } from "../router/tools";
 import { logEvent } from "../utils/observability";
