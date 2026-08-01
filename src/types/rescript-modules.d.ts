@@ -313,3 +313,70 @@ declare module "*ReasoningCapability.res.mjs" {
   //   5. otherwise → { kind: "none" }
   export const inferCapability: (tier: tierConfig) => reasoningCapability;
 }
+
+// ---------------------------------------------------------------------------
+// ReasoningAdaptive (src/reasoning/ReasoningAdaptive.res)
+// Deterministic adaptive level selector — pure function, no IO, no module state.
+// Decision order: isTrivial → tierDefaults → keywordRules → defaultLevel.
+// Uses ReasoningMatch.matchSignal internally for keyword matching.
+// ---------------------------------------------------------------------------
+declare module "*ReasoningAdaptive.res.mjs" {
+  // Normalized reasoning level — same as ReasoningCapability
+  export type reasoningLevel = "minimal" | "normal" | "elevated" | "max";
+
+  // Match mode — same as ReasoningMatch
+  export type matchMode = "word" | "stem" | "substring" | "regex";
+
+  // Adaptive signals: signals available at dispatch time
+  export type adaptiveSignals = {
+    prompt: string;
+    description: string;
+    tierName: string;
+    isTrivial: boolean;
+  };
+
+  // Keyword rule shape (mirrors AdaptivePolicyConfig.keywordRules)
+  export type keywordRule = {
+    keywords: string[];
+    level: string;
+    match: string | null;
+    excludeKeywords: string[] | null;
+  };
+
+  // AdaptivePolicyConfig minimal shape
+  export type adaptivePolicyConfig = {
+    trivialLevel: string | null;
+    defaultLevel: string | null;
+    keywordRules: keywordRule[] | null;
+    tierDefaults: Record<string, string> | null;
+    surfaceDecision: boolean | null;
+  };
+
+  // ReasoningPolicyConfig minimal shape (fields read by selectAdaptiveLevel)
+  export type reasoningPolicyConfig = {
+    mode: string | null;
+    defaultLevel: string | null;
+    surfaceLimits: boolean | null;
+    adaptive: adaptivePolicyConfig | null;
+  };
+
+  // Return type — level is Js.Nullable.t at the TS boundary
+  export type adaptiveDecision = {
+    level: reasoningLevel | null; // Js.Nullable.t maps to nullable in TS
+    reason: string;
+  };
+
+  // Main export: pure adaptive level selector
+  export const selectAdaptiveLevel: (
+    signals: adaptiveSignals,
+    policy: reasoningPolicyConfig | null,
+  ) => adaptiveDecision;
+
+  // Accessor helpers (for test assertions)
+  export const getLevelNull: (d: adaptiveDecision) => reasoningLevel | null;
+  export const getLevelOption: (d: adaptiveDecision) => reasoningLevel | null | undefined;
+  export const getReason: (d: adaptiveDecision) => string;
+
+  // Test helper: build a ReasoningPolicyConfig with adaptive block
+  export const makePolicyWithAdaptive: (adaptive: adaptivePolicyConfig | null) => reasoningPolicyConfig;
+}
