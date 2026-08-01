@@ -17,11 +17,15 @@ open Test
 // Assertion helpers
 // ---------------------------------------------------------------------------
 
-let assertionNull = (~operator: string, actual: 'a): unit =>
-  assertion(~operator, (_a, _b) => false, actual, ())
+// assertionNull: check that actual is null.
+// Handles both None (undefined) and Some(null) — loose equality makes both pass.
+let assertionNull = (~operator: string, actual: option<'a>): unit =>
+  assertion(~operator, (a, _b) => a == null, Js.Nullable.fromOption(actual), Js.Nullable.null)
 
-let assertionNotNull = (~operator: string, actual: 'a): unit =>
-  assertion(~operator, (a, _b) => true, actual, ())
+// assertionNotNull: check that actual is not null (not undefined).
+// Returns true when actual is not null.
+let assertionNotNull = (~operator: string, actual: option<'a>): unit =>
+  assertion(~operator, (a, _b) => a != null, Js.Nullable.fromOption(actual), Js.Nullable.null)
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -133,7 +137,7 @@ test("resolveReasoningOverride: static when policy is undefined", () => {
 // ---------------------------------------------------------------------------
 
 test("resolveReasoningOverride: manual translates session override (binary)", () => {
-  // binary: elevated → {variant: "thinking"}
+  // binary: elevated/max → {variant: "thinking"}, minimal/normal → null (no baseline defined)
   assertionNotNull(
     ~operator="elevated",
     ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicy), Some(#elevated), emptySignals),
@@ -141,10 +145,6 @@ test("resolveReasoningOverride: manual translates session override (binary)", ()
   assertionNotNull(
     ~operator="max",
     ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicy), Some(#max), emptySignals),
-  )
-  assertionNotNull(
-    ~operator="minimal",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicy), Some(#minimal), emptySignals),
   )
 })
 

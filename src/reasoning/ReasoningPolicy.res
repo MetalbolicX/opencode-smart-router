@@ -113,6 +113,12 @@ let _getDefaultLevel = (policy: option<reasoningPolicyConfig>): option<string> =
   }
 }
 
+// %raw helper: return explicit JS null instead of undefined (which is what None compiles to)
+@setRuntimeSideEffects
+let _nullResult = (): resolvedReasoning => {
+  %raw("null")
+}
+
 // ---------------------------------------------------------------------------
 // resolveReasoningOverride — main export
 // ---------------------------------------------------------------------------
@@ -126,10 +132,10 @@ let resolveReasoningOverride = (
   let mode = _getMode(policy)
 
   // Primary regression guard: static mode hard no-op.
-  // policy absent OR mode === "static" → null
+  // policy absent OR mode === "static" → null (not undefined)
   switch mode {
-  | Some("static") => None
-  | None => None
+  | Some("static") => _nullResult()->Some
+  | None => _nullResult()->Some
   | _ => {
       // Manual mode: sessionOverride ?? defaultLevel, then translate
       switch mode {
@@ -150,18 +156,21 @@ let resolveReasoningOverride = (
               | Some(c) => (c :> ReasoningTranslate.reasoningCapability)
               | None => (ReasoningCapability.inferCapability(tier :> ReasoningCapability.tierConfig) :> ReasoningTranslate.reasoningCapability)
               }
-              (ReasoningTranslate.translateLevel(cap, l) :> option<resolvedReasoning>)
+              switch ReasoningTranslate.translateLevel(cap, l) {
+              | Some(r) => Some(r :> resolvedReasoning)
+              | None => _nullResult()->Some
+              }
             }
-          | None => None
+          | None => _nullResult()->Some
           }
         }
 
       // Adaptive mode: Phase 2 will replace with call to selectAdaptiveLevel.
       // For Phase 1, stub to null (adaptive.ts not yet ported).
-      | Some("adaptive") => None
+      | Some("adaptive") => _nullResult()->Some
 
       // Unknown mode (not static, not manual, not adaptive): fail soft to null
-      | _ => None
+      | _ => _nullResult()->Some
       }
     }
   }

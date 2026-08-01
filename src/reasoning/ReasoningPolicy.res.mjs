@@ -30,16 +30,20 @@ function _getDefaultLevel(policy) {
   }
 }
 
+function _nullResult() {
+  return null;
+}
+
 function resolveReasoningOverride(tier, policy, sessionOverride, signals) {
   let mode = _getMode(policy);
   if (mode === undefined) {
-    return;
+    return _nullResult();
   }
   if (mode === "static") {
-    return;
+    return _nullResult();
   }
   if (mode === undefined) {
-    return;
+    return _nullResult();
   }
   switch (mode) {
     case "manual" :
@@ -51,13 +55,18 @@ function resolveReasoningOverride(tier, policy, sessionOverride, signals) {
         level = dl !== undefined ? _levelFromString(dl) : undefined;
       }
       if (level === undefined) {
-        return;
+        return _nullResult();
       }
       let c = tier.capability;
       let cap = c !== undefined ? c : ReasoningCapability.inferCapability(tier);
-      return ReasoningTranslate.translateLevel(cap, level);
+      let r = ReasoningTranslate.translateLevel(cap, level);
+      if (r !== undefined) {
+        return r;
+      } else {
+        return _nullResult();
+      }
     default:
-      return;
+      return _nullResult();
   }
 }
 

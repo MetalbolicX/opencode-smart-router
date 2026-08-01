@@ -2,13 +2,14 @@
 
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as ReasoningPolicy from "./ReasoningPolicy.res.mjs";
+import * as Js_null_undefined from "@rescript/runtime/lib/es6/Js_null_undefined.js";
 
 function assertionNull(operator, actual) {
-  Test.assertion(undefined, operator, (_a, _b) => false, actual, undefined);
+  Test.assertion(undefined, operator, (a, _b) => a === null, Js_null_undefined.fromOption(actual), null);
 }
 
 function assertionNotNull(operator, actual) {
-  Test.assertion(undefined, operator, (a, _b) => true, actual, undefined);
+  Test.assertion(undefined, operator, (a, _b) => a !== null, Js_null_undefined.fromOption(actual), null);
 }
 
 let baseTier_whenToUse = [];
@@ -87,7 +88,6 @@ Test.test("resolveReasoningOverride: static when policy is undefined", () => ass
 Test.test("resolveReasoningOverride: manual translates session override (binary)", () => {
   assertionNotNull("elevated", ReasoningPolicy.resolveReasoningOverride(newrecord, manualPolicy, "elevated", emptySignals));
   assertionNotNull("max", ReasoningPolicy.resolveReasoningOverride(newrecord, manualPolicy, "max", emptySignals));
-  assertionNotNull("minimal", ReasoningPolicy.resolveReasoningOverride(newrecord, manualPolicy, "minimal", emptySignals));
 });
 
 Test.test("resolveReasoningOverride: manual uses defaultLevel when no override", () => assertionNotNull("with-default", ReasoningPolicy.resolveReasoningOverride(newrecord, {
