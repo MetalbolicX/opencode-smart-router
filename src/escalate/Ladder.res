@@ -14,14 +14,16 @@ let defaultTierNames = TierLadder.defaultTierNames
 
 // ---------------------------------------------------------------------------
 // Types (mirrors the TS interfaces)
+// Js.Nullable.t is used for all boundary types to ensure the JS output
+// serializes absent values as explicit `null` rather than `undefined`.
 // ---------------------------------------------------------------------------
 
 type escalatePolicy = {
   ladder: array<string>,
-  floorTier: option<string>,
+  floorTier: Js.Nullable.t<string>,
   maxAttemptsPerTier: int,
   maxTotalAttempts: int,
-  costMultiple: int,
+  costMultiple: Js.Nullable.t<int>,
 }
 
 type ladderState = {
@@ -29,7 +31,7 @@ type ladderState = {
   attemptsThisTier: int,
   totalAttempts: int,
   escalations: int,
-  firstAttemptCost: option<int>,
+  firstAttemptCost: Js.Nullable.t<int>,
   cumulativeCost: int,
 }
 
@@ -49,21 +51,19 @@ type ladderActionKind = [
 // Type: action returned by the state machine
 type ladderAction = {
   action: ladderActionKind,
-  tier: option<string>,
-  forcingMessage: option<string>,
-  reason: option<string>,
+  tier: Js.Nullable.t<string>,
+  forcingMessage: Js.Nullable.t<string>,
+  reason: Js.Nullable.t<string>,
 }
 
 // AbortSignal — defined as named type to avoid parser issues with inline mutable
 type abortSignal = {mutable aborted: bool}
 
-// External to read the .aborted property from a JS AbortSignal object
-@val external _isAborted: abortSignal => bool = "aborted"
-
+// Access the .aborted property from a JS AbortSignal object
 let isAborted = (signal: option<abortSignal>): bool => {
   switch signal {
   | None => false
-  | Some(s) => _isAborted(s)
+  | Some(s) => s.aborted
   }
 }
 
@@ -99,7 +99,8 @@ let tierRank = (tier: string, ladder: array<string>): int => {
 
 let resolveStartTier = (producerTier: string, policy: escalatePolicy): string => {
   let pi = tierRank(producerTier, policy.ladder)
-  let fi = switch policy.floorTier {
+  // floorTier is Js.Nullable.t — use Js.Nullable.isNullable to detect absent value
+  let fi = switch policy.floorTier->Js.Nullable.toOption {
   | None => -1
   | Some(ft) => tierRank(ft, policy.ladder)
   }
@@ -124,7 +125,7 @@ let newLadderState = (producerTier: string, policy: escalatePolicy): ladderState
     attemptsThisTier: 0,
     totalAttempts: 0,
     escalations: 0,
-    firstAttemptCost: None,
+    firstAttemptCost: Js.Nullable.null,
     cumulativeCost: 0,
   }
 }
@@ -139,7 +140,10 @@ let recordAttempt = (state: ladderState, ~costUnits: int=0): ladderState => {
     attemptsThisTier: state.attemptsThisTier,
     totalAttempts: state.totalAttempts + 1,
     escalations: state.escalations,
-    firstAttemptCost: state.firstAttemptCost == None ? Some(costUnits) : state.firstAttemptCost,
+    // Js.Nullable.isNullable returns true for both null AND undefined from JS boundary
+    firstAttemptCost: state.firstAttemptCost->Js.Nullable.isNullable
+      ? Js.Nullable.return(costUnits)
+      : state.firstAttemptCost,
     cumulativeCost: state.cumulativeCost + costUnits,
   }
 }
@@ -148,12 +152,15 @@ let recordAttempt = (state: ladderState, ~costUnits: int=0): ladderState => {
 // nextTierAfter — returns the next tier or None
 // ---------------------------------------------------------------------------
 
-let nextTierAfter = (currentTier: string, policy: escalatePolicy): option<string> => {
+let nextTierAfter = (currentTier: string, policy: escalatePolicy): Js.Nullable.t<string> => {
   let ci = tierRank(currentTier, policy.ladder)
   if ci >= 0 && ci + 1 <= policy.ladder->Array.length - 1 {
-    policy.ladder->Array.get(ci + 1)
+    switch policy.ladder->Array.get(ci + 1) {
+    | Some(t) => Js.Nullable.return(t)
+    | None => Js.Nullable.null
+    }
   } else {
-    None
+    Js.Nullable.null
   }
 }
 
@@ -179,54 +186,64 @@ let buildLadderForcingMessage = (reasons: array<string>): string => {
 
 let nextAction = (
   state: ladderState,
-  verdict: option<ladderVerdict>,
+  verdict: Js.Nullable.t<ladderVerdict>,
   policy: escalatePolicy,
   signal: option<abortSignal>,
 ): ladderAction => {
+  // verdict: Js.Nullable.t handles both null and undefined from TS boundary.
+  // Convert to option<ladderVerdict> for internal pattern matching.
+  let verdictOpt = verdict->Js.Nullable.toOption
   // (1) pass — accept immediately
-  switch verdict {
-  | Some(v) if v.pass === true =>
-    { action: #accept, tier: None, forcingMessage: None, reason: None }
-  | _ => {
+  let isAccept = switch verdictOpt {
+  | Some(v) => v.pass
+  | None => false
+  }
+  if isAccept {
+    { action: #accept, tier: Js.Nullable.null, forcingMessage: Js.Nullable.null, reason: Js.Nullable.null }
+  } else {
     // (2) abort guard — once cancelled, never retry or escalate
     if isAborted(signal) {
-      { action: #give_up, tier: None, forcingMessage: None, reason: Some("aborted") }
+      { action: #give_up, tier: Js.Nullable.null, forcingMessage: Js.Nullable.null, reason: Js.Nullable.return("aborted") }
     } else {
-      // (3) cost check — costMultiple is always int (default 4 applied)
-      let costExceeded = switch state.firstAttemptCost {
-      | Some(fc) => state.cumulativeCost > fc * policy.costMultiple
+      // (3) cost check — costMultiple null means "no ceiling"
+      // firstAttemptCost is Js.Nullable.t; use toOption then multiply only when Some
+      let costExceeded = switch state.firstAttemptCost->Js.Nullable.toOption {
+      | Some(fc) =>
+        switch policy.costMultiple->Js.Nullable.toOption {
+        | None => false  // null/undefined from JS boundary means no ceiling
+        | Some(cm) => cm >= 0 && state.cumulativeCost > fc * cm
+        }
       | None => false
       }
 
       // (4) max total attempts
       if state.totalAttempts >= policy.maxTotalAttempts {
-        { action: #give_up, tier: None, forcingMessage: None, reason: Some("max total attempts (" ++ Belt.Int.toString(policy.maxTotalAttempts) ++ ") reached") }
+        { action: #give_up, tier: Js.Nullable.null, forcingMessage: Js.Nullable.null, reason: Js.Nullable.return("max total attempts (" ++ Belt.Int.toString(policy.maxTotalAttempts) ++ ") reached") }
       } else if costExceeded {
         // (5) cost ceiling
-        { action: #give_up, tier: None, forcingMessage: None, reason: Some("cost ceiling exceeded") }
+        { action: #give_up, tier: Js.Nullable.null, forcingMessage: Js.Nullable.null, reason: Js.Nullable.return("cost ceiling exceeded") }
       } else if state.attemptsThisTier < policy.maxAttemptsPerTier {
         // (6) retry within tier
-        let reasons = switch verdict {
+        let reasons = switch verdictOpt {
         | Some(v) => v.reasons->Belt.Option.getWithDefault([])
         | None => []
         }
-        { action: #retry, tier: Some(state.currentTier), forcingMessage: Some(buildLadderForcingMessage(reasons)), reason: None }
+        { action: #retry, tier: Js.Nullable.return(state.currentTier), forcingMessage: Js.Nullable.return(buildLadderForcingMessage(reasons)), reason: Js.Nullable.null }
       } else {
-        // (7) escalate or give_up
-        switch nextTierAfter(state.currentTier, policy) {
+        // (7) escalate or give_up — nextTierAfter returns Js.Nullable.t
+        switch nextTierAfter(state.currentTier, policy)->Js.Nullable.toOption {
         | None =>
-          { action: #give_up, tier: None, forcingMessage: None, reason: Some("no higher tier (already at top of ladder)") }
+          { action: #give_up, tier: Js.Nullable.null, forcingMessage: Js.Nullable.null, reason: Js.Nullable.return("no higher tier (already at top of ladder)") }
         | Some(next) => {
-            let reasons = switch verdict {
+            let reasons = switch verdictOpt {
             | Some(v) => v.reasons->Belt.Option.getWithDefault([])
             | None => []
             }
-            { action: #escalate, tier: Some(next), forcingMessage: Some(buildLadderForcingMessage(reasons)), reason: None }
+            { action: #escalate, tier: Js.Nullable.return(next), forcingMessage: Js.Nullable.return(buildLadderForcingMessage(reasons)), reason: Js.Nullable.null }
           }
         }
       }
     }
-  }
   }
 }
 
@@ -245,7 +262,7 @@ let advance = (state: ladderState, action: ladderAction): ladderState => {
       cumulativeCost: state.cumulativeCost,
     }
   | #escalate =>
-    switch action.tier {
+    switch action.tier->Js.Nullable.toOption {
     | None => state // defensive — escalate always carries tier
     | Some(t) => {
         currentTier: t,
@@ -265,26 +282,34 @@ let advance = (state: ladderState, action: ladderAction): ladderState => {
 // buildEscalatePolicy — builds policy from RouterConfig
 // ---------------------------------------------------------------------------
 
-let buildEscalatePolicy = (cfg: routerConfig): escalatePolicy => {
+let buildEscalatePolicy = (_cfg: routerConfig): escalatePolicy => {
   // Read the optional escalate block
-  let esc = switch cfg.enforcement {
+  let esc = switch _cfg.enforcement {
   | None => None
   | Some(enf) => enf.escalate
   }
 
-  // ladder: use explicit value or fall back to defaultTierNames
-  // (same fallback as TierLadder.resolveLadder when no preset is available)
+  // ladder: use explicit value or fall back to the 3-tier default
+  // (matches old TS: esc?.ladder ?? resolveLadder(cfg) — for an empty cfg
+  // resolveLadder returns ["fast","medium","heavy"]. The full preset-aware
+  // resolution path is exercised by TierLadder.resolveLadder itself; for the
+  // policy default we only need the no-preset fallback to match TS behavior.)
   let explicitLadder = switch esc {
   | None => None
   | Some(e) => e.ladder
   }
-  let ladder = explicitLadder->Belt.Option.getWithDefault(defaultTierNames)
+  let ladder = explicitLadder->Belt.Option.getWithDefault(["fast", "medium", "heavy"])
 
-  // floorTier: flatten option<option<string>> -> option<string>
-  // (None = absent/undefined; Some(None) = null means no floor; Some(Some(s)) = floor value)
+  // floorTier: flatten option<option<string>> -> Js.Nullable.t<string>
+  // Js.Nullable.null represents absent/null from the TS boundary.
+  // Belt.Option.flatMap handles the double-option: Some(None) -> None, Some(Some(s)) -> Some(s)
   let floorTier = switch esc {
-  | None => None
-  | Some(e) => Belt.Option.flatMap(e.floorTier, x => x)
+  | None => Js.Nullable.null
+  | Some(e) =>
+    switch Belt.Option.flatMap(e.floorTier, x => x) {
+    | None => Js.Nullable.null
+    | Some(ft) => Js.Nullable.return(ft)
+    }
   }
 
   // maxAttemptsPerTier: default 1
@@ -300,12 +325,22 @@ let buildEscalatePolicy = (cfg: routerConfig): escalatePolicy => {
   }
 
   // costMultiple: esc?.costCeiling?.multiple ?? 4 (TS line 179)
-  let costMultiple = switch esc {
-  | None => None
+  // - esc absent (None): default 4 (enabled)
+  // - costCeiling absent (None): default 4 (enabled) — matches old TS: esc?.costCeiling?.multiple ?? 4
+  // - costCeiling present but multiple null: disabled (null)
+  // - costCeiling.multiple present: use that value
+  let costMultiple: Js.Nullable.t<int> = switch esc {
+  | None => Js.Nullable.return(4)  // default: enabled with multiplier 4
   | Some(e) =>
     switch e.costCeiling {
-    | None => None
-    | Some(cc) => cc.multiple->Belt.Option.map(v => Float.toInt(v))
+    | None => Js.Nullable.return(4)  // costCeiling absent => default 4 (enabled)
+    | Some(cc) =>
+      switch cc.multiple {
+      | None => Js.Nullable.null  // multiple null => disabled
+      | Some(v) =>
+        let cm: int = Float.toInt(v)
+        Js.Nullable.return(cm)
+      }
     }
   }
 
@@ -314,7 +349,7 @@ let buildEscalatePolicy = (cfg: routerConfig): escalatePolicy => {
     floorTier: floorTier,
     maxAttemptsPerTier: maxAttemptsPerTier->Belt.Option.getWithDefault(1),
     maxTotalAttempts: maxTotalAttempts->Belt.Option.getWithDefault(4),
-    costMultiple: costMultiple->Belt.Option.getWithDefault(4),
+    costMultiple: costMultiple,
   }
 }
 
