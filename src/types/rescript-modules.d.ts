@@ -201,10 +201,10 @@ declare module "*TierModelGuard.res.mjs" {
 declare module "*Ladder.res.mjs" {
   export type EscalatePolicy = {
     ladder: string[];
-    floorTier: string | null;
+    floorTier?: string | null;
     maxAttemptsPerTier: number;
     maxTotalAttempts: number;
-    costMultiple: number;
+    costMultiple?: number | null;
   };
 
   export type LadderState = {
@@ -218,16 +218,16 @@ declare module "*Ladder.res.mjs" {
 
   export type LadderVerdict = {
     pass: boolean;
-    reasons: string[] | null;
+    reasons?: string[] | null;
   };
 
   export type LadderActionKind = "accept" | "retry" | "escalate" | "give_up";
 
   export type LadderAction = {
     action: LadderActionKind;
-    tier?: string;
-    forcingMessage?: string;
-    reason?: string;
+    tier?: string | null;
+    forcingMessage?: string | null;
+    reason?: string | null;
   };
 
   export const tierRank: (tier: string, ladder: string[]) => number;

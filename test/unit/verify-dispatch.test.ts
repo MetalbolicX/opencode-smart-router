@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dumpDelegateScorecard } from "../../src/escalate/ladder";
+import { dumpDelegateScorecard } from "../../src/escalate/ladder-io";
 import type { PluginContext } from "../../src/plugin/context";
 import type { RouterConfig } from "../../src/router/config";
 import { createFsSeam } from "../../src/utils/fs";

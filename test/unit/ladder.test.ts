@@ -3,17 +3,19 @@ import {
   advance,
   buildEscalatePolicy,
   buildLadderForcingMessage,
-  type EscalatePolicy,
   formatLadderScorecard,
-  type LadderState,
-  type LadderVerdict,
   newLadderState,
   nextAction,
   nextTierAfter,
   recordAttempt,
   resolveStartTier,
   tierRank,
-} from "../../src/escalate/ladder";
+} from "../../src/escalate/Ladder.res.mjs";
+import type {
+  EscalatePolicy,
+  LadderState,
+  LadderVerdict,
+} from "../../src/escalate/Ladder.res.mjs";
 import type { RouterConfig } from "../../src/router/config";
 
 // ---------------------------------------------------------------------------
@@ -463,7 +465,7 @@ describe("nextAction", () => {
     const s = makeState({ totalAttempts: 1 });
     const a = nextAction(s, { pass: false }, p);
     expect(a.action).toBe("give_up");
-    expect(a.forcingMessage).toBeUndefined();
+    expect(a.forcingMessage).toBeNull();
   });
 
   it("costMultiple null => cost check never triggers", () => {
@@ -957,7 +959,7 @@ describe("nextAction — AbortSignal guard", () => {
     const ac = new AbortController();
     ac.abort();
     const a = nextAction(s, { pass: false }, p, ac.signal);
-    expect(a.forcingMessage).toBeUndefined();
+    expect(a.forcingMessage).toBeNull();
   });
 
   it("un-aborted signal => behaves exactly like no signal (no regression)", () => {

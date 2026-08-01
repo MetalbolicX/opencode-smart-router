@@ -15,13 +15,15 @@
 import {
   advance,
   buildEscalatePolicy,
-  dumpDelegateScorecard,
-  logDelegation,
-  logEscalation,
   newLadderState,
   nextAction,
   recordAttempt,
-} from "../escalate/ladder";
+} from "../escalate/Ladder.res.mjs";
+import {
+  dumpDelegateScorecard,
+  logDelegation,
+  logEscalation,
+} from "../escalate/ladder-io";
 import { scrubText } from "../guard/scrub";
 import type { Preset } from "../router/config";
 import { getActiveTiers } from "../router/protocol";

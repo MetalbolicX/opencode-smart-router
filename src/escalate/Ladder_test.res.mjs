@@ -2,7 +2,7 @@
 
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Ladder from "./Ladder.res.mjs";
-import * as TierLadder from "../router/TierLadder.res.mjs";
+import * as Primitive_object from "@rescript/runtime/lib/es6/Primitive_object.js";
 import * as Primitive_option from "@rescript/runtime/lib/es6/Primitive_option.js";
 
 function assertionEqual(operator, expected, actual) {
@@ -27,10 +27,10 @@ function makePolicy(ladderOpt, floorTierOpt, maxAttemptsPerTierOpt, maxTotalAtte
       "medium",
       "heavy"
     ];
-  let floorTier = floorTierOpt !== undefined ? Primitive_option.valFromOption(floorTierOpt) : undefined;
+  let floorTier = floorTierOpt !== undefined ? Primitive_option.valFromOption(floorTierOpt) : null;
   let maxAttemptsPerTier = maxAttemptsPerTierOpt !== undefined ? maxAttemptsPerTierOpt : 1;
   let maxTotalAttempts = maxTotalAttemptsOpt !== undefined ? maxTotalAttemptsOpt : 4;
-  let costMultiple = costMultipleOpt !== undefined ? costMultipleOpt : 4;
+  let costMultiple = costMultipleOpt !== undefined ? Primitive_option.valFromOption(costMultipleOpt) : 4;
   return {
     ladder: ladder,
     floorTier: floorTier,
@@ -45,7 +45,7 @@ function makeState(currentTierOpt, attemptsThisTierOpt, totalAttemptsOpt, escala
   let attemptsThisTier = attemptsThisTierOpt !== undefined ? attemptsThisTierOpt : 0;
   let totalAttempts = totalAttemptsOpt !== undefined ? totalAttemptsOpt : 0;
   let escalations = escalationsOpt !== undefined ? escalationsOpt : 0;
-  let firstAttemptCost = firstAttemptCostOpt !== undefined ? Primitive_option.valFromOption(firstAttemptCostOpt) : undefined;
+  let firstAttemptCost = firstAttemptCostOpt !== undefined ? Primitive_option.valFromOption(firstAttemptCostOpt) : null;
   let cumulativeCost = cumulativeCostOpt !== undefined ? cumulativeCostOpt : 0;
   return {
     currentTier: currentTier,
@@ -134,7 +134,7 @@ Test.test("newLadderState: initialises all counters to zero/null", () => {
   assertionEqual("attemptsThisTier", s.attemptsThisTier, 0);
   assertionEqual("totalAttempts", s.totalAttempts, 0);
   assertionEqual("escalations", s.escalations, 0);
-  assertionEqual("firstAttemptCost", s.firstAttemptCost, undefined);
+  assertionEqual("firstAttemptCost", Primitive_option.fromNullable(s.firstAttemptCost), undefined);
   assertionEqual("cumulativeCost", s.cumulativeCost, 0);
 });
 
@@ -157,14 +157,14 @@ Test.test("recordAttempt: increments totalAttempts and cumulativeCost", () => {
   let s2 = Ladder.recordAttempt(s, 5);
   assertionEqual("total", s2.totalAttempts, 1);
   assertionEqual("cumulative", s2.cumulativeCost, 5);
-  assertionEqual("first", s2.firstAttemptCost, 5);
+  assertionEqual("first", Primitive_option.fromNullable(s2.firstAttemptCost), 5);
 });
 
 Test.test("recordAttempt: firstAttemptCost set only once", () => {
   let s = makeState(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
   let s1 = Ladder.recordAttempt(s, 3);
   let s2 = Ladder.recordAttempt(s1, 10);
-  assertionEqual("first", s2.firstAttemptCost, 3);
+  assertionEqual("first", Primitive_option.fromNullable(s2.firstAttemptCost), 3);
   assertionEqual("cumulative", s2.cumulativeCost, 13);
   assertionEqual("total", s2.totalAttempts, 2);
 });
@@ -173,7 +173,7 @@ Test.test("recordAttempt: default cost is 0", () => {
   let s = makeState(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
   let s2 = Ladder.recordAttempt(s, undefined);
   assertionEqual("cumulative", s2.cumulativeCost, 0);
-  assertionEqual("first", s2.firstAttemptCost, 0);
+  assertionEqual("first", Primitive_option.fromNullable(s2.firstAttemptCost), 0);
 });
 
 Test.test("recordAttempt: does NOT mutate input state", () => {
@@ -191,33 +191,33 @@ Test.test("recordAttempt: accumulates cost across many calls", () => {
   let s3 = Ladder.recordAttempt(s2, 3);
   let s4 = Ladder.recordAttempt(s3, 4);
   assertionEqual("cumulative", s4.cumulativeCost, 10);
-  assertionEqual("first", s4.firstAttemptCost, 1);
+  assertionEqual("first", Primitive_option.fromNullable(s4.firstAttemptCost), 1);
   assertionEqual("total", s4.totalAttempts, 4);
 });
 
 Test.test("nextTierAfter: fast => medium", () => {
   let p = makePolicy(undefined, undefined, undefined, undefined, undefined, undefined);
-  assertionEqual("fast", Ladder.nextTierAfter("fast", p), "medium");
+  assertionEqual("fast", Primitive_option.fromNullable(Ladder.nextTierAfter("fast", p)), "medium");
 });
 
 Test.test("nextTierAfter: medium => heavy", () => {
   let p = makePolicy(undefined, undefined, undefined, undefined, undefined, undefined);
-  assertionEqual("medium", Ladder.nextTierAfter("medium", p), "heavy");
+  assertionEqual("medium", Primitive_option.fromNullable(Ladder.nextTierAfter("medium", p)), "heavy");
 });
 
 Test.test("nextTierAfter: heavy (top) => null", () => {
   let p = makePolicy(undefined, undefined, undefined, undefined, undefined, undefined);
-  assertionEqual("top", Ladder.nextTierAfter("heavy", p), undefined);
+  assertionEqual("top", Primitive_option.fromNullable(Ladder.nextTierAfter("heavy", p)), undefined);
 });
 
 Test.test("nextTierAfter: unknown tier => null", () => {
   let p = makePolicy(undefined, undefined, undefined, undefined, undefined, undefined);
-  assertionEqual("unknown", Ladder.nextTierAfter("unknown", p), undefined);
+  assertionEqual("unknown", Primitive_option.fromNullable(Ladder.nextTierAfter("unknown", p)), undefined);
 });
 
 Test.test("nextTierAfter: single-tier ladder => null", () => {
   let p = makePolicy(["medium"], undefined, undefined, undefined, undefined, undefined);
-  assertionEqual("single", Ladder.nextTierAfter("medium", p), undefined);
+  assertionEqual("single", Primitive_option.fromNullable(Ladder.nextTierAfter("medium", p)), undefined);
 });
 
 Test.test("buildLadderForcingMessage: includes header line", () => {
@@ -274,14 +274,14 @@ Test.test("nextAction: verdict.pass=true => accept", () => {
 Test.test("nextAction: verdict null => treated as FAIL", () => {
   let p = makePolicy(undefined, undefined, 2, 4, undefined, undefined);
   let s = makeState(undefined, 0, 1, undefined, undefined, undefined, undefined);
-  let a = Ladder.nextAction(s, undefined, p, undefined);
+  let a = Ladder.nextAction(s, null, p, undefined);
   assertionFalse("notAccept", a.action === "accept");
 });
 
 Test.test("nextAction: verdict undefined => treated as FAIL", () => {
   let p = makePolicy(undefined, undefined, 2, 4, undefined, undefined);
   let s = makeState(undefined, 0, 1, undefined, undefined, undefined, undefined);
-  let a = Ladder.nextAction(s, undefined, p, undefined);
+  let a = Ladder.nextAction(s, null, p, undefined);
   assertionFalse("notAccept", a.action === "accept");
 });
 
@@ -294,10 +294,10 @@ Test.test("nextAction: maxTotalAttempts reached => give_up with message", () => 
   }, p, undefined);
   assertionEqual("action", a.action, "give_up");
   let r = a.reason;
-  if (r !== undefined) {
-    return assertionTrue("reason", stringContains(r, "max total attempts (3)"));
-  } else {
+  if (r == null) {
     return assertionTrue("reason", false);
+  } else {
+    return assertionTrue("reason", stringContains(r, "max total attempts (3)"));
   }
 });
 
@@ -319,7 +319,7 @@ Test.test("nextAction: cost ceiling exceeded => give_up", () => {
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "give_up");
-  assertionEqual("reason", a.reason, "cost ceiling exceeded");
+  assertionEqual("reason", Primitive_option.fromNullable(a.reason), "cost ceiling exceeded");
 });
 
 Test.test("nextAction: cost ceiling at exact threshold is NOT exceeded", () => {
@@ -340,8 +340,8 @@ Test.test("nextAction: retry when attemptsThisTier < maxAttemptsPerTier", () => 
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "retry");
-  assertionEqual("tier", a.tier, "fast");
-  assertionTrue("forcing", a.forcingMessage !== undefined);
+  assertionEqual("tier", Primitive_option.fromNullable(a.tier), "fast");
+  assertionTrue("forcing", Primitive_option.fromNullable(a.forcingMessage) !== undefined);
 });
 
 Test.test("nextAction: retry includes forcingMessage from verdict reasons", () => {
@@ -355,10 +355,10 @@ Test.test("nextAction: retry includes forcingMessage from verdict reasons", () =
   let a = Ladder.nextAction(s, verdict, p, undefined);
   assertionEqual("action", a.action, "retry");
   let msg = a.forcingMessage;
-  if (msg !== undefined) {
-    return assertionTrue("forcing", stringContains(msg, "bad output"));
-  } else {
+  if (msg == null) {
     return assertionTrue("forcing", false);
+  } else {
+    return assertionTrue("forcing", stringContains(msg, "bad output"));
   }
 });
 
@@ -370,8 +370,8 @@ Test.test("nextAction: escalate when attemptsThisTier >= maxAttemptsPerTier and 
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "escalate");
-  assertionEqual("tier", a.tier, "medium");
-  assertionTrue("forcing", a.forcingMessage !== undefined);
+  assertionEqual("tier", Primitive_option.fromNullable(a.tier), "medium");
+  assertionTrue("forcing", Primitive_option.fromNullable(a.forcingMessage) !== undefined);
 });
 
 Test.test("nextAction: give_up at top of ladder", () => {
@@ -382,7 +382,7 @@ Test.test("nextAction: give_up at top of ladder", () => {
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "give_up");
-  assertionEqual("reason", a.reason, "no higher tier (already at top of ladder)");
+  assertionEqual("reason", Primitive_option.fromNullable(a.reason), "no higher tier (already at top of ladder)");
 });
 
 Test.test("nextAction: maxAttemptsPerTier 0 => escalate immediately", () => {
@@ -397,7 +397,7 @@ Test.test("nextAction: maxAttemptsPerTier 0 => escalate immediately", () => {
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "escalate");
-  assertionEqual("tier", a.tier, "medium");
+  assertionEqual("tier", Primitive_option.fromNullable(a.tier), "medium");
 });
 
 Test.test("nextAction: single-tier ladder retries up to cap then give_up", () => {
@@ -408,7 +408,7 @@ Test.test("nextAction: single-tier ladder retries up to cap then give_up", () =>
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "give_up");
-  assertionEqual("reason", a.reason, "no higher tier (already at top of ladder)");
+  assertionEqual("reason", Primitive_option.fromNullable(a.reason), "no higher tier (already at top of ladder)");
 });
 
 Test.test("nextAction: no forcingMessage on give_up", () => {
@@ -419,7 +419,7 @@ Test.test("nextAction: no forcingMessage on give_up", () => {
     reasons: undefined
   }, p, undefined);
   assertionEqual("action", a.action, "give_up");
-  assertionEqual("noForcing", a.forcingMessage, undefined);
+  assertionEqual("noForcing", Primitive_option.fromNullable(a.forcingMessage), undefined);
 });
 
 Test.test("nextAction: costMultiple=0 => cost check never triggers", () => {
@@ -434,7 +434,7 @@ Test.test("nextAction: costMultiple=0 => cost check never triggers", () => {
 
 Test.test("nextAction: firstAttemptCost null => cost check never triggers", () => {
   let p = makePolicy(undefined, undefined, 3, 10, 2, undefined);
-  let s = makeState(undefined, 0, 1, undefined, Primitive_option.some(undefined), 100, undefined);
+  let s = makeState(undefined, 0, 1, undefined, null, 100, undefined);
   let a = Ladder.nextAction(s, {
     pass: false,
     reasons: undefined
@@ -454,12 +454,15 @@ Test.test("nextAction: accept takes priority over cost/attempt checks", () => {
 
 Test.test("advance: retry increments attemptsThisTier only", () => {
   let s = makeState("fast", 0, undefined, undefined, undefined, undefined, undefined);
-  let s2 = Ladder.advance(s, {
+  let action_forcingMessage = null;
+  let action_reason = null;
+  let action = {
     action: "retry",
     tier: "fast",
-    forcingMessage: undefined,
-    reason: undefined
-  });
+    forcingMessage: action_forcingMessage,
+    reason: action_reason
+  };
+  let s2 = Ladder.advance(s, action);
   assertionEqual("attempts", s2.attemptsThisTier, 1);
   assertionEqual("tier", s2.currentTier, "fast");
   assertionEqual("escalations", s2.escalations, 0);
@@ -468,12 +471,15 @@ Test.test("advance: retry increments attemptsThisTier only", () => {
 
 Test.test("advance: escalate updates currentTier resets attemptsThisTier increments escalations", () => {
   let s = makeState("fast", 1, undefined, 0, undefined, undefined, undefined);
-  let s2 = Ladder.advance(s, {
+  let action_forcingMessage = null;
+  let action_reason = null;
+  let action = {
     action: "escalate",
     tier: "medium",
-    forcingMessage: undefined,
-    reason: undefined
-  });
+    forcingMessage: action_forcingMessage,
+    reason: action_reason
+  };
+  let s2 = Ladder.advance(s, action);
   assertionEqual("tier", s2.currentTier, "medium");
   assertionEqual("attempts", s2.attemptsThisTier, 0);
   assertionEqual("escalations", s2.escalations, 1);
@@ -481,35 +487,45 @@ Test.test("advance: escalate updates currentTier resets attemptsThisTier increme
 
 Test.test("advance: accept => state unchanged", () => {
   let s = makeState("medium", undefined, 3, undefined, undefined, undefined, undefined);
-  let s2 = Ladder.advance(s, {
+  let action_tier = null;
+  let action_forcingMessage = null;
+  let action_reason = null;
+  let action = {
     action: "accept",
-    tier: undefined,
-    forcingMessage: undefined,
-    reason: undefined
-  });
+    tier: action_tier,
+    forcingMessage: action_forcingMessage,
+    reason: action_reason
+  };
+  let s2 = Ladder.advance(s, action);
   assertionEqual("same", s2, s);
 });
 
 Test.test("advance: give_up => state unchanged", () => {
   let s = makeState("heavy", undefined, 4, undefined, undefined, undefined, undefined);
-  let s2 = Ladder.advance(s, {
+  let action_tier = null;
+  let action_forcingMessage = null;
+  let action = {
     action: "give_up",
-    tier: undefined,
-    forcingMessage: undefined,
+    tier: action_tier,
+    forcingMessage: action_forcingMessage,
     reason: "done"
-  });
+  };
+  let s2 = Ladder.advance(s, action);
   assertionEqual("same", s2, s);
 });
 
 Test.test("advance: does NOT mutate input state on retry", () => {
   let s = makeState(undefined, 2, undefined, undefined, undefined, undefined, undefined);
   let sOrig = JSON.stringify(s);
-  Ladder.advance(s, {
+  let action_forcingMessage = null;
+  let action_reason = null;
+  let action = {
     action: "retry",
     tier: "fast",
-    forcingMessage: undefined,
-    reason: undefined
-  });
+    forcingMessage: action_forcingMessage,
+    reason: action_reason
+  };
+  Ladder.advance(s, action);
   let sAfter = JSON.stringify(s);
   assertionEqual("noMutate", sOrig, sAfter);
 });
@@ -517,12 +533,15 @@ Test.test("advance: does NOT mutate input state on retry", () => {
 Test.test("advance: does NOT mutate input state on escalate", () => {
   let s = makeState("fast", undefined, undefined, 0, undefined, undefined, undefined);
   let sOrig = JSON.stringify(s);
-  Ladder.advance(s, {
+  let action_forcingMessage = null;
+  let action_reason = null;
+  let action = {
     action: "escalate",
     tier: "medium",
-    forcingMessage: undefined,
-    reason: undefined
-  });
+    forcingMessage: action_forcingMessage,
+    reason: action_reason
+  };
+  Ladder.advance(s, action);
   let sAfter = JSON.stringify(s);
   assertionEqual("noMutate", sOrig, sAfter);
 });
@@ -538,11 +557,15 @@ Test.test("buildEscalatePolicy: all defaults when enforcement absent", () => {
     enforcement: undefined
   };
   let p = Ladder.buildEscalatePolicy(cfg);
-  assertionEqual("ladder", p.ladder, TierLadder.defaultTierNames);
-  assertionEqual("floorTier", p.floorTier, undefined);
+  Test.assertion(undefined, "ladderDeepEqual", Primitive_object.equal, p.ladder, [
+    "fast",
+    "medium",
+    "heavy"
+  ]);
+  assertionEqual("floorTier", Primitive_option.fromNullable(p.floorTier), undefined);
   assertionEqual("maxAttempts", p.maxAttemptsPerTier, 1);
   assertionEqual("maxTotal", p.maxTotalAttempts, 4);
-  assertionEqual("costMultiple", p.costMultiple, 4);
+  assertionEqual("costMultiple", Primitive_option.fromNullable(p.costMultiple), 4);
 });
 
 Test.test("formatLadderScorecard: accepted=true => verdict=PASS", () => {
@@ -571,7 +594,7 @@ Test.test("edge: FAIL at heavy with no retries left => give_up no higher tier", 
     reasons: undefined
   }, p, undefined);
   assertionEqual("giveUp", a.action, "give_up");
-  assertionEqual("reason", a.reason, "no higher tier (already at top of ladder)");
+  assertionEqual("reason", Primitive_option.fromNullable(a.reason), "no higher tier (already at top of ladder)");
 });
 
 Test.test("edge: maxTotalAttempts mid-ladder => give_up max total attempts", () => {
@@ -583,10 +606,10 @@ Test.test("edge: maxTotalAttempts mid-ladder => give_up max total attempts", () 
   }, p, undefined);
   assertionEqual("giveUp", a.action, "give_up");
   let r = a.reason;
-  if (r !== undefined) {
-    return assertionTrue("reason", stringContains(r, "max total attempts (2)"));
-  } else {
+  if (r == null) {
     return assertionTrue("reason", false);
+  } else {
+    return assertionTrue("reason", stringContains(r, "max total attempts (2)"));
   }
 });
 
@@ -621,7 +644,7 @@ Test.test("edge: producer below floor => starts at floor", () => {
 });
 
 Test.test("edge: unknown producer not in ladder => starts at ladder[0]", () => {
-  let p = makePolicy(undefined, Primitive_option.some(undefined), undefined, undefined, undefined, undefined);
+  let p = makePolicy(undefined, null, undefined, undefined, undefined, undefined);
   let s = Ladder.newLadderState("turbo", p);
   assertionEqual("startsLadder0", s.currentTier, "fast");
 });
