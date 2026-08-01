@@ -1,4 +1,4 @@
-import type { ResolvedReasoning } from "../reasoning/translate.js";
+import type { resolvedReasoning as ResolvedReasoning } from "../reasoning/Reasoning.res.mjs";
 import type { Preset, RouterConfig, TierConfig } from "./config";
 import { CLAUDE_ANTI_NARRATION, CLAUDE_TIER_PREFIX, isClaudeModel } from "./protocol";
 

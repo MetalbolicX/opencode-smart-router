@@ -26,10 +26,10 @@
 
 import type { BeforeResult } from "../../guard/enforce";
 import { guardBeforeCall } from "../../guard/enforce";
-import type { AdaptiveSignals } from "../../reasoning/adaptive.js";
-import { selectAdaptiveLevel } from "../../reasoning/adaptive.js";
-import { normalizeSignalText } from "../../reasoning/match.js";
-import { resolveReasoningOverride } from "../../reasoning/policy.js";
+// Type imports from original TS files (type definitions preserved for backward compat)
+import type { adaptiveSignals as AdaptiveSignals } from "../../reasoning/Reasoning.res.mjs";
+// Value imports from ReScript facade
+import { selectAdaptiveLevel, normalizeSignalText, resolveReasoningOverride } from "../../reasoning/Reasoning.res.mjs";
 import { applyReasoningPatch } from "../../router/agents";
 import { getActiveTiers } from "../../router/protocol";
 import { READ_ONLY_TOOLS } from "../../router/tools";
@@ -183,7 +183,12 @@ export const applyOrchestratorReasoningPatch = async (params: {
               tierName: subagentType,
               isTrivial: ctx.sessionStore.isTrivial(sid),
             };
-            const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, override, signals);
+            const resolved = resolveReasoningOverride(
+              tier,
+              cfg.reasoningPolicy as unknown as import("../../reasoning/Reasoning.res.mjs").reasoningPolicyConfig | null,
+              override as import("../../reasoning/Reasoning.res.mjs").reasoningLevel | null,
+              signals,
+            );
             if (resolved) {
               applyReasoningPatch(agentDef, resolved);
               // Surface-only advisory: emit a debug log when the policy opted in
@@ -220,7 +225,10 @@ export const applyOrchestratorReasoningPatch = async (params: {
               cfg.reasoningPolicy?.mode === "adaptive" &&
               cfg.reasoningPolicy?.adaptive?.surfaceDecision === true
             ) {
-              const decision = selectAdaptiveLevel(signals, cfg.reasoningPolicy);
+              const decision = selectAdaptiveLevel(
+                signals,
+                cfg.reasoningPolicy as unknown as import("../../reasoning/Reasoning.res.mjs").reasoningPolicyConfig | null,
+              );
               log.debug({
                 event: "reasoning.adaptive_selected",
                 session: sid,

@@ -380,3 +380,113 @@ declare module "*ReasoningAdaptive.res.mjs" {
   // Test helper: build a ReasoningPolicyConfig with adaptive block
   export const makePolicyWithAdaptive: (adaptive: adaptivePolicyConfig | null) => reasoningPolicyConfig;
 }
+
+// ---------------------------------------------------------------------------
+// Reasoning (src/reasoning/Reasoning.res)
+// Public facade re-exporting from five reasoning sub-modules.
+// TS consumers import from this single stable path, not the sub-modules.
+// ---------------------------------------------------------------------------
+declare module "*Reasoning.res.mjs" {
+  // Normalized reasoning level
+  export type reasoningLevel = "minimal" | "normal" | "elevated" | "max";
+
+  // Match mode variants
+  export type matchMode = "word" | "stem" | "substring" | "regex";
+
+  // Output channel discriminator
+  export type reasoningField = "variant" | "reasoning.effort" | "thinking.budgetTokens";
+
+  // Capability discriminated union (JS object form)
+  export type reasoningCapability = {
+    kind: string;
+    field?: reasoningField;
+    baseline?: string;
+    elevated?: string;
+    levels?: Array<string>;
+    recommended?: Record<string, number>;
+  };
+
+  // Minimal TierConfig shape (fields read by inferCapability)
+  export type tierConfig = {
+    model: string;
+    variant?: string;
+    thinking?: { budgetTokens?: number };
+    reasoning?: { effort?: string };
+    description: string;
+    whenToUse: Array<string>;
+    capability?: reasoningCapability;
+  };
+
+  // Adaptive signals: dispatch-time signals for adaptive level selection
+  export type adaptiveSignals = {
+    prompt: string;
+    description: string;
+    tierName: string;
+    isTrivial: boolean;
+  };
+
+  // Keyword rule shape
+  export type keywordRule = {
+    keywords: string[];
+    level: string;
+    match: string | null;
+    excludeKeywords: string[] | null;
+  };
+
+  // Adaptive policy config
+  export type adaptivePolicyConfig = {
+    trivialLevel: string | null;
+    defaultLevel: string | null;
+    keywordRules: keywordRule[] | null;
+    tierDefaults: Record<string, string> | null;
+    surfaceDecision: boolean | null;
+  };
+
+  // Reasoning policy config (static | manual | adaptive modes)
+  export type reasoningPolicyConfig = {
+    mode: string | null;
+    defaultLevel: string | null;
+    surfaceLimits: boolean | null;
+    adaptive: adaptivePolicyConfig | null;
+  };
+
+  // Resolved reasoning: provider-specific patch or null for no-op
+  // variant and options are optional fields; null means no patch
+  export type resolvedReasoning = {
+    variant?: string;
+    options?: Record<string, unknown>;
+  } | null;
+
+  // Adaptive decision
+  export type adaptiveDecision = {
+    level: reasoningLevel | null; // Js.Nullable.t maps to nullable
+    reason: string;
+  };
+
+  // Module aliases for sub-module types (values are undefined at runtime)
+  export const Match: typeof import("./ReasoningMatch.res.mjs");
+  export const Capability: typeof import("./ReasoningCapability.res.mjs");
+  export const Translate: typeof import("./ReasoningTranslate.res.mjs");
+  export const Policy: typeof import("./ReasoningPolicy.res.mjs");
+  export const Adaptive: typeof import("./ReasoningAdaptive.res.mjs");
+
+  // Re-exported functions
+  export const normalizeSignalText: (raw: string) => string;
+  export const matchSignal: (text: string, keyword: string, mode: matchMode) => boolean;
+  export const inferCapability: (tier: tierConfig) => reasoningCapability;
+  export const translateLevel: (cap: reasoningCapability, level: reasoningLevel) => resolvedReasoning | null;
+  export const resolveReasoningOverride: (
+    tier: tierConfig,
+    policy: reasoningPolicyConfig | null,
+    sessionOverride: reasoningLevel | null,
+    signals: adaptiveSignals,
+  ) => resolvedReasoning | null;
+  export const selectAdaptiveLevel: (
+    signals: adaptiveSignals,
+    policy: reasoningPolicyConfig | null,
+  ) => adaptiveDecision;
+  export const getLevelNull: (d: adaptiveDecision) => reasoningLevel | null;
+  export const getLevelOption: (d: adaptiveDecision) => reasoningLevel | null | undefined;
+  export const getReason: (d: adaptiveDecision) => string;
+  export const makePolicyWithAdaptive: (adaptive: adaptivePolicyConfig | null) => reasoningPolicyConfig;
+}
