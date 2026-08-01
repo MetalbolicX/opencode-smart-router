@@ -8,7 +8,7 @@ import {
   runSubagentGuard,
 } from "../../src/plugin/hooks/tool-guards";
 import type { HookPayload } from "../../src/plugin/types";
-import type { ReasoningLevel } from "../../src/reasoning/capability.js";
+import type { reasoningLevel as ReasoningLevel } from "../../src/reasoning/Reasoning.res.mjs";
 import { createReasoningStore } from "../../src/reasoning/store";
 import type { Preset, RouterConfig } from "../../src/router/config";
 import type { TierConfig } from "../../src/router/config.types";

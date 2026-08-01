@@ -2,8 +2,8 @@ import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AdaptiveSignals } from "../../src/reasoning/adaptive";
-import { resolveReasoningOverride } from "../../src/reasoning/policy";
+import type { adaptiveSignals as AdaptiveSignals } from "../../src/reasoning/Reasoning.res.mjs";
+import { resolveReasoningOverride } from "../../src/reasoning/Reasoning.res.mjs";
 import {
   applyReasoningPatch,
   buildAgentOptions,
@@ -388,7 +388,7 @@ describe("integration — manual mode patch merges into agent def", () => {
     registerTierAgents(opencodeConfig, makePreset({ fast: tier }), cfg);
     const baseline = structuredClone(opencodeConfig.agent.fast);
 
-    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, "max", emptySignals);
+    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy as unknown as Parameters<typeof resolveReasoningOverride>[1], "max", emptySignals);
     expect(resolved).not.toBeNull();
     applyReasoningPatch(opencodeConfig.agent.fast, resolved!);
 
@@ -405,7 +405,7 @@ describe("integration — manual mode patch merges into agent def", () => {
     registerTierAgents(opencodeConfig, makePreset({ fast: tier }), cfg);
     const baseline = structuredClone(opencodeConfig.agent.fast);
 
-    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, "max", emptySignals);
+    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy as unknown as Parameters<typeof resolveReasoningOverride>[1], "max", emptySignals);
     // The primary regression guard: even when the caller asks for `max`,
     // a `none`-capability tier resolves to null.
     expect(resolved).toBeNull();
@@ -421,7 +421,7 @@ describe("integration — manual mode patch merges into agent def", () => {
     registerTierAgents(opencodeConfig, makePreset({ fast: tier }), cfg);
     const baseline = structuredClone(opencodeConfig.agent.fast);
 
-    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy, "max", emptySignals);
+    const resolved = resolveReasoningOverride(tier, cfg.reasoningPolicy as unknown as Parameters<typeof resolveReasoningOverride>[1], "max", emptySignals);
     expect(resolved).toBeNull();
 
     applyReasoningPatch(opencodeConfig.agent.fast, resolved);

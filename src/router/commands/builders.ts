@@ -18,9 +18,10 @@
 // ---------------------------------------------------------------------------
 
 import type { PluginContext } from "../../plugin/context";
-import type { ReasoningCapability, ReasoningLevel } from "../../reasoning/capability.js";
-import { inferCapability } from "../../reasoning/capability.js";
-import { translateLevel } from "../../reasoning/translate.js";
+// Type imports from original TS files (type definitions preserved for backward compat)
+import type { reasoningCapability as ReasoningCapability, reasoningLevel as ReasoningLevel } from "../../reasoning/Reasoning.res.mjs";
+// Value imports from ReScript facade
+import { inferCapability, translateLevel } from "../../reasoning/Reasoning.res.mjs";
 import type { RouterConfig } from "../config";
 import { resolvePresetName } from "../config";
 import { resolveEnforcementMode } from "../enforcement";
@@ -238,12 +239,14 @@ const describeCapability = (tierName: string, cap: ReasoningCapability): string 
       return `@${tierName}: binary variant (elevated: ${cap.elevated}${cap.baseline ? `, baseline: ${cap.baseline}` : ""}).`;
     case "discrete": {
       const channel = cap.field === "variant" ? "variant" : "reasoning_effort";
-      return `@${tierName}: discrete ${channel} ladder [${cap.levels.join(" < ")}].`;
+      return `@${tierName}: discrete ${channel} ladder [${(cap.levels ?? []).join(" < ")}].`;
     }
     case "budgeted":
-      return `@${tierName}: budgeted (thinking tokens per level: ${Object.entries(cap.recommended)
+      return `@${tierName}: budgeted (thinking tokens per level: ${Object.entries(cap.recommended ?? {})
         .map(([k, v]) => `${k}=${v}`)
         .join(", ")}).`;
+    default:
+      return `@${tierName}: unknown capability.`;
   }
 };
 
@@ -304,7 +307,7 @@ export const buildReasoningOutput = async (
       "",
     ];
     for (const [name, tier] of Object.entries(tiers)) {
-      const cap = tier.capability ?? inferCapability(tier);
+    const cap: ReasoningCapability = tier.capability ?? (inferCapability(tier) as ReasoningCapability);
       lines.push(describeCapability(name, cap));
     }
     lines.push(
@@ -371,7 +374,9 @@ export const buildReasoningOutput = async (
   ];
   let anyCollapse = false;
   for (const [name, tier] of Object.entries(tiers)) {
-    const cap = tier.capability ?? inferCapability(tier);
+    const cap: ReasoningCapability = tier.capability
+      ? (tier.capability as ReasoningCapability)
+      : (inferCapability(tier) as ReasoningCapability);
     if (cap.kind === "none") {
       if (surfaceLimits) lines.push(`- @${name}: unsupported (no reasoning control).`);
       continue;

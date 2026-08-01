@@ -26,7 +26,7 @@
 // branch on `undefined`.
 // ---------------------------------------------------------------------------
 
-import type { MatchMode } from "../reasoning/match.js";
+import type { matchMode } from "../reasoning/Reasoning.res.mjs";
 import { isPlainObject } from "./config-loader";
 import type {
   EnforcementConfig,
@@ -475,7 +475,7 @@ export const validateKeywordRule = (rule: unknown, index: number): void => {
   if (rule.match !== undefined) {
     if (
       typeof rule.match !== "string" ||
-      !(MATCH_MODES as readonly string[]).includes(rule.match as MatchMode)
+      !(MATCH_MODES as readonly string[]).includes(rule.match as matchMode)
     ) {
       throw new Error(
         `tiers.json: ${prefix}.match must be one of ${MATCH_MODES_LIST} (got ${JSON.stringify(rule.match)})`,

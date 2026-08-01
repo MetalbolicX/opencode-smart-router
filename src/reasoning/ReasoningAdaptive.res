@@ -84,6 +84,25 @@ let _nullLevel = (): Js.Nullable.t<reasoningLevel> => {
   %raw("null")
 }
 
+// IIFE helpers to safely extract nullable record fields from JS boundary.
+// %raw at module scope (not inside switch/if) CAN capture function params via IIFE.
+@setRuntimeSideEffects
+let _getTrivialLevel = (ac): option<string> => {
+  %raw(`(function(ac) { return ac.trivialLevel == null ? undefined : ac.trivialLevel; })(arguments[0])`)
+}
+@setRuntimeSideEffects
+let _getTierDefaults = (ac): option<Js.Dict.t<string>> => {
+  %raw(`(function(ac) { return ac.tierDefaults == null ? undefined : ac.tierDefaults; })(arguments[0])`)
+}
+@setRuntimeSideEffects
+let _getKeywordRules = (ac): option<array<keywordRule>> => {
+  %raw(`(function(ac) { return ac.keywordRules == null ? undefined : ac.keywordRules; })(arguments[0])`)
+}
+@setRuntimeSideEffects
+let _getDefaultLevel = (ac): option<string> => {
+  %raw(`(function(ac) { return ac.defaultLevel == null ? undefined : ac.defaultLevel; })(arguments[0])`)
+}
+
 // Convert string level to reasoningLevel variant, or return null
 let _levelFromString = (s: string): Js.Nullable.t<reasoningLevel> => {
   switch s {
@@ -208,25 +227,36 @@ let selectAdaptiveLevel = (
   signals: adaptiveSignals,
   policy: option<reasoningPolicyConfig>,
 ): adaptiveDecision => {
-  // Step 1: adaptive config absent
-  let adaptive: option<adaptivePolicyConfig> = switch policy {
-  | Some(p) => p.adaptive
+  // Step 0: handle JS null policy (the option type only covers undefined, not null)
+  // %raw here CAN capture `policy` because it's at function scope
+  let p = %raw(`policy == null ? undefined : policy`);
+  let effectivePolicy: option<reasoningPolicyConfig> = switch p {
+  | Some(pp) => Some(pp)
   | None => None
-  }
+  };
+  let adaptive: option<adaptivePolicyConfig> = switch effectivePolicy {
+  | Some(pp) => pp.adaptive
+  | None => None
+  };
   switch adaptive {
   | None => { level: _nullLevel(), reason: "no adaptive config" }
 
   | Some(ac) => {
-      // Step 2: trivial short-circuit
+      // Use IIFE helpers to safely extract nullable fields from `ac`
+      // (ac is from switch pattern; %raw can't capture it directly)
+      let acTrivialLevel = _getTrivialLevel(ac)
+      let acTierDefaults = _getTierDefaults(ac)
+      let acKeywordRules = _getKeywordRules(ac)
+      let acDefaultLevel = _getDefaultLevel(ac)
+
       if signals.isTrivial {
-        let lvl = switch ac.trivialLevel {
+        let lvl = switch acTrivialLevel {
         | Some(s) => _levelFromString(s)
         | None => _nullLevel()
         }
         { level: lvl, reason: "trivial" }
       } else {
-        // Step 3: tierDefaults check
-        let tierDefaults = switch ac.tierDefaults {
+        let tierDefaults: Js.Dict.t<string> = switch acTierDefaults {
         | Some(td) => td
         | None => Js.Dict.empty()
         }
@@ -236,16 +266,14 @@ let selectAdaptiveLevel = (
             { level: lvl, reason: `tier default: ${signals.tierName}` }
           }
         | None => {
-            // Step 4: keywordRules
-            let keywordRules = switch ac.keywordRules {
+            let keywordRules: array<keywordRule> = switch acKeywordRules {
             | Some(rules) => rules
             | None => []
             }
             switch _scanRules(keywordRules, 0, signals.prompt, signals.description) {
             | Some(d) => d
             | None => {
-                // Step 5: catch-all defaultLevel
-                let lvl = switch ac.defaultLevel {
+                let lvl = switch acDefaultLevel {
                 | Some(s) => _levelFromString(s)
                 | None => _nullLevel()
                 }

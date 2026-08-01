@@ -11,12 +11,12 @@
 // The ReScript Config module provides only the `parse` runtime function.
 // ---------------------------------------------------------------------------
 
-// Re-export the canonical reasoning types from `src/reasoning/capability.js`.
+// Re-export the canonical reasoning types from the Reasoning facade.
 export type {
-  ReasoningCapability,
-  ReasoningField,
-  ReasoningLevel,
-} from "../reasoning/capability.js";
+  reasoningCapability as ReasoningCapability,
+  reasoningField as ReasoningField,
+  reasoningLevel as ReasoningLevel,
+} from "../reasoning/Reasoning.res.mjs";
 
 export interface ThinkingConfig {
   budgetTokens?: number;
@@ -38,7 +38,7 @@ export interface TierConfig {
   steps?: number;
   prompt?: string;
   whenToUse: string[];
-  capability?: import("../reasoning/capability.js").ReasoningCapability;
+  capability?: import("../reasoning/Reasoning.res.mjs").reasoningCapability;
 }
 
 export type Preset = Record<string, TierConfig>;
@@ -89,22 +89,22 @@ export interface EnforcementConfig {
 
 export interface AdaptiveKeywordRule {
   keywords: string[];
-  level: import("../reasoning/capability.js").ReasoningLevel;
-  match?: import("../reasoning/match.js").MatchMode;
+  level: import("../reasoning/Reasoning.res.mjs").reasoningLevel;
+  match?: import("../reasoning/Reasoning.res.mjs").matchMode;
   excludeKeywords?: string[];
 }
 
 export interface AdaptivePolicyConfig {
-  trivialLevel?: import("../reasoning/capability.js").ReasoningLevel | null;
-  defaultLevel?: import("../reasoning/capability.js").ReasoningLevel | null;
+  trivialLevel?: import("../reasoning/Reasoning.res.mjs").reasoningLevel | null;
+  defaultLevel?: import("../reasoning/Reasoning.res.mjs").reasoningLevel | null;
   keywordRules?: AdaptiveKeywordRule[];
-  tierDefaults?: Record<string, import("../reasoning/capability.js").ReasoningLevel>;
+  tierDefaults?: Record<string, import("../reasoning/Reasoning.res.mjs").reasoningLevel>;
   surfaceDecision?: boolean;
 }
 
 export interface ReasoningPolicyConfig {
   mode?: "static" | "manual" | "adaptive";
-  defaultLevel?: import("../reasoning/capability.js").ReasoningLevel;
+  defaultLevel?: import("../reasoning/Reasoning.res.mjs").reasoningLevel;
   surfaceLimits?: boolean;
   adaptive?: AdaptivePolicyConfig;
 }
