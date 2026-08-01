@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildEscalatePolicy } from "../../src/escalate/ladder";
+import { buildEscalatePolicy } from "../../src/escalate/Ladder.res.mjs";
 import { buildGuardPolicy } from "../../src/guard/enforce";
 import type { RouterConfig } from "../../src/router/config";
 import { validateConfig } from "../../src/router/config";
