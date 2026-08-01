@@ -252,3 +252,64 @@ declare module "*Ladder.res.mjs" {
     method: string,
   ) => string;
 }
+
+// ---------------------------------------------------------------------------
+// ReasoningMatch (src/reasoning/ReasoningMatch.res)
+// Pure word/stem/substring/regex matcher with module-level regex cache.
+// Uses explicit pattern-string cache so %raw can access parameters directly.
+// ---------------------------------------------------------------------------
+declare module "*ReasoningMatch.res.mjs" {
+  // Match mode variants — string literals matching TS MatchMode.
+  export type matchMode = "word" | "stem" | "substring" | "regex";
+
+  // Preprocess raw task text: lowercase → collapse whitespace → trim.
+  export const normalizeSignalText: (raw: string) => string;
+
+  // Test whether text matches keyword under mode.
+  // Empty keyword → false; invalid regex → false (fail-soft).
+  export const matchSignal: (text: string, keyword: string, mode: matchMode) => boolean;
+}
+
+// ---------------------------------------------------------------------------
+// ReasoningCapability (src/reasoning/ReasoningCapability.res)
+// Provider-agnostic reasoning capability inference from TierConfig fields.
+// Pure helper — no I/O, no router state.
+// ---------------------------------------------------------------------------
+declare module "*ReasoningCapability.res.mjs" {
+  // Normalized reasoning level — provider-agnostic rank.
+  export type reasoningLevel = "minimal" | "normal" | "elevated" | "max";
+
+  // Output channel a capability writes through.
+  export type reasoningField = "variant" | "reasoning.effort" | "thinking.budgetTokens";
+
+  // Capability discriminated union as plain record.
+  // kind: "none" | "binary" | "discrete" | "budgeted"
+  export type reasoningCapability = {
+    kind: string;
+    field?: reasoningField;
+    baseline?: string;
+    elevated?: string;
+    levels?: Array<string>;
+    recommended?: Record<string, number>;
+  };
+
+  // Minimal TierConfig shape — only fields read by inferCapability.
+  export type tierConfig = {
+    model: string;
+    variant?: string;
+    thinking?: { budgetTokens?: number };
+    reasoning?: { effort?: string };
+    description: string;
+    whenToUse: Array<string>;
+    capability?: reasoningCapability;
+  };
+
+  // Infer a capability from a TierConfig when no explicit capability is declared.
+  // Inference precedence (first match wins):
+  //   1. tier.reasoning?.effort  → discrete / "reasoning.effort"
+  //   2. tier.thinking?.budgetTokens → budgeted / "thinking.budgetTokens"
+  //   3. tier.variant in {low,medium,high} → discrete / "variant"
+  //   4. tier.variant in {thinking,max}  → binary / "variant"
+  //   5. otherwise → { kind: "none" }
+  export const inferCapability: (tier: tierConfig) => reasoningCapability;
+}
