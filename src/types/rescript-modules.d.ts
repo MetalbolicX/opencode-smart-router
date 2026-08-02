@@ -521,6 +521,18 @@ declare module "*ValidatePresets.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// MODES section validators: validateModes, validateMode.
+// Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// ---------------------------------------------------------------------------
+declare module "*ValidateModes.res.mjs" {
+  // Validate the top-level modes block (modes is optional — no-op if absent)
+  export const validateModes: (obj: Record<string, unknown>) => void;
+
+  // Validate a single mode (named by modeName for error messages)
+  export const validateMode: (modeName: string, mode: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.

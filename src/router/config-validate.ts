@@ -43,6 +43,10 @@ import {
   validatePreset as validatePresetReScript,
   validateTier as validateTierReScript,
 } from "../validate/ValidatePresets.res.mjs";
+import {
+  validateModes as validateModesReScript,
+  validateMode as validateModeReScript,
+} from "../validate/ValidateModes.res.mjs";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -127,29 +131,21 @@ export const validateTier = (presetName: string, tierName: string, tier: unknown
 };
 
 // ---------------------------------------------------------------------------
-// Modes
+// Modes — wired to ValidateModes.res.mjs
 // ---------------------------------------------------------------------------
 
 export const validateModes = (obj: Record<string, unknown>): void => {
-  if (obj.modes === undefined) return;
-  if (!isPlainObject(obj.modes) || Array.isArray(obj.modes)) {
-    throw new Error("tiers.json: 'modes' must be an object");
-  }
-  for (const [modeName, mode] of Object.entries(obj.modes)) {
-    validateMode(modeName, mode);
-  }
+  // Delegate to ReScript implementation (ValidateModes.res.mjs)
+  validateModesReScript(obj);
 };
 
 export const validateMode = (modeName: string, mode: unknown): void => {
+  // Explicit guard: non-object inputs must be rejected with the expected error
   if (!isPlainObject(mode)) {
     throw new Error(`tiers.json: mode '${modeName}' must be an object`);
   }
-  if (typeof mode.defaultTier !== "string") {
-    throw new Error(`tiers.json: mode '${modeName}.defaultTier' must be a string`);
-  }
-  if (typeof mode.description !== "string") {
-    throw new Error(`tiers.json: mode '${modeName}.description' must be a string`);
-  }
+  // Delegate to ReScript implementation (ValidateModes.res.mjs)
+  validateModeReScript(modeName, mode as Record<string, unknown>);
 };
 
 // ---------------------------------------------------------------------------
