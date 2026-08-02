@@ -24,8 +24,8 @@
 // `runtime.ts`, `commands/*`, or `router/*` (the dep graph stays acyclic).
 // ---------------------------------------------------------------------------
 
-import type { BeforeResult } from "../../guard/enforce";
-import { guardBeforeCall } from "../../guard/enforce";
+import type { beforeResult as BeforeResult } from "../../guard/Guard.res.mjs";
+import { guardBeforeCall } from "../../guard/Guard.res.mjs";
 // Type imports from original TS files (type definitions preserved for backward compat)
 import type { adaptiveSignals as AdaptiveSignals } from "../../reasoning/Reasoning.res.mjs";
 // Value imports from ReScript facade
@@ -315,9 +315,11 @@ export const runSubagentGuard = async (params: {
       trivial: ctx.sessionStore.isTrivial(sid),
       sessionID: sid,
       tool,
-      toolArgs: output?.args as Record<string, unknown> | undefined,
+      toolArgs: (output?.args as Record<string, unknown> | undefined) ?? null,
       store: ctx.guardStore,
-      env: process.env,
+      env: Object.fromEntries(
+        Object.entries(process.env).map(([k, v]) => [k, v ?? null]),
+      ) as Record<string, string | null>,
     });
   } catch {
     return; // never break a real session on a guard-internal error
@@ -329,6 +331,6 @@ export const runSubagentGuard = async (params: {
       blocked: true,
       selfScript: res.guard === "anti_self_script",
     });
-    throw new Error(res.message);
+    throw new Error(res.message ?? "");
   }
 };

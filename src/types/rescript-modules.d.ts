@@ -490,3 +490,129 @@ declare module "*Reasoning.res.mjs" {
   export const getReason: (d: adaptiveDecision) => string;
   export const makePolicyWithAdaptive: (adaptive: adaptivePolicyConfig | null) => reasoningPolicyConfig;
 }
+
+// ---------------------------------------------------------------------------
+// Guard (src/guard/Guard.res)
+// Guard engine: threat matrix, state tracking, before/after hooks.
+// Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
+// ---------------------------------------------------------------------------
+declare module "*Guard.res.mjs" {
+  // Guard kind: classifies a tool call into one of 5 buckets
+  export type guardKind = "finish" | "read" | "mutation" | "self_script" | "other";
+
+  // Guard policy: configuration for the guard engine
+  export type guardPolicy = {
+    budget: number;
+    readDraftCap: number;
+    sameOpRetryCap: number;
+    blockSelfScript: boolean;
+    deliverableFirst: boolean;
+    deliverableSignal: string | null;
+    deliverablePath: string | null;
+    deliverableIsScript: boolean | null;
+    blockScriptWrites: boolean | null;
+  };
+
+  // Guard call: a tool call to be evaluated
+  export type guardCall = {
+    tool: string;
+    args?: Record<string, unknown>;
+  };
+
+  // Guard decision: result of evaluateGuards
+  export type guardDecision = {
+    allow: boolean;
+    guard: string | null;
+    observation: string | null;
+  };
+
+  // Guard state: mutable state tracked across a delegation session
+  export type guardState = {
+    budget: number;
+    toolCallCount: number;
+    readCount: number;
+    execCount: number;
+    selfScriptCount: number;
+    redundantCount: number;
+    blockedCount: number;
+    consecutiveNonProducing: number;
+    deliverableExecuted: boolean;
+    ttfa: number | null;
+    seen: Record<string, number>;
+    lastBlock: string | null;
+  };
+
+  // Before result: result of guardBeforeCall
+  export type beforeResult = {
+    block: boolean;
+    message: string | null;
+    mode: string;
+    guard: string | null;
+  };
+
+  // Guard store-like interface
+  export type guardStoreLike = {
+    ensure: (sessionID: string, policy: guardPolicy) => guardState;
+    get: (sessionID: string) => guardState | undefined;
+    setPendingNote: (sessionID: string, note: string) => void;
+    takePendingNote: (sessionID: string) => string | undefined;
+  };
+
+  // Router config minimal shape
+  export type routerConfigMinimal = {
+    enforcement?: {
+      guard?: {
+        budget?: number;
+        readDraftCap?: number;
+        sameOpRetryCap?: number;
+        blockSelfScript?: boolean;
+        deliverableFirst?: boolean;
+        blockScriptWrites?: boolean;
+      };
+      proportional?: {
+        trivialBypass?: boolean;
+      };
+    };
+  };
+
+  // PascalCase type aliases for backward compat with TS consumers
+  export type GuardKind = guardKind;
+  export type GuardPolicy = guardPolicy;
+  export type GuardCall = guardCall;
+  export type GuardDecision = guardDecision;
+  export type GuardState = guardState;
+  export type BeforeResult = beforeResult;
+
+  // Functions
+  export const defaultGuardBudget: number;
+  export const newGuardState: (policy: guardPolicy) => guardState;
+  export const updateState: (state: guardState, call: guardCall, opts: { ok: boolean }, policy: guardPolicy) => guardState;
+  export const recordBlock: (state: guardState, decision: guardDecision) => guardState;
+  export const isSelfScript: (call: guardCall, policy: guardPolicy) => boolean;
+  export const classify: (call: guardCall, policy: guardPolicy) => guardKind;
+  export const evaluateGuards: (state: guardState, call: guardCall, policy: guardPolicy) => guardDecision;
+  export const forcingMessage: (state: guardState, policy: guardPolicy) => string;
+  export const trajectoryMetrics: (state: guardState) => Record<string, unknown>;
+  export const observationOk: (output: unknown) => boolean;
+  export const buildGuardPolicy: (cfg: routerConfigMinimal, tier: string | null) => guardPolicy;
+  export const formatScorecard: (state: guardState, tier: string | null) => string;
+  export const guardBeforeCall: (params: {
+    cfg: routerConfigMinimal;
+    tier: string | null;
+    sessionID: string;
+    tool: string;
+    toolArgs: Record<string, unknown> | null;
+    store: guardStoreLike;
+    env: Record<string, string | null>;
+    trivial: boolean | null;
+  }) => beforeResult;
+  export const guardAfterCall: (params: {
+    cfg: routerConfigMinimal;
+    tier: string | null;
+    sessionID: string;
+    tool: string;
+    toolArgs: Record<string, unknown> | null;
+    output: { output: unknown | null };
+    store: guardStoreLike;
+  }) => void;
+}

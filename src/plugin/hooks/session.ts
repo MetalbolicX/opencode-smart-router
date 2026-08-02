@@ -9,7 +9,7 @@
 // barrel. It only needs to be visible inside this module.
 // ---------------------------------------------------------------------------
 
-import { formatScorecard } from "../../guard/enforce";
+import { formatScorecard } from "../../guard/Guard.res.mjs";
 import { writeTrajectoryLog } from "../../utils/log";
 import type { PluginContext } from "../context";
 import type { HookEventPayload } from "../types";

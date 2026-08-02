@@ -11,7 +11,7 @@ import { assembleRuntimeHooks } from "./plugin/runtime";
 // Tests import from their specific source files instead of this entry point.
 // ---------------------------------------------------------------------------
 
-export type { GuardCall, GuardDecision, GuardPolicy, GuardState } from "./guard/guards";
+export type { GuardCall, GuardDecision, GuardPolicy, GuardState } from "./guard/Guard.res.mjs";
 export type {
   EnforcementConfig,
   FallbackConfig,
