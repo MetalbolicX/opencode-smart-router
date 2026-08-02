@@ -505,6 +505,22 @@ declare module "*ValidateRoot.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// ValidatePresets (src/validate/ValidatePresets.res)
+// PRESETS section validators: validatePresets, validatePreset, validateTier.
+// Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// ---------------------------------------------------------------------------
+declare module "*ValidatePresets.res.mjs" {
+  // Validate the top-level presets block: must be a non-null object with at least one key
+  export const validatePresets: (obj: Record<string, unknown>) => void;
+
+  // Validate a single preset (named by presetName for error messages)
+  export const validatePreset: (presetName: string, preset: Record<string, unknown>) => void;
+
+  // Validate a single tier within a preset
+  export const validateTier: (presetName: string, tierName: string, tier: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
