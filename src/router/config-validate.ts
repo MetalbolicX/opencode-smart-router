@@ -61,6 +61,9 @@ import {
   validateEnforcementGuard as validateEnforcementGuardReScript,
   validateEscalateCostCeiling as validateEscalateCostCeilingReScript,
 } from "../validate/ValidateEnforcement.res.mjs";
+// @ts-ignore TS bug: glob "Reasoning.res.mjs" matches "ValidateReasoning.res.mjs"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ValidateReasoningReScript: any = require("../validate/ValidateReasoning.res.mjs");
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -289,55 +292,23 @@ const REASONING_LEVELS_LIST = REASONING_LEVELS.join("|");
 const MATCH_MODES_LIST = MATCH_MODES.join("|");
 
 export const validateReasoningPolicy = (obj: Record<string, unknown>): void => {
-  if (obj.reasoningPolicy === undefined) return;
-  if (!isPlainObject(obj.reasoningPolicy) || Array.isArray(obj.reasoningPolicy)) {
-    throw new Error("tiers.json: 'reasoningPolicy' must be an object");
-  }
-  const policy = obj.reasoningPolicy;
-  validateReasoningPolicyMode(policy);
-  validateAdaptivePolicy(policy);
+  // Delegate to ReScript implementation (ValidateReasoning.res.mjs)
+  ValidateReasoningReScript.validateReasoningPolicy(obj);
 };
 
 export const validateReasoningPolicyMode = (policy: Record<string, unknown>): void => {
-  if (policy.mode === undefined) return;
-  if (
-    typeof policy.mode !== "string" ||
-    !(REASONING_MODES as readonly string[]).includes(policy.mode)
-  ) {
-    throw new Error(
-      `tiers.json: reasoningPolicy.mode must be one of ${REASONING_MODES_LIST} (got ${JSON.stringify(policy.mode)})`,
-    );
-  }
+  // Delegate to ReScript implementation (ValidateReasoning.res.mjs)
+  ValidateReasoningReScript.validateReasoningPolicyMode(policy);
 };
 
 export const validateAdaptivePolicy = (policy: Record<string, unknown>): void => {
-  if (policy.adaptive === undefined) return;
-  if (!isPlainObject(policy.adaptive) || Array.isArray(policy.adaptive)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive must be an object");
-  }
-  const adaptive = policy.adaptive;
-  validateLevelOrNull(adaptive.trivialLevel, "reasoningPolicy.adaptive.trivialLevel");
-  validateLevelOrNull(adaptive.defaultLevel, "reasoningPolicy.adaptive.defaultLevel");
-  validateKeywordRules(adaptive.keywordRules);
-  validateAdaptiveTierDefaults(adaptive.tierDefaults);
-  validateAdaptiveSurfaceDecision(adaptive.surfaceDecision);
-};
-
-/**
- * Validate an adaptive level slot that admits `null` (e.g. `trivialLevel`,
- * `defaultLevel`). Null/absent means "no patch"; any other value must be a
- * member of the reasoning level set.
- */
-const validateLevelOrNull = (value: unknown, path: string): void => {
-  if (value === undefined || value === null) return;
-  if (!isReasoningLevel(value)) {
-    throw new Error(
-      `tiers.json: ${path} must be one of ${REASONING_LEVELS_LIST} or null (got ${JSON.stringify(value)})`,
-    );
-  }
+  // Delegate to ReScript implementation (ValidateReasoning.res.mjs)
+  ValidateReasoningReScript.validateAdaptivePolicy(policy);
 };
 
 export const validateKeywordRules = (rules: unknown): void => {
+  // Called by validateAdaptivePolicy internally; also exported for direct use.
+  // ReScript validateKeywordRule is called per-element in the TS loop.
   if (rules === undefined) return;
   if (!Array.isArray(rules)) {
     throw new Error("tiers.json: reasoningPolicy.adaptive.keywordRules must be an array");
@@ -348,81 +319,31 @@ export const validateKeywordRules = (rules: unknown): void => {
 };
 
 export const validateKeywordRule = (rule: unknown, index: number): void => {
-  const prefix = `reasoningPolicy.adaptive.keywordRules[${index}]`;
-  if (!isPlainObject(rule) || Array.isArray(rule)) {
-    throw new Error(`tiers.json: ${prefix} must be an object`);
-  }
-  // keywords: REQUIRED, non-empty array of strings
-  if (!Array.isArray(rule.keywords)) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
-  }
-  if (rule.keywords.length === 0) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be a non-empty array of strings`);
-  }
-  if (!rule.keywords.every((k: unknown) => typeof k === "string")) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
-  }
-  // level: REQUIRED, must be in the level set
-  if (!isReasoningLevel(rule.level)) {
-    throw new Error(
-      `tiers.json: ${prefix}.level must be one of ${REASONING_LEVELS_LIST} (got ${JSON.stringify(rule.level)})`,
-    );
-  }
-  // match: OPTIONAL; must be one of the four mode literals
-  if (rule.match !== undefined) {
-    if (
-      typeof rule.match !== "string" ||
-      !(MATCH_MODES as readonly string[]).includes(rule.match as matchMode)
-    ) {
-      throw new Error(
-        `tiers.json: ${prefix}.match must be one of ${MATCH_MODES_LIST} (got ${JSON.stringify(rule.match)})`,
-      );
-    }
-  }
-  // excludeKeywords: OPTIONAL; array of strings (may be empty)
-  if (rule.excludeKeywords !== undefined) {
-    if (
-      !Array.isArray(rule.excludeKeywords) ||
-      !rule.excludeKeywords.every((k: unknown) => typeof k === "string")
-    ) {
-      throw new Error(`tiers.json: ${prefix}.excludeKeywords must be an array of strings`);
-    }
-  }
-  // regex fail-fast: any keyword that does not compile under `new RegExp`
-  // throws at config load. Runtime (`matchSignal`) keeps fail-soft as a
-  // safety net, but malformed configs should not ship.
-  if (rule.match === "regex") {
-    for (const kw of rule.keywords as string[]) {
-      try {
-        new RegExp(kw);
-      } catch (err) {
-        throw new Error(
-          `tiers.json: ${prefix} has invalid regex '${kw}': ${(err as Error).message}`,
-        );
-      }
-    }
-  }
+  // Delegate to ReScript implementation (ValidateReasoning.res.mjs)
+  ValidateReasoningReScript.validateKeywordRule(rule as Record<string, unknown>, index);
 };
 
 export const validateAdaptiveTierDefaults = (td: unknown): void => {
+  // Called by validateAdaptivePolicy internally; also exported for direct use.
+  // TS API: skip if absent, throw if not an object.
   if (td === undefined) return;
   if (!isPlainObject(td) || Array.isArray(td)) {
     throw new Error("tiers.json: reasoningPolicy.adaptive.tierDefaults must be an object");
   }
-  for (const [tierName, level] of Object.entries(td)) {
-    if (!isReasoningLevel(level)) {
-      throw new Error(
-        `tiers.json: reasoningPolicy.adaptive.tierDefaults.${tierName} must be one of ${REASONING_LEVELS_LIST} (got ${JSON.stringify(level)})`,
-      );
-    }
-  }
+  // The ReScript function expects an adaptive dict with tierDefaults inside.
+  // For direct-call TS usage (from config-validate-sections.test.ts), wrap td
+  // in an object so the ReScript function can find it.
+  const adaptive: Record<string, unknown> = { tierDefaults: td };
+  ValidateReasoningReScript.validateAdaptiveTierDefaults(adaptive as Record<string, unknown>);
 };
 
-const validateAdaptiveSurfaceDecision = (value: unknown): void => {
-  if (value === undefined) return;
-  if (typeof value !== "boolean") {
-    throw new Error(
-      `tiers.json: reasoningPolicy.adaptive.surfaceDecision must be a boolean (got ${JSON.stringify(value)})`,
-    );
+export const validateAdaptiveSurfaceDecision = (value: unknown): void => {
+  // Called by validateAdaptivePolicy internally; also exported for direct use.
+  // ReScript validateAdaptiveSurfaceDecision is called with the adaptive dict.
+  // For the TS direct-call case, pass a dict with surfaceDecision.
+  const dict: Record<string, unknown> = {};
+  if (value !== undefined) {
+    dict["surfaceDecision"] = value;
   }
+  ValidateReasoningReScript.validateAdaptiveSurfaceDecision(dict as Record<string, unknown>);
 };

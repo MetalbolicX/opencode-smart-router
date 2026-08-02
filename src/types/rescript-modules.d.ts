@@ -581,6 +581,37 @@ declare module "*ValidateEnforcement.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// REASONING section validators: validateReasoningPolicy, validateReasoningPolicyMode,
+// validateAdaptivePolicy, validateKeywordRule, validateAdaptiveTierDefaults,
+// validateAdaptiveSurfaceDecision. Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
+// ---------------------------------------------------------------------------
+declare module "*ValidateReasoning.res.mjs" {
+  // Top-level reasoningPolicy dispatcher. Throws if reasoningPolicy is present but not a plain object.
+  export const validateReasoningPolicy: (obj: Record<string, unknown>) => void;
+
+  // Validate reasoningPolicy.mode in {static, manual, adaptive}. Silently skips if absent.
+  export const validateReasoningPolicyMode: (policy: Record<string, unknown>) => void;
+
+  // Validate reasoningPolicy.adaptive block (optional). Validates trivialLevel, defaultLevel,
+  // keywordRules, tierDefaults, surfaceDecision.
+  export const validateAdaptivePolicy: (policy: Record<string, unknown>) => void;
+
+  // Validate adaptive.keywordRules array (optional). Called internally by validateAdaptivePolicy.
+  export const validateKeywordRules: (adaptive: Record<string, unknown>) => void;
+
+  // Validate a single keyword rule at a given array index.
+  // Used internally and by TS config-validate for per-rule error messages.
+  export const validateKeywordRule: (ruleJson: unknown, index: number) => void;
+
+  // Validate adaptive.tierDefaults object (optional). Each value must be a reasoning level string.
+  export const validateAdaptiveTierDefaults: (adaptive: Record<string, unknown>) => void;
+
+  // Validate adaptive.surfaceDecision (optional). Must be a boolean if present.
+  export const validateAdaptiveSurfaceDecision: (adaptive: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
