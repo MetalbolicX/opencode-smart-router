@@ -13,8 +13,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
+import { assembleSystemPrompt } from "../../src/router/Protocol.res.mjs";
+import type { tierConfig } from "../../src/router/Protocol.res.mjs";
 import { validateConfig } from "../../src/router/config";
-import { assembleSystemPrompt } from "../../src/router/protocol";
 
 // ---------------------------------------------------------------------------
 // Globally unique session counter (offset to avoid colliding with ladder-wiring).
@@ -161,8 +162,8 @@ describe("Phase 3.3 — provider-failover / quality-escalation orthogonality", (
   it("CASE B: provider-failover advisory is present regardless of enforcement (orthogonal)", () => {
     const cfg = validateConfig(JSON.parse(readFileSync("tiers.json", "utf-8")));
 
-    const withoutEnf = assembleSystemPrompt(cfg, "anthropic/claude-haiku-4-5", false);
-    const withEnf = assembleSystemPrompt(cfg, "anthropic/claude-haiku-4-5", true);
+    const withoutEnf = assembleSystemPrompt(cfg as unknown as tierConfig, "anthropic/claude-haiku-4-5", false);
+    const withEnf = assembleSystemPrompt(cfg as unknown as tierConfig, "anthropic/claude-haiku-4-5", true);
 
     // Provider-failover chain is present without enforcement.
     expect(withoutEnf).toContain("Chain:");

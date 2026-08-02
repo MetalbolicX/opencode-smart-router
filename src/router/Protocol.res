@@ -317,14 +317,14 @@ let getActiveTiers = (cfg: tierConfig): Js.Dict.t<tierDef> => {
 // getActiveMode — returns the active mode or undefined
 // ---------------------------------------------------------------------------
 
-let getActiveMode = (cfg: tierConfig): Js.Nullable.t<modeConfig> => {
+let getActiveMode = (cfg: tierConfig): option<modeConfig> => {
   switch (Js.Nullable.toOption(cfg.modes), Js.Nullable.toOption(cfg.activeMode)) {
   | (Some(modes), Some(activeMode)) =>
     switch modes->Js.Dict.get(activeMode) {
-    | Some(mode) => Js.Nullable.return(mode)
-    | None => Js.Nullable.null
+    | Some(mode) => Some(mode)
+    | None => None
     }
-  | _ => Js.Nullable.null
+  | _ => None
   }
 }
 
@@ -336,43 +336,46 @@ let buildFallbackInstructions = (cfg: tierConfig): string => {
   switch cfg.fallback->Js.Nullable.toOption {
   | None => ""
   | Some(fb) =>
-    // presetMap = fb.presets[cfg.activePreset]
-    switch fb.presets->Js.Nullable.toOption {
-    | None => ""
-    | Some(fbPresets) =>
-      switch fbPresets->Js.Dict.get(cfg.activePreset) {
-      | None => ""
-      | Some(presetMap) =>
-        // map = presetMap && Object.keys(presetMap).length > 0 ? presetMap : fb.global
-        let innerKeys = Js.Dict.keys(presetMap)
-        let map = if Array.length(innerKeys) > 0 {
-          Js.Nullable.return(presetMap)
+    // presetMap = fb.presets?.[cfg.activePreset]; map = presetMap || fb.global
+    let presetMap = switch fb.presets->Js.Nullable.toOption {
+      | None => None
+      | Some(fbPresets) => fbPresets->Js.Dict.get(cfg.activePreset)
+      }
+    let map = switch presetMap {
+      | Some(pm) =>
+        let keys = Js.Dict.keys(pm)
+        if Array.length(keys) > 0 {
+          Some(pm)
         } else {
-          fb.global
+          fb.global->Js.Nullable.toOption
         }
-  switch map->Js.Nullable.toOption {
-  | None => ""
-  | Some(m) =>
-          // chains = Object.entries(map).flatMap(...)
-          let chains = Js.Dict.entries(m)->Array.map(((provider, presetOrder)) => {
+      | None => fb.global->Js.Nullable.toOption
+      }
+    switch map {
+    | None => ""
+    | Some(m) =>
+        // chains = Object.entries(map).flatMap(...)
+        let chains: array<(string, array<string>)> = []
+        Js.Dict.entries(m)->Array.forEach(((provider, presetOrder)) => {
+          // Guard: if presetOrder is not an array (e.g. a string value in fb.global), skip
+          if !(Array.isArray(presetOrder)) {
+            ()->ignore
+          } else {
             let valid = presetOrder->Array.filter(p =>
               p !== cfg.activePreset && cfg.presets->Js.Dict.get(p)->Option.isSome
             )
             if Array.length(valid) > 0 {
-              (`${provider}→${valid->Array.join("→")}`, valid)
-            } else {
-              ("", [])
+              Array.push(chains, (provider ++ "→" ++ valid->Array.join("→"), valid))->ignore
             }
-          })
-          let validChains = chains->Array.map(((s, _arr)) => s)->Array.filter(s => s !== "")
-          if Array.length(validChains) === 0 {
-            ""
-          } else {
-            `Err→retry-alt-tier→fail→direct. Chain: ${validChains->Array.join(" | ")}`
           }
+        })
+        let validChains = chains->Array.map(((s, _arr)) => s)->Array.filter(s => s !== "")
+        if Array.length(validChains) === 0 {
+          ""
+        } else {
+          `Err→retry-alt-tier→fail→direct. Chain: ${validChains->Array.join(" | ")}`
         }
       }
-    }
   }
 }
 
@@ -411,7 +414,7 @@ let buildTaskTaxonomy = (cfg: tierConfig): string => {
 let buildDecomposeHint = (cfg: tierConfig): string => {
   let modeOpt = getActiveMode(cfg)
   // Skip if active mode has overrideRules
-  let hasOverrideRules = switch modeOpt->Js.Nullable.toOption {
+  let hasOverrideRules = switch modeOpt {
     | None => false
     | Some(mode) =>
       switch mode.overrideRules->Js.Nullable.toOption {
@@ -437,7 +440,7 @@ let buildDecomposeHint = (cfg: tierConfig): string => {
           | Some(r) => r
           | None => 1.0
           }
-        float_of_int(compare(bRatio, aRatio))
+        float_of_int(compare(aRatio, bRatio))
       })
       let (cheapestName, _) = Array.unsafe_get(entriesCopy, 0)
       let (midName, _) = Array.unsafe_get(entriesCopy, 1)
@@ -483,7 +486,7 @@ let buildDelegationProtocol = (cfg: tierConfig): string => {
   let taxonomy = buildTaskTaxonomy(cfg)
   let decompose = buildDecomposeHint(cfg)
 
-  let effectiveRules: array<string> = switch modeOpt->Js.Nullable.toOption {
+  let effectiveRules: array<string> = switch modeOpt {
     | None => cfg.rules
     | Some(mode) =>
       switch mode.overrideRules->Js.Nullable.toOption {
@@ -498,9 +501,8 @@ let buildDelegationProtocol = (cfg: tierConfig): string => {
     }
   let rulesLine = {
     let parts: array<string> = []
-    Array.push(parts, "")->ignore
     effectiveRules->Array.forEach(r =>
-      Array.push(parts, `${parts->Array.length->Int.toString}.${r}`)->ignore
+      Array.push(parts, `${(parts->Array.length + 1)->Int.toString}.${r}`)->ignore
     )
     parts->Array.join(" ")
   }

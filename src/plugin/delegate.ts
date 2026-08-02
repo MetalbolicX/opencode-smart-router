@@ -26,7 +26,8 @@ import {
 } from "../escalate/ladder-io";
 import { scrubText } from "../guard/scrub";
 import type { Preset } from "../router/config";
-import { getActiveTiers } from "../router/protocol";
+import type { tierConfig } from "../router/Protocol.res.mjs";
+import { getActiveTiers } from "../router/Protocol.res.mjs";
 import { classifyPromptError } from "../utils/error-classify";
 import { log, logEvent } from "../utils/observability";
 import { resolveTierModelGuard } from "../utils/TierModelGuard.res.mjs";
@@ -172,7 +173,7 @@ export const executeDelegate = async (
 
     const policy = buildEscalatePolicy(activeCfg);
     let state = newLadderState(initialTier, policy);
-    const tiersForCost: Preset = getActiveTiers(activeCfg);
+    const tiersForCost: Preset = getActiveTiers(activeCfg as unknown as tierConfig) as unknown as Preset;
 
     // Independent safety net: even a policy bug cannot loop unbounded.
     const safetyMax =

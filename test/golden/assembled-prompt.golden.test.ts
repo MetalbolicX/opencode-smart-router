@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { assembleSystemPrompt } from "../../src/router/Protocol.res.mjs";
+import type { tierConfig } from "../../src/router/Protocol.res.mjs";
 import type { RouterConfig } from "../../src/router/config";
 import { validateConfig } from "../../src/router/config";
-import { assembleSystemPrompt } from "../../src/router/protocol";
 
 describe("assembled-prompt golden", () => {
   const raw = JSON.parse(readFileSync(join(process.cwd(), "tiers.json"), "utf-8"));
@@ -25,7 +26,7 @@ describe("assembled-prompt golden", () => {
           activePreset: preset,
           activeMode: undefined,
         };
-        expect(assembleSystemPrompt(cfg, modelID)).toMatchSnapshot(
+        expect(assembleSystemPrompt(cfg as unknown as tierConfig, modelID ?? null, false)).toMatchSnapshot(
           `assembled-prompt-${preset}-model-${label}`,
         );
       });
@@ -44,7 +45,7 @@ describe("assembled-prompt golden", () => {
         activePreset: preset,
         activeMode: undefined,
       };
-      expect(assembleSystemPrompt(cfg, modelID, true)).toMatchSnapshot(
+      expect(assembleSystemPrompt(cfg as unknown as tierConfig, modelID, true)).toMatchSnapshot(
         `assembled-prompt-${preset}-enforcement-on`,
       );
     });
@@ -54,14 +55,14 @@ describe("assembled-prompt golden", () => {
   it("default param is byte-identical to assembleSystemPrompt(cfg, m, false)", () => {
     const cfg: RouterConfig = { ...base, activePreset: "anthropic", activeMode: undefined };
     const m = "anthropic/claude-sonnet-4-6";
-    expect(assembleSystemPrompt(cfg, m)).toBe(assembleSystemPrompt(cfg, m, false));
+    expect(assembleSystemPrompt(cfg as unknown as tierConfig, m, false)).toBe(assembleSystemPrompt(cfg as unknown as tierConfig, m, false));
   });
 
   // --- [acceptance] presence: off=absent, on=present ---
   it("off output does NOT contain [acceptance]; enforcement-on output DOES", () => {
     const cfg: RouterConfig = { ...base, activePreset: "anthropic", activeMode: undefined };
     const m = "anthropic/claude-sonnet-4-6";
-    expect(assembleSystemPrompt(cfg, m)).not.toContain("[acceptance]");
-    expect(assembleSystemPrompt(cfg, m, true)).toContain("[acceptance]");
+    expect(assembleSystemPrompt(cfg as unknown as tierConfig, m, false)).not.toContain("[acceptance]");
+    expect(assembleSystemPrompt(cfg as unknown as tierConfig, m, true)).toContain("[acceptance]");
   });
 });

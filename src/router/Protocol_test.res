@@ -109,7 +109,10 @@ test("getActiveTiers: falls back to first preset when activePreset unknown", () 
 
 test("getActiveMode: returns undefined when modes absent", () => {
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(minimalCfg))
-  assertion(~operator="is null", (a, _b) => a == null, result, Js.Nullable.null)
+  switch result {
+  | None => assertionTrue(~operator="result is None", true)
+  | Some(_) => assertionTrue(~operator="result should be None", false)
+  }
 })
 
 test("getActiveMode: returns undefined when activeMode absent", () => {
@@ -120,13 +123,16 @@ test("getActiveMode: returns undefined when activeMode absent", () => {
     defaultTier: "only"
   }`)
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(cfg))
-  assertion(~operator="is null", (a, _b) => a == null, result, Js.Nullable.null)
+  switch result {
+  | None => assertionTrue(~operator="result is None", true)
+  | Some(_) => assertionTrue(~operator="result should be None", false)
+  }
 })
 
 test("getActiveMode: returns active mode when present", () => {
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(richCfg))
-  switch result->Js.Nullable.toOption {
-  | None => assertion(~operator="should not be null", (_a, _b) => false, true, false)
+  switch result {
+  | None => assertionTrue(~operator="should not be None", false)
   | Some(m) => assertionEqual(~operator="defaultTier", "fast", Protocol.modeDefaultTier(m))
   }
 })

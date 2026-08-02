@@ -81,7 +81,11 @@ Test.test("getActiveTiers: falls back to first preset when activePreset unknown"
 
 Test.test("getActiveMode: returns undefined when modes absent", () => {
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(minimalCfg));
-  Test.assertion(undefined, "is null", (a, _b) => a === null, result, null);
+  if (result !== undefined) {
+    return assertionTrue("result should be None", false);
+  } else {
+    return assertionTrue("result is None", true);
+  }
 });
 
 Test.test("getActiveMode: returns undefined when activeMode absent", () => {
@@ -92,15 +96,19 @@ Test.test("getActiveMode: returns undefined when activeMode absent", () => {
     defaultTier: "only"
   };
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(cfg));
-  Test.assertion(undefined, "is null", (a, _b) => a === null, result, null);
+  if (result !== undefined) {
+    return assertionTrue("result should be None", false);
+  } else {
+    return assertionTrue("result is None", true);
+  }
 });
 
 Test.test("getActiveMode: returns active mode when present", () => {
   let result = Protocol.getActiveMode(Protocol.tierConfigFromDict(richCfg));
-  if (result == null) {
-    return Test.assertion(undefined, "should not be null", (_a, _b) => false, true, false);
-  } else {
+  if (result !== undefined) {
     return assertionEqual("defaultTier", "fast", Protocol.modeDefaultTier(result));
+  } else {
+    return assertionTrue("should not be None", false);
   }
 });
 

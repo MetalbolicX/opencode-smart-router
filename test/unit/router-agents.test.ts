@@ -13,10 +13,10 @@ import {
 import type { Preset, RouterConfig } from "../../src/router/config";
 import type { TierConfig } from "../../src/router/config.types";
 import {
-  CLAUDE_ANTI_NARRATION,
-  CLAUDE_TIER_PREFIX,
+  claudeAntiNarration,
+  claudeTierPrefix,
   isClaudeModel,
-} from "../../src/router/protocol";
+} from "../../src/router/Protocol.res.mjs";
 
 let tmpHome: string;
 let tmpCwd: string;
@@ -205,7 +205,7 @@ describe("registerTierAgents", () => {
 
     registerTierAgents(opencodeConfig, preset, cfg);
 
-    const expectedPrefix = `${CLAUDE_TIER_PREFIX["fast"]}\n\n${CLAUDE_ANTI_NARRATION}`;
+    const expectedPrefix = `${claudeTierPrefix["fast"]}\n\n${claudeAntiNarration}`;
     expect(opencodeConfig.agent?.fast?.prompt).toContain(expectedPrefix);
     expect(opencodeConfig.agent?.fast?.prompt).toContain("original prompt");
   });
@@ -457,14 +457,14 @@ describe("registerTierAgents — five tiers with five Claude prefixes", () => {
   it("applies light Claude prefix to light-tier Claude model", () => {
     const opencodeConfig: Record<string, any> = {};
     registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
-    const expectedPrefix = `${CLAUDE_TIER_PREFIX["light"]}\n\n${CLAUDE_ANTI_NARRATION}`;
+    const expectedPrefix = `${claudeTierPrefix["light"]}\n\n${claudeAntiNarration}`;
     expect(opencodeConfig.agent?.light?.prompt).toContain(expectedPrefix);
   });
 
   it("applies focused Claude prefix to focused-tier Claude model", () => {
     const opencodeConfig: Record<string, any> = {};
     registerTierAgents(opencodeConfig, fiveTierPreset, fiveTierCfg);
-    const expectedPrefix = `${CLAUDE_TIER_PREFIX["focused"]}\n\n${CLAUDE_ANTI_NARRATION}`;
+    const expectedPrefix = `${claudeTierPrefix["focused"]}\n\n${claudeAntiNarration}`;
     expect(opencodeConfig.agent?.focused?.prompt).toContain(expectedPrefix);
   });
 

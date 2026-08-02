@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
 import { readMergedConfig } from "../../src/router/config-loader";
-import { getActiveTiers } from "../../src/router/protocol";
+import { getActiveTiers } from "../../src/router/Protocol.res.mjs";
+import type { tierConfig } from "../../src/router/Protocol.res.mjs";
 import { createSessionStore } from "../../src/router/sessions";
 
 /**
@@ -26,7 +27,7 @@ describe("trajectory wiring (Phase 0.3, record-only)", () => {
   it("GA-1: emitted cap banner is byte-identical with trajectory wiring active", async () => {
     const plugin: any = await ModelRouterPlugin({} as any);
     const cfg = await readMergedConfig({ cwd: process.cwd() });
-    const tierNames = Object.keys(getActiveTiers(cfg));
+    const tierNames = Object.keys(getActiveTiers(cfg as unknown as tierConfig));
     const ref = createSessionStore();
 
     const msg = { agent: "fast", sessionID: "ses_ga1" };
