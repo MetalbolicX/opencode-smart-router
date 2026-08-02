@@ -52,6 +52,15 @@ import {
   validateTierPrompts as validateTierPromptsReScript,
   validateTaskPatterns as validateTaskPatternsReScript,
 } from "../validate/ValidateSimple.res.mjs";
+import {
+  validateEnforcement as validateEnforcementReScript,
+  validateEnforcementMode as validateEnforcementModeReScript,
+  validateEnforcementVerify as validateEnforcementVerifyReScript,
+  validateEnforcementEscalate as validateEnforcementEscalateReScript,
+  validateEnforcementPerTier as validateEnforcementPerTierReScript,
+  validateEnforcementGuard as validateEnforcementGuardReScript,
+  validateEscalateCostCeiling as validateEscalateCostCeilingReScript,
+} from "../validate/ValidateEnforcement.res.mjs";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -198,139 +207,42 @@ export const validateTaskPatterns = (obj: Record<string, unknown>): void => {
 // ---------------------------------------------------------------------------
 
 export const validateEnforcement = (obj: Record<string, unknown>): void => {
-  if (obj.enforcement === undefined) return;
-  if (!isPlainObject(obj.enforcement) || Array.isArray(obj.enforcement)) {
-    throw new Error("tiers.json: enforcement must be an object");
-  }
-  const enf = obj.enforcement;
-  validateEnforcementMode(enf);
-  validateEnforcementVerify(enf);
-  validateEnforcementEscalate(enf);
-  validateEnforcementPerTier(enf);
-  validateEnforcementGuard(enf);
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementReScript(obj);
 };
 
 export const validateEnforcementMode = (enf: Record<string, unknown>): void => {
-  if (enf.mode === undefined) return;
-  if (
-    typeof enf.mode !== "string" ||
-    !(ENFORCEMENT_MODES as readonly string[]).includes(enf.mode)
-  ) {
-    throw new Error(`tiers.json: enforcement.mode must be one of ${ENFORCEMENT_MODES_LIST}`);
-  }
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementModeReScript(enf);
 };
 
 export const validateEnforcementVerify = (enf: Record<string, unknown>): void => {
-  if (enf.verify === undefined) return;
-  // Permissive skip: a non-object verify is ignored so older configs survive.
-  if (!isPlainObject(enf.verify)) return;
-  const verify = enf.verify;
-  if (
-    verify.graderPolicy !== undefined &&
-    !(GRADER_POLICIES as readonly string[]).includes(verify.graderPolicy as string)
-  ) {
-    throw new Error(
-      `tiers.json: enforcement.verify.graderPolicy must be "${EXPECTED_GRADER_POLICY}"`,
-    );
-  }
-  if (verify.require !== undefined) {
-    if (
-      typeof verify.require !== "string" ||
-      !(VERIFY_REQUIRE_MODES as readonly string[]).includes(verify.require)
-    ) {
-      throw new Error(
-        `tiers.json: enforcement.verify.require must be one of ${VERIFY_REQUIRE_MODES_LIST} (got ${JSON.stringify(verify.require)})`,
-      );
-    }
-  }
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementVerifyReScript(enf);
 };
 
 export const validateEnforcementEscalate = (enf: Record<string, unknown>): void => {
-  if (enf.escalate === undefined) return;
-  // Permissive skip: a non-object escalate is ignored so older configs survive.
-  if (!isPlainObject(enf.escalate)) return;
-  const escalate = enf.escalate;
-  validateEscalateCostCeiling(escalate);
-  if (escalate.ladder !== undefined) {
-    if (
-      !Array.isArray(escalate.ladder) ||
-      !escalate.ladder.every((s: unknown) => typeof s === "string")
-    ) {
-      throw new Error("tiers.json: enforcement.escalate.ladder must be an array of strings");
-    }
-  }
-  if (escalate.maxAttemptsPerTier !== undefined) {
-    if (
-      typeof escalate.maxAttemptsPerTier !== "number" ||
-      !Number.isInteger(escalate.maxAttemptsPerTier) ||
-      escalate.maxAttemptsPerTier < 0
-    ) {
-      throw new Error(
-        "tiers.json: enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
-      );
-    }
-  }
-  if (escalate.maxTotalAttempts !== undefined) {
-    if (
-      typeof escalate.maxTotalAttempts !== "number" ||
-      !Number.isInteger(escalate.maxTotalAttempts) ||
-      escalate.maxTotalAttempts < 1
-    ) {
-      throw new Error("tiers.json: enforcement.escalate.maxTotalAttempts must be an integer >= 1");
-    }
-  }
-  if (
-    escalate.floorTier !== undefined &&
-    escalate.floorTier !== null &&
-    typeof escalate.floorTier !== "string"
-  ) {
-    throw new Error("tiers.json: enforcement.escalate.floorTier must be a string or null");
-  }
-};
-
-export const validateEscalateCostCeiling = (escalate: Record<string, unknown>): void => {
-  if (escalate.costCeiling === undefined) return;
-  // Permissive skip: a non-object costCeiling is ignored so older configs survive.
-  if (!isPlainObject(escalate.costCeiling)) return;
-  const costCeiling = escalate.costCeiling;
-  if (costCeiling.multiple !== undefined) {
-    if (typeof costCeiling.multiple !== "number" || costCeiling.multiple <= 0) {
-      throw new Error("tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0");
-    }
-  }
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementEscalateReScript(enf);
 };
 
 export const validateEnforcementPerTier = (enf: Record<string, unknown>): void => {
-  if (enf.perTier === undefined) return;
-  // Permissive skip: a non-object perTier is ignored so older configs survive.
-  if (!isPlainObject(enf.perTier) || Array.isArray(enf.perTier)) return;
-  for (const [tierName, tierMode] of Object.entries(enf.perTier)) {
-    if (
-      typeof tierMode !== "string" ||
-      !(ENFORCEMENT_MODES as readonly string[]).includes(tierMode)
-    ) {
-      throw new Error(
-        `tiers.json: enforcement.perTier.${tierName} must be one of ${ENFORCEMENT_MODES_LIST}`,
-      );
-    }
-  }
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementPerTierReScript(enf);
 };
 
 export const validateEnforcementGuard = (enf: Record<string, unknown>): void => {
-  if (enf.guard === undefined) return;
-  // Permissive skip: a non-object guard is ignored so older configs survive.
-  if (!isPlainObject(enf.guard)) return;
-  const guard = enf.guard;
-  if (guard.budget !== undefined) {
-    if (typeof guard.budget !== "number" || !Number.isFinite(guard.budget) || guard.budget < 1) {
-      throw new Error("enforcement.guard.budget must be a number >= 1");
-    }
-  }
-  if (guard.blockScriptWrites !== undefined) {
-    if (typeof guard.blockScriptWrites !== "boolean") {
-      throw new Error("enforcement.guard.blockScriptWrites must be a boolean");
-    }
-  }
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEnforcementGuardReScript(enf);
+};
+
+// ---------------------------------------------------------------------------
+// Enforcement helpers (internal, called by validateEnforcementEscalate)
+// ---------------------------------------------------------------------------
+
+export const validateEscalateCostCeiling = (escalate: Record<string, unknown>): void => {
+  // Delegate to ReScript implementation (ValidateEnforcement.res.mjs)
+  validateEscalateCostCeilingReScript(escalate);
 };
 
 // ---------------------------------------------------------------------------

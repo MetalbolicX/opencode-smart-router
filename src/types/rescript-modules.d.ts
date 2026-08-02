@@ -552,6 +552,35 @@ declare module "*ValidateSimple.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// ENFORCEMENT section validators: validateEnforcement, validateEnforcementMode,
+// validateEnforcementVerify, validateEnforcementEscalate, validateEnforcementPerTier,
+// validateEnforcementGuard. Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// ---------------------------------------------------------------------------
+declare module "*ValidateEnforcement.res.mjs" {
+  // Top-level enforcement dispatcher. Throws if enforcement is present but not a plain object.
+  export const validateEnforcement: (obj: Record<string, unknown>) => void;
+
+  // Validate enforcement.mode in {off, advisory, enforced}. Silently skips if absent.
+  export const validateEnforcementMode: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.verify block (optional). Permissive: non-object verify values are ignored.
+  export const validateEnforcementVerify: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.escalate block (optional). Permissive: non-object escalate values are ignored.
+  export const validateEnforcementEscalate: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.perTier block (optional). Permissive: non-object perTier values are ignored.
+  export const validateEnforcementPerTier: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.guard block (optional). Permissive: non-object guard values are ignored.
+  export const validateEnforcementGuard: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.escalate.costCeiling block (optional).
+  // Permissive: non-object costCeiling values are ignored.
+  export const validateEscalateCostCeiling: (escalate: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
