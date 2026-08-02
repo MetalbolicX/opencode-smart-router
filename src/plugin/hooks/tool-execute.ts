@@ -21,7 +21,7 @@
 // `handleToolExecuteAfter` stays as-is.
 // ---------------------------------------------------------------------------
 
-import { guardAfterCall } from "../../guard/enforce";
+import { guardAfterCall } from "../../guard/Guard.res.mjs";
 import { restoreAgentBaseline } from "../../router/agents";
 import { READ_ONLY_TOOLS } from "../../router/tools";
 import { log } from "../../utils/observability";
@@ -136,8 +136,8 @@ export const handleToolExecuteAfter = async (
         tier: ctx.sessionStore.getTier(sid),
         sessionID: sid,
         tool,
-        toolArgs: input?.args,
-        output,
+        toolArgs: input?.args as Record<string, unknown> | null,
+        output: { output: (output as Record<string, unknown>).output as unknown | null },
         store: ctx.guardStore,
       });
     } catch {

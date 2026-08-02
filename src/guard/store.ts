@@ -1,5 +1,5 @@
-import type { GuardPolicy, GuardState } from "./guards";
-import { newGuardState } from "./guards";
+import type { GuardPolicy, GuardState } from "./Guard.res.mjs";
+import { newGuardState } from "./Guard.res.mjs";
 
 /**
  * Per-plugin-instance store of guard state, keyed by sessionID. Mirrors the
