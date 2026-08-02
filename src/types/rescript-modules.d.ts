@@ -828,3 +828,82 @@ declare module "*Guard.res.mjs" {
     store: guardStoreLike;
   }) => void;
 }
+
+declare module "*Protocol.res.mjs" {
+  // Tier definition
+  export type tierDef = {
+    model: string;
+    variant: string | null;
+    costRatio: number | null;
+    description: string;
+    whenToUse: string[];
+  };
+
+  // Mode configuration
+  export type modeConfig = {
+    defaultTier: string;
+    description: string;
+    overrideRules: string[] | null;
+  };
+
+  // Verify configuration
+  export type verifyConfig = {
+    requireExplicitDoD: boolean | null;
+  };
+
+  // Enforcement configuration
+  export type enforcementConfig = {
+    verify: verifyConfig | null;
+  };
+
+  // Fallback configuration
+  export type fallbackConfig = {
+    global: Record<string, string[]> | null;
+    presets: Record<string, Record<string, string[]>> | null;
+  };
+
+  // Tier configuration (root config shape for Protocol)
+  export type tierConfig = {
+    activePreset: string;
+    activeMode: string | null;
+    presets: Record<string, Record<string, tierDef>>;
+    rules: string[];
+    defaultTier: string;
+    fallback: fallbackConfig | null;
+    taskPatterns: Record<string, string[]> | null;
+    modes: Record<string, modeConfig> | null;
+    enforcement: enforcementConfig | null;
+  };
+
+  // Tier / mode helpers
+  export const tierConfigFromDict: (raw: Record<string, any>) => tierConfig;
+  export const modeDefaultTier: (mode: modeConfig) => string;
+  export const getActiveTiers: (tierConfig: tierConfig) => Record<string, tierDef>;
+  export const getActiveMode: (tierConfig: tierConfig) => modeConfig | null;
+
+  // Fallback instructions builder
+  export const buildFallbackInstructions: (tierConfig: tierConfig) => string;
+
+  // Cost & taxonomy builders
+  export const buildTaskTaxonomy: (tierConfig: tierConfig) => string;
+  export const buildDecomposeHint: (tierConfig: tierConfig) => string;
+
+  // System prompt builder
+  export const buildDelegationProtocol: (tierConfig: tierConfig) => string;
+
+  // Claude-model helpers
+  export const isClaudeModel: (model: string | null) => boolean;
+  export const claudeTierPrefix: Record<string, string>;
+  export const claudeOrchestratorPrefix: string;
+  export const claudeAntiNarration: string;
+
+  // DoD protocol section
+  export const buildDoDProtocolSection: (tierConfig: tierConfig) => string;
+
+  // Assembled system prompt
+  export const assembleSystemPrompt: (
+    tierConfig: tierConfig,
+    claudeVersion: string | null,
+    hasFallback: boolean,
+  ) => string;
+}
