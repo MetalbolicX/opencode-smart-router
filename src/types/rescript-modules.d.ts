@@ -533,6 +533,25 @@ declare module "*ValidateModes.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// ValidateSimple (src/validate/ValidateSimple.res)
+// SIMPLE section validators: validateTierCaps, validateTierPrompts,
+// validateTaskPatterns. Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// ---------------------------------------------------------------------------
+declare module "*ValidateSimple.res.mjs" {
+  // Validate the tierCaps block: each cap must be a finite positive integer.
+  // tierCaps is optional — no-op if absent.
+  export const validateTierCaps: (obj: Record<string, unknown>) => void;
+
+  // Validate the tierPrompts block: each prompt must be a string.
+  // tierPrompts is optional — no-op if absent.
+  export const validateTierPrompts: (obj: Record<string, unknown>) => void;
+
+  // Validate the taskPatterns block: each patterns value must be an array of strings.
+  // taskPatterns is optional — no-op if absent.
+  export const validateTaskPatterns: (obj: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
