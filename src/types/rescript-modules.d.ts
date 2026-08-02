@@ -492,6 +492,19 @@ declare module "*Reasoning.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// ValidateRoot (src/validate/ValidateRoot.res)
+// ROOT section validators: validateRootFields and validateRulesAndDefaultTier.
+// Input is Js.Dict.t<Js.Json.t> (maps to TS Record<string, unknown>).
+// ---------------------------------------------------------------------------
+declare module "*ValidateRoot.res.mjs" {
+  // Validate root-level activePreset is a non-empty string
+  export const validateRootFields: (obj: Record<string, unknown>) => void;
+
+  // Validate rules (array of strings) and defaultTier (string)
+  export const validateRulesAndDefaultTier: (obj: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.

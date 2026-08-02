@@ -34,6 +34,10 @@ import type {
   RouterConfig,
 } from "./config.types";
 import { ENFORCEMENT_MODES, GRADER_POLICIES, VERIFY_REQUIRE_MODES } from "./config-resolve";
+import {
+  validateRootFields as validateRootFieldsReScript,
+  validateRulesAndDefaultTier as validateRulesAndDefaultTierReScript,
+} from "../validate/ValidateRoot.res.mjs";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -76,19 +80,18 @@ export const validateConfig = (raw: unknown): RouterConfig => {
 // Root scalars
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Root scalars — wired to ValidateRoot.res.mjs
+// ---------------------------------------------------------------------------
+
 export const validateRootFields = (obj: Record<string, unknown>): void => {
-  if (typeof obj.activePreset !== "string" || !obj.activePreset) {
-    throw new Error("tiers.json: 'activePreset' must be a non-empty string");
-  }
+  // Delegate to ReScript implementation (ValidateRoot.res.mjs)
+  validateRootFieldsReScript(obj);
 };
 
 export const validateRulesAndDefaultTier = (obj: Record<string, unknown>): void => {
-  if (!Array.isArray(obj.rules)) {
-    throw new Error("tiers.json: 'rules' must be an array of strings");
-  }
-  if (typeof obj.defaultTier !== "string") {
-    throw new Error("tiers.json: 'defaultTier' must be a string");
-  }
+  // Delegate to ReScript implementation (ValidateRoot.res.mjs)
+  validateRulesAndDefaultTierReScript(obj);
 };
 
 // ---------------------------------------------------------------------------
