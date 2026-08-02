@@ -1,6 +1,6 @@
 import type { resolvedReasoning as ResolvedReasoning } from "../reasoning/Reasoning.res.mjs";
+import { claudeAntiNarration, claudeTierPrefix, isClaudeModel } from "./Protocol.res.mjs";
 import type { Preset, RouterConfig, TierConfig } from "./config";
-import { CLAUDE_ANTI_NARRATION, CLAUDE_TIER_PREFIX, isClaudeModel } from "./protocol";
 
 // ---------------------------------------------------------------------------
 // Build agent options from tier config
@@ -125,7 +125,7 @@ export const registerTierAgents = (
     // Detection is by model string, so hybrid presets get the override
     // only on their Claude-backed tiers.
     const claudePrefix = isClaudeModel(tier.model)
-      ? `${CLAUDE_TIER_PREFIX[name]}\n\n${CLAUDE_ANTI_NARRATION}`
+      ? `${claudeTierPrefix[name]}\n\n${claudeAntiNarration}`
       : undefined;
     const finalPrompt =
       claudePrefix && resolvedPrompt

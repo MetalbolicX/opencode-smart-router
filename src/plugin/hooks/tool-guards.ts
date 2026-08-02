@@ -31,7 +31,9 @@ import type { adaptiveSignals as AdaptiveSignals } from "../../reasoning/Reasoni
 // Value imports from ReScript facade
 import { selectAdaptiveLevel, normalizeSignalText, resolveReasoningOverride } from "../../reasoning/Reasoning.res.mjs";
 import { applyReasoningPatch } from "../../router/agents";
-import { getActiveTiers } from "../../router/protocol";
+import type { TierConfig } from "../../router/config";
+import type { tierConfig } from "../../router/Protocol.res.mjs";
+import { getActiveTiers } from "../../router/Protocol.res.mjs";
 import { READ_ONLY_TOOLS } from "../../router/tools";
 import { log } from "../../utils/observability";
 import { resolveTierModelGuard } from "../../utils/TierModelGuard.res.mjs";
@@ -132,7 +134,7 @@ export const applyOrchestratorReasoningPatch = async (params: {
           }
 
           const cfg = await ctx.getConfig();
-          const tiers = getActiveTiers(cfg);
+          const tiers = getActiveTiers(cfg as unknown as tierConfig) as unknown as Record<string, TierConfig>;
           const tier = tiers[subagentType];
           if (tier) {
             // Defense-in-depth runtime guard (PR 2 of fix-task-model-fallback-cleanup).

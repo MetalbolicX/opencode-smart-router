@@ -58,7 +58,7 @@ let modeDefaultTier: (modeConfig) => string
 
 let getActiveTiers: (tierConfig) => Js.Dict.t<tierDef>
 
-let getActiveMode: (tierConfig) => Js.Nullable.t<modeConfig>
+let getActiveMode: (tierConfig) => option<modeConfig>
 
 // ---------------------------------------------------------------------------
 // Fallback instructions builder

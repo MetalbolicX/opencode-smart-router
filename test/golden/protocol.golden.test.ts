@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildDelegationProtocol } from "../../src/router/Protocol.res.mjs";
+import type { tierConfig } from "../../src/router/Protocol.res.mjs";
 import type { RouterConfig } from "../../src/router/config";
 import { validateConfig } from "../../src/router/config";
-import { buildDelegationProtocol } from "../../src/router/protocol";
 
 describe("protocol golden", () => {
   const raw = JSON.parse(readFileSync(join(process.cwd(), "tiers.json"), "utf-8"));
@@ -16,7 +17,7 @@ describe("protocol golden", () => {
         activePreset: preset,
         activeMode: undefined,
       };
-      expect(buildDelegationProtocol(cfg)).toMatchSnapshot(`protocol-${preset}`);
+      expect(buildDelegationProtocol(cfg as unknown as tierConfig)).toMatchSnapshot(`protocol-${preset}`);
     });
   }
 
@@ -27,7 +28,7 @@ describe("protocol golden", () => {
         activePreset: "anthropic",
         activeMode: m,
       };
-      expect(buildDelegationProtocol(cfg)).toMatchSnapshot(`protocol-anthropic-mode-${m}`);
+      expect(buildDelegationProtocol(cfg as unknown as tierConfig)).toMatchSnapshot(`protocol-anthropic-mode-${m}`);
     });
   }
 });

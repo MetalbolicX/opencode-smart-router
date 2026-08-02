@@ -4,6 +4,7 @@ import * as Js_dict from "@rescript/runtime/lib/es6/Js_dict.js";
 import * as Js_json from "@rescript/runtime/lib/es6/Js_json.js";
 import * as Stdlib_Option from "@rescript/runtime/lib/es6/Stdlib_Option.js";
 import * as Primitive_float from "@rescript/runtime/lib/es6/Primitive_float.js";
+import * as Primitive_option from "@rescript/runtime/lib/es6/Primitive_option.js";
 
 function optString(json) {
   let s = Js_json.decodeString(json);
@@ -289,16 +290,14 @@ function getActiveMode(cfg) {
   let match = cfg.modes;
   let match$1 = cfg.activeMode;
   if (match == null) {
-    return null;
+    return;
   }
   if (match$1 == null) {
-    return null;
+    return;
   }
   let mode = Js_dict.get(match, match$1);
   if (mode !== undefined) {
     return mode;
-  } else {
-    return null;
   }
 }
 
@@ -308,20 +307,24 @@ function buildFallbackInstructions(cfg) {
     return "";
   }
   let fbPresets = fb.presets;
-  if (fbPresets == null) {
+  let presetMap = !(fbPresets == null) ? Js_dict.get(fbPresets, cfg.activePreset) : undefined;
+  let map;
+  if (presetMap !== undefined) {
+    let keys = Object.keys(presetMap);
+    map = keys.length !== 0 ? presetMap : Primitive_option.fromNullable(fb.global);
+  } else {
+    map = Primitive_option.fromNullable(fb.global);
+  }
+  if (map === undefined) {
     return "";
   }
-  let presetMap = Js_dict.get(fbPresets, cfg.activePreset);
-  if (presetMap === undefined) {
-    return "";
-  }
-  let innerKeys = Object.keys(presetMap);
-  let map = innerKeys.length !== 0 ? presetMap : fb.global;
-  if (map == null) {
-    return "";
-  }
-  let chains = Js_dict.entries(map).map(param => {
-    let valid = param[1].filter(p => {
+  let chains = [];
+  Js_dict.entries(map).forEach(param => {
+    let presetOrder = param[1];
+    if (!Array.isArray(presetOrder)) {
+      return;
+    }
+    let valid = presetOrder.filter(p => {
       if (p !== cfg.activePreset) {
         return Stdlib_Option.isSome(Js_dict.get(cfg.presets, p));
       } else {
@@ -329,15 +332,11 @@ function buildFallbackInstructions(cfg) {
       }
     });
     if (valid.length !== 0) {
-      return [
-        param[0] + `→` + valid.join("→"),
+      chains.push([
+        param[0] + "→" + valid.join("→"),
         valid
-      ];
-    } else {
-      return [
-        "",
-        []
-      ];
+      ]);
+      return;
     }
   });
   let validChains = chains.map(param => param[0]).filter(s => s !== "");
@@ -371,11 +370,11 @@ function buildTaskTaxonomy(cfg) {
 function buildDecomposeHint(cfg) {
   let modeOpt = getActiveMode(cfg);
   let hasOverrideRules;
-  if (modeOpt == null) {
-    hasOverrideRules = false;
-  } else {
+  if (modeOpt !== undefined) {
     let rules = modeOpt.overrideRules;
     hasOverrideRules = (rules == null) ? false : rules.length !== 0;
+  } else {
+    hasOverrideRules = false;
   }
   if (hasOverrideRules) {
     return "";
@@ -391,7 +390,7 @@ function buildDecomposeHint(cfg) {
     let aRatio = (r == null) ? 1.0 : r;
     let r$1 = param$1[1].costRatio;
     let bRatio = (r$1 == null) ? 1.0 : r$1;
-    return Primitive_float.compare(bRatio, aRatio);
+    return Primitive_float.compare(aRatio, bRatio);
   });
   let match = entriesCopy[0];
   let cheapestName = match[0];
@@ -424,16 +423,15 @@ function buildDelegationProtocol(cfg) {
   let taxonomy = buildTaskTaxonomy(cfg);
   let decompose = buildDecomposeHint(cfg);
   let effectiveRules;
-  if (modeOpt == null) {
-    effectiveRules = cfg.rules;
-  } else {
+  if (modeOpt !== undefined) {
     let rules = modeOpt.overrideRules;
     effectiveRules = (rules == null) || rules.length === 0 ? cfg.rules : rules;
+  } else {
+    effectiveRules = cfg.rules;
   }
   let parts = [];
-  parts.push("");
   effectiveRules.forEach(r => {
-    parts.push(parts.length.toString() + `.` + r);
+    parts.push((parts.length + 1 | 0).toString() + `.` + r);
   });
   let rulesLine = parts.join(" ");
   let fallback = buildFallbackInstructions(cfg);

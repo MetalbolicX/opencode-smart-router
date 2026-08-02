@@ -26,7 +26,8 @@ import {
 import type { RouterConfig } from "../router/config";
 import { resolveEnforcementMode } from "../router/enforcement";
 import { resolveLadder } from "../router/TierLadder.res.mjs";
-import { getActiveTiers } from "../router/protocol";
+import type { tierConfig } from "../router/Protocol.res.mjs";
+import { getActiveTiers } from "../router/Protocol.res.mjs";
 import { WRITE_TOOLS } from "../router/tools";
 import { logEvent } from "../utils/observability";
 import { resolveTierModelGuard } from "../utils/TierModelGuard.res.mjs";
@@ -159,7 +160,7 @@ export const tierModel = (
   cfg: RouterConfig,
   tierName: string,
 ): { providerID: string; modelID: string } | null => {
-  const tiers = getActiveTiers(cfg);
+  const tiers = getActiveTiers(cfg as unknown as tierConfig);
   const t = tiers[tierName];
   if (!t || typeof t.model !== "string") return null;
   const slash = t.model.indexOf("/");

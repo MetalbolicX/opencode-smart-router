@@ -31,9 +31,10 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createGuardStore } from "../guard/store";
 import { createReasoningStore } from "../reasoning/store";
+import type { tierConfig } from "../router/Protocol.res.mjs";
 import type { Preset, RouterConfig } from "../router/config";
 import { createConfigStore } from "../router/config-store";
-import { getActiveTiers } from "../router/protocol";
+import { getActiveTiers } from "../router/Protocol.res.mjs";
 import { createSessionStore } from "../router/sessions";
 import { createTrajectoryStore } from "../telemetry/trajectory";
 import { createFsSeam } from "../utils/fs";
@@ -157,7 +158,7 @@ export const createPluginContext = async (plugin: PluginInput): Promise<PluginCo
     cwd: plugin.directory ?? process.cwd(),
   });
   const initialConfig = await configStore.read();
-  const activeTiersAtLoad = getActiveTiers(initialConfig);
+  const activeTiersAtLoad = getActiveTiers(initialConfig as unknown as tierConfig) as unknown as Preset;
 
   // Build the context as a literal with method-shorthand syntax so
   // `getFreshConfig` can call `this.refreshConfig()` / `this.getConfig()`
