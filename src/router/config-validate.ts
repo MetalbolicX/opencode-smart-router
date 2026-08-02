@@ -47,6 +47,11 @@ import {
   validateModes as validateModesReScript,
   validateMode as validateModeReScript,
 } from "../validate/ValidateModes.res.mjs";
+import {
+  validateTierCaps as validateTierCapsReScript,
+  validateTierPrompts as validateTierPromptsReScript,
+  validateTaskPatterns as validateTaskPatternsReScript,
+} from "../validate/ValidateSimple.res.mjs";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -77,9 +82,9 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   validatePresets(raw);
   validateRulesAndDefaultTier(raw);
   validateModes(raw);
-  validateTierCaps(raw);
-  validateTierPrompts(raw);
-  validateTaskPatterns(raw);
+  validateTierCapsReScript(raw);
+  validateTierPromptsReScript(raw);
+  validateTaskPatternsReScript(raw);
   validateEnforcement(raw);
   validateReasoningPolicy(raw);
   return raw as unknown as RouterConfig;
