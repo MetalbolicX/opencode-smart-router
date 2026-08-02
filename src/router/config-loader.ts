@@ -34,7 +34,7 @@ export const isPlainObject = (v: unknown): v is Record<string, unknown> => {
 import { globalConfigPath, resolveConfigPaths } from "./config-paths";
 import { resolvePresetName } from "./config-resolve";
 import { readState } from "./config-state";
-import { validateConfig } from "./config-validate";
+import { validateConfig } from "../validate/Validate.res.mjs";
 import { isValidEnforcementMode } from "./enforcement";
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,8 @@ export const readMergedConfig = async (opts: { cwd: string }): Promise<RouterCon
   const local = await readConfigLayer(layers[2]!);
 
   const mergedManual = deepMergeConfig(deepMergeConfig(bundled, global), local);
-  const cfg = validateConfig(mergedManual);
+  // validateConfig returns Record<string, unknown>; caller casts to RouterConfig via ABI
+  const cfg = validateConfig(mergedManual as Record<string, unknown>) as unknown as RouterConfig;
 
   // Runtime state overlays only its owned fields and never mutates tiers.json.
   const state = await readState();

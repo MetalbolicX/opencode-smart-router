@@ -612,6 +612,98 @@ declare module "*ValidateReasoning.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// Validate (src/validate/Validate.res)
+// Public facade re-exporting all validators from the six sub-modules.
+// Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.
+// ---------------------------------------------------------------------------
+declare module "*Validate.res.mjs" {
+  import type { RouterConfig } from "../router/config.types";
+
+  // Note: validateConfig returns Record<string, unknown> at the .res.mjs boundary.
+  // The TS consumer (config-loader.ts) casts it to RouterConfig via
+  // `as unknown as RouterConfig`, preserving the old TS API contract.
+  // The return type below reflects the TS consumer's view, not the raw ReScript output.
+  export function validateConfig(obj: Record<string, unknown>): RouterConfig;
+  // Validate the root-level scalar fields: activePreset must be a non-empty string.
+  export const validateRootFields: (obj: Record<string, unknown>) => void;
+
+  // Validate rules (array of strings) and defaultTier (string).
+  export const validateRulesAndDefaultTier: (obj: Record<string, unknown>) => void;
+
+  // Validate the top-level presets block.
+  export const validatePresets: (obj: Record<string, unknown>) => void;
+
+  // Validate a single preset (named by presetName for error messages).
+  export const validatePreset: (presetName: string, preset: Record<string, unknown>) => void;
+
+  // Validate a single tier within a preset.
+  export const validateTier: (presetName: string, tierName: string, tier: Record<string, unknown>) => void;
+
+  // Validate the top-level modes block.
+  export const validateModes: (obj: Record<string, unknown>) => void;
+
+  // Validate a single mode (named by modeName for error messages).
+  export const validateMode: (modeName: string, mode: Record<string, unknown>) => void;
+
+  // Validate the tierCaps block: each cap must be a finite positive integer.
+  // tierCaps is optional — no-op if absent.
+  export const validateTierCaps: (obj: Record<string, unknown>) => void;
+
+  // Validate the tierPrompts block: each prompt must be a string.
+  // tierPrompts is optional — no-op if absent.
+  export const validateTierPrompts: (obj: Record<string, unknown>) => void;
+
+  // Validate the taskPatterns block: each patterns value must be an array of strings.
+  // taskPatterns is optional — no-op if absent.
+  export const validateTaskPatterns: (obj: Record<string, unknown>) => void;
+
+  // Top-level enforcement dispatcher. Throws if enforcement is present but not a plain object.
+  export const validateEnforcement: (obj: Record<string, unknown>) => void;
+
+  // Validate enforcement.mode in {off, advisory, enforced}. Silently skips if absent.
+  export const validateEnforcementMode: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.verify block (optional). Permissive: non-object verify values are ignored.
+  export const validateEnforcementVerify: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.escalate block (optional). Permissive: non-object escalate values are ignored.
+  export const validateEnforcementEscalate: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.perTier block (optional). Permissive: non-object perTier values are ignored.
+  export const validateEnforcementPerTier: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.guard block (optional). Permissive: non-object guard values are ignored.
+  export const validateEnforcementGuard: (enf: Record<string, unknown>) => void;
+
+  // Validate enforcement.escalate.costCeiling block (optional).
+  // Permissive: non-object costCeiling values are ignored.
+  export const validateEscalateCostCeiling: (escalate: Record<string, unknown>) => void;
+
+  // Top-level reasoningPolicy dispatcher. Throws if reasoningPolicy is present but not a plain object.
+  export const validateReasoningPolicy: (obj: Record<string, unknown>) => void;
+
+  // Validate reasoningPolicy.mode in {static, manual, adaptive}. Silently skips if absent.
+  export const validateReasoningPolicyMode: (policy: Record<string, unknown>) => void;
+
+  // Validate reasoningPolicy.adaptive block (optional). Validates trivialLevel, defaultLevel,
+  // keywordRules, tierDefaults, surfaceDecision.
+  export const validateAdaptivePolicy: (policy: Record<string, unknown>) => void;
+
+  // Validate adaptive.keywordRules array (optional). Called internally by validateAdaptivePolicy.
+  export const validateKeywordRules: (adaptive: Record<string, unknown>) => void;
+
+  // Validate a single keyword rule at a given array index.
+  // Used internally and by TS config-validate for per-rule error messages.
+  export const validateKeywordRule: (ruleJson: unknown, index: number) => void;
+
+  // Validate adaptive.tierDefaults object (optional). Each value must be a reasoning level string.
+  export const validateAdaptiveTierDefaults: (adaptive: Record<string, unknown>) => void;
+
+  // Validate adaptive.surfaceDecision (optional). Must be a boolean if present.
+  export const validateAdaptiveSurfaceDecision: (adaptive: Record<string, unknown>) => void;
+}
+
+// ---------------------------------------------------------------------------
 // Guard (src/guard/Guard.res)
 // Guard engine: threat matrix, state tracking, before/after hooks.
 // Uses Js.Nullable.t<T> at ABI boundary for explicit null handling.

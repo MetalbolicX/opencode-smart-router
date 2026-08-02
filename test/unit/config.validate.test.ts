@@ -52,7 +52,8 @@ describe("validateConfig — root shape", () => {
     ["a number", 5],
     ["undefined", undefined],
   ])("throws when root is %s", (_label, raw) => {
-    expect(() => validateConfig(raw)).toThrow();
+    // Cast through unknown since the ABI bridge narrows the parameter type to Record<string, unknown>
+    expect(() => validateConfig(raw as unknown as Record<string, unknown>)).toThrow();
   });
 
   it("throws on empty/missing activePreset", () => {
