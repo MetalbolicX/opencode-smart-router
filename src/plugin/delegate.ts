@@ -35,10 +35,12 @@ import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
 import {
   buildAcceptedSuffix,
+} from "../verify/Verify.res.mjs";
+import {
   buildDelegationDoD,
   buildForcingNote,
   buildGateDeps,
-} from "../verify/dispatch";
+} from "../verify/dispatch-io";
 import { accept } from "../verify/gate";
 import type { PluginContext } from "./context";
 import type { DelegateArgs, SessionCreateResult, SessionPromptResult } from "./types";

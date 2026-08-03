@@ -36,9 +36,9 @@ import { __resetLoggerForTest } from "../../src/utils/observability";
 // ---------------------------------------------------------------------------
 
 const verifyTaskAfterHookMock = vi.fn((..._args: unknown[]): Promise<void> => Promise.resolve());
-vi.mock("../../src/verify/dispatch", async () => {
-  const actual = await vi.importActual<typeof import("../../src/verify/dispatch")>(
-    "../../src/verify/dispatch",
+vi.mock("../../src/verify/dispatch-io", async () => {
+  const actual = await vi.importActual<typeof import("../../src/verify/dispatch-io")>(
+    "../../src/verify/dispatch-io",
   );
   return {
     ...actual,

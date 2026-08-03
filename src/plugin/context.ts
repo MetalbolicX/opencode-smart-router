@@ -40,7 +40,7 @@ import { createTrajectoryStore } from "../telemetry/trajectory";
 import { createFsSeam } from "../utils/fs";
 import { createExecSeam } from "../utils/shell";
 import { createMutexRegistry } from "../verify/deterministic";
-import { createChangedFileStore } from "../verify/dispatch";
+import { createChangedFileStore } from "../verify/Verify.res.mjs";
 import type { ExecSeam, FsSeam, MutexRegistry } from "../verify/types";
 
 /**

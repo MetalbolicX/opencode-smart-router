@@ -907,3 +907,182 @@ declare module "*Protocol.res.mjs" {
     hasFallback: boolean,
   ) => string;
 }
+
+// ---------------------------------------------------------------------------
+// VerifyDoD (src/verify/VerifyDoD.res)
+// DoD parser — pure functions for parsing and validating DoD blocks.
+// Uses Js.Nullable.t at ABI boundary.
+// ---------------------------------------------------------------------------
+declare module "*VerifyDoD.res.mjs" {
+  // Check kind variants
+  export type checkKind = "run" | "fileExists" | "schemaMatch" | "testsPass" | "buildPasses" | "lintClean";
+
+  // Dod kind variants
+  export type dodKind = "deterministic" | "checker" | "none";
+
+  // Dod source variants
+  export type dodSource = "explicit" | "inferred" | "annotation" | "none";
+
+  // A single check in a DoD
+  // command, expect, path, schema are optional — runner supplies defaults when absent
+  export type check = {
+    kind: checkKind;
+    command?: string | null;
+    expect?: string | null;
+    path?: string | null;
+    schema?: string | null;
+  };
+
+  // Inference hints from dispatch context
+  export type inferHints = {
+    testCommand?: string | null;
+    buildCommand?: string | null;
+    lintCommand?: string | null;
+    declaredPath?: string | null;
+  };
+
+  // A full DoD record
+  export type dod = {
+    kind: dodKind;
+    checks: check[];
+    criteria: string[];
+    deliverable: string | null;
+    source: dodSource;
+  };
+
+  // Type alias for TS consumer naming convention (must follow the type definition)
+  export type DoD = dod;
+
+  // Type alias for TS consumer naming convention (must follow the type definition)
+  export type InferHints = inferHints;
+
+  // Functions
+  export const summarizeDispatch: (text: string) => string;
+  export const normalizeDoD: (d: dod) => dod;
+  export const parseAcceptanceBlock: (text: string, source: dodSource) => dod | null;
+  export const parseDoDFromDispatch: (dispatchText: string) => dod | null;
+  export const parseDoDFromAnnotation: (annotationText: string) => dod | null;
+  export const inferDoD: (dispatchText: string, tier: string, hints: inferHints) => dod;
+  export const isCheckable: (d: dod) => boolean;
+
+  // Accessors
+  export const getCheckCommand: (c: check) => string | null;
+  export const getCheckExpect: (c: check) => string | null;
+  export const getCheckPath: (c: check) => string | null;
+  export const getCheckSchema: (c: check) => string | null;
+  export const getCheckKind: (c: check) => checkKind;
+  export const getDodDeliverable: (d: dod) => string | null;
+  export const getDodKind: (d: dod) => dodKind;
+  export const getDodChecks: (d: dod) => check[];
+  export const getDodCriteria: (d: dod) => string[];
+  export const getDodSource: (d: dod) => dodSource;
+}
+
+// ---------------------------------------------------------------------------
+// VerifyDispatchCore (src/verify/VerifyDispatchCore.res)
+// Pure dispatch core helpers — no IO, no SDK calls.
+// ---------------------------------------------------------------------------
+declare module "*VerifyDispatchCore.res.mjs" {
+  // Changed file record
+  export type changedFile = {
+    path: string;
+    status: string;
+  };
+
+  // Changed file store interface
+  export type changedFileStore = {
+    record: (sessionID: string, tool: string, args: unknown) => void;
+    get: (sessionID: string) => changedFile[];
+    clear: (sessionID: string) => void;
+  };
+
+  // Parsed task result
+  export type parsedTaskResult = {
+    finalReturnText: string;
+    childSessionID: string | null;
+    parentSessionID: string | null;
+  };
+
+  // Tier model result
+  export type tierModelResult = {
+    providerID: string;
+    modelID: string;
+  };
+
+  // Escalation hint
+  export type escalationHint = {
+    producerTier: string | null;
+    nextTier: string | null;
+  };
+
+  // Delegation args
+  export type delegationArgs = {
+    prompt: string | null;
+    description: string | null;
+    acceptance: string | null;
+  };
+
+  // Functions
+  export const extractChangedFile: (tool: string, args: unknown) => changedFile | null;
+  export const createChangedFileStore: () => changedFileStore;
+  export const parseTaskResult: (output: unknown) => parsedTaskResult;
+  export const buildDelegationDoD: (args: delegationArgs, hints: import("*VerifyDoD.res.mjs").inferHints) => import("*VerifyDoD.res.mjs").dod;
+  export const getActiveTiers: (cfg: unknown) => Record<string, { model: string }>;
+  export const tierModel: (cfg: unknown, tierName: string) => tierModelResult | null;
+  export const shouldVerifyTask: (tool: string, action: string, sessionID: string | null) => boolean;
+  export const buildForcingNote: (reasons: string[], escalation: escalationHint | null) => string;
+  export const buildAcceptedSuffix: (method: string) => string;
+}
+
+// ---------------------------------------------------------------------------
+// Verify (src/verify/Verify.res)
+// Public facade re-exporting from VerifyDoD and VerifyDispatchCore.
+// ---------------------------------------------------------------------------
+declare module "*Verify.res.mjs" {
+  import type * as VDoD from "*VerifyDoD.res.mjs";
+  import type * as VCore from "*VerifyDispatchCore.res.mjs";
+
+  export type checkKind = VDoD.checkKind;
+  export type check = VDoD.check;
+  export type dodKind = VDoD.dodKind;
+  export type dodSource = VDoD.dodSource;
+  export type dod = VDoD.dod;
+  export type inferHints = VDoD.inferHints;
+  export type changedFile = VCore.changedFile;
+  export type changedFileStore = VCore.changedFileStore;
+  export type parsedTaskResult = VCore.parsedTaskResult;
+  export type tierModelResult = VCore.tierModelResult;
+  export type escalationHint = VCore.escalationHint;
+  export type delegationArgs = VCore.delegationArgs;
+
+  // DoD functions
+  export function summarizeDispatch(text: string): string;
+  export function normalizeDoD(d: VDoD.dod): VDoD.dod;
+  export function parseAcceptanceBlock(text: string, source: VDoD.dodSource): VDoD.dod | null;
+  export function parseDoDFromDispatch(dispatchText: string): VDoD.dod | null;
+  export function parseDoDFromAnnotation(annotationText: string): VDoD.dod | null;
+  export function inferDoD(dispatchText: string, tier: string, hints: VDoD.inferHints): VDoD.dod;
+  export function isCheckable(d: VDoD.dod): boolean;
+
+  // Accessors
+  export function getCheckCommand(c: VDoD.check): string | null;
+  export function getCheckExpect(c: VDoD.check): string | null;
+  export function getCheckPath(c: VDoD.check): string | null;
+  export function getCheckSchema(c: VDoD.check): string | null;
+  export function getCheckKind(c: VDoD.check): VDoD.checkKind;
+  export function getDodDeliverable(d: VDoD.dod): string | null;
+  export function getDodKind(d: VDoD.dod): VDoD.dodKind;
+  export function getDodChecks(d: VDoD.dod): VDoD.check[];
+  export function getDodCriteria(d: VDoD.dod): string[];
+  export function getDodSource(d: VDoD.dod): VDoD.dodSource;
+
+  // Dispatch core functions
+  export function extractChangedFile(tool: string, args: unknown): VCore.changedFile | null;
+  export function createChangedFileStore(): VCore.changedFileStore;
+  export function parseTaskResult(output: unknown): VCore.parsedTaskResult;
+  export function buildDelegationDoD(args: VCore.delegationArgs, hints: VDoD.inferHints): VDoD.dod;
+  export function tierModel(cfg: unknown, tierName: string): VCore.tierModelResult | null;
+  export function shouldVerifyTask(tool: string, action: string, sessionID: string | null): boolean;
+  export function buildForcingNote(reasons: string[], escalation: VCore.escalationHint | null): string;
+  export function buildAcceptedSuffix(method: string): string;
+}

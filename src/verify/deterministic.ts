@@ -175,7 +175,7 @@ const runRun = async (
       return { ok: false, reason: `run timed out after ${timeoutMs}ms: ${check.command}` };
     }
     const out = r.stdout + "\n" + r.stderr;
-    if (check.expect !== undefined && !out.includes(check.expect)) {
+    if (check.expect !== undefined && check.expect !== null && !out.includes(check.expect)) {
       return {
         ok: false,
         reason: `expected substring not found: "${check.expect}"`,
