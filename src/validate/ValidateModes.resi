@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 // Validate the top-level modes block.
-let validateModes: (Js.Dict.t<Js.Json.t>) => unit
+let validateModes: dict<JSON.t> => unit
 
 // Validate a single mode (named by modeName for error messages).
-let validateMode: (string, Js.Dict.t<Js.Json.t>) => unit
+let validateMode: (string, dict<JSON.t>) => unit

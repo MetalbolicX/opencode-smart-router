@@ -28,13 +28,29 @@ let assertionFalse = (~operator: string, actual: bool): unit =>
 // ---------------------------------------------------------------------------
 
 test("normalizeSignalText: lowercases input", () => {
-  assertionEqual(~operator="mixed", ReasoningMatch.normalizeSignalText("Hello WORLD"), "hello world")
+  assertionEqual(
+    ~operator="mixed",
+    ReasoningMatch.normalizeSignalText("Hello WORLD"),
+    "hello world",
+  )
 })
 
 test("normalizeSignalText: collapses whitespace runs", () => {
-  assertionEqual(~operator="tabs", ReasoningMatch.normalizeSignalText("hello\tworld"), "hello world")
-  assertionEqual(~operator="newlines", ReasoningMatch.normalizeSignalText("hello\nworld"), "hello world")
-  assertionEqual(~operator="multi-space", ReasoningMatch.normalizeSignalText("hello  world"), "hello world")
+  assertionEqual(
+    ~operator="tabs",
+    ReasoningMatch.normalizeSignalText("hello\tworld"),
+    "hello world",
+  )
+  assertionEqual(
+    ~operator="newlines",
+    ReasoningMatch.normalizeSignalText("hello\nworld"),
+    "hello world",
+  )
+  assertionEqual(
+    ~operator="multi-space",
+    ReasoningMatch.normalizeSignalText("hello  world"),
+    "hello world",
+  )
 })
 
 test("normalizeSignalText: trims edges", () => {
@@ -44,8 +60,16 @@ test("normalizeSignalText: trims edges", () => {
 
 test("normalizeSignalText: phrase whitespace normalisation", () => {
   // "root cause" → "root cause" (already single space) but also matches "root\tcause" etc.
-  assertionEqual(~operator="phrase", ReasoningMatch.normalizeSignalText("root\tcause"), "root cause")
-  assertionEqual(~operator="phrase-multi-space", ReasoningMatch.normalizeSignalText("root    cause"), "root cause")
+  assertionEqual(
+    ~operator="phrase",
+    ReasoningMatch.normalizeSignalText("root\tcause"),
+    "root cause",
+  )
+  assertionEqual(
+    ~operator="phrase-multi-space",
+    ReasoningMatch.normalizeSignalText("root    cause"),
+    "root cause",
+  )
 })
 
 // ---------------------------------------------------------------------------

@@ -25,7 +25,15 @@ open Test
 // For GREEN phase: valid input → no throw → assertion(0, 0) → PASS
 // For RED phase: function missing → ReferenceError → test fails
 let assertionNoThrow = (~operator: string, fn: unit => unit): unit =>
-  assertion(~operator, (_a, _b) => true, { fn(); 0 }, 0)
+  assertion(
+    ~operator,
+    (_a, _b) => true,
+    {
+      fn()
+      0
+    },
+    0,
+  )
 
 // ---------------------------------------------------------------------------
 // validateRootFields tests
@@ -33,14 +41,14 @@ let assertionNoThrow = (~operator: string, fn: unit => unit): unit =>
 
 test("validateRootFields: accepts non-empty string activePreset", () => {
   // Build a minimal valid dict and call validateRootFields
-  let dict = Js.Dict.empty()
-  Js.Dict.set(dict, "activePreset", Js.Json.string("anthropic"))
+  let dict = Dict.make()
+  Dict.set(dict, "activePreset", JSON.Encode.string("anthropic"))
   assertionNoThrow(~operator="valid activePreset", () => ValidateRoot.validateRootFields(dict))
 })
 
 test("validateRootFields: accepts any non-empty string preset name", () => {
-  let dict = Js.Dict.empty()
-  Js.Dict.set(dict, "activePreset", Js.Json.string("my-preset"))
+  let dict = Dict.make()
+  Dict.set(dict, "activePreset", JSON.Encode.string("my-preset"))
   assertionNoThrow(~operator="non-empty string", () => ValidateRoot.validateRootFields(dict))
 })
 
@@ -49,22 +57,26 @@ test("validateRootFields: accepts any non-empty string preset name", () => {
 // ---------------------------------------------------------------------------
 
 test("validateRulesAndDefaultTier: accepts rules array + string defaultTier", () => {
-  let dict = Js.Dict.empty()
-  Js.Dict.set(dict, "rules", Js.Json.stringArray(["rule1", "rule2"]))
-  Js.Dict.set(dict, "defaultTier", Js.Json.string("fast"))
-  assertionNoThrow(~operator="valid rules+defaultTier", () => ValidateRoot.validateRulesAndDefaultTier(dict))
+  let dict = Dict.make()
+  Dict.set(dict, "rules", JSON.Encode.stringArray(["rule1", "rule2"]))
+  Dict.set(dict, "defaultTier", JSON.Encode.string("fast"))
+  assertionNoThrow(~operator="valid rules+defaultTier", () =>
+    ValidateRoot.validateRulesAndDefaultTier(dict)
+  )
 })
 
 test("validateRulesAndDefaultTier: accepts empty rules array", () => {
-  let dict = Js.Dict.empty()
-  Js.Dict.set(dict, "rules", Js.Json.stringArray([]))
-  Js.Dict.set(dict, "defaultTier", Js.Json.string("medium"))
-  assertionNoThrow(~operator="empty rules array", () => ValidateRoot.validateRulesAndDefaultTier(dict))
+  let dict = Dict.make()
+  Dict.set(dict, "rules", JSON.Encode.stringArray([]))
+  Dict.set(dict, "defaultTier", JSON.Encode.string("medium"))
+  assertionNoThrow(~operator="empty rules array", () =>
+    ValidateRoot.validateRulesAndDefaultTier(dict)
+  )
 })
 
 test("validateRulesAndDefaultTier: accepts single-rule array", () => {
-  let dict = Js.Dict.empty()
-  Js.Dict.set(dict, "rules", Js.Json.stringArray(["only-rule"]))
-  Js.Dict.set(dict, "defaultTier", Js.Json.string("heavy"))
+  let dict = Dict.make()
+  Dict.set(dict, "rules", JSON.Encode.stringArray(["only-rule"]))
+  Dict.set(dict, "defaultTier", JSON.Encode.string("heavy"))
   assertionNoThrow(~operator="single rule", () => ValidateRoot.validateRulesAndDefaultTier(dict))
 })

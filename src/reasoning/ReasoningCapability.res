@@ -29,7 +29,7 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: Js.Dict.t<float>,
+  recommended?: dict<float>,
 }
 
 // Minimal TierConfig shape mirroring src/router/config.types.ts.
@@ -37,8 +37,8 @@ type reasoningCapability = {
 type tierConfig = {
   model: string,
   variant?: string,
-  thinking?: { budgetTokens?: int },
-  reasoning?: { effort?: string },
+  thinking?: {budgetTokens?: int},
+  reasoning?: {effort?: string},
   description: string,
   whenToUse: array<string>,
   capability?: reasoningCapability,
@@ -49,19 +49,19 @@ type tierConfig = {
 // ---------------------------------------------------------------------------
 
 // Plain objects used as Sets — Js.Dict.get returns the value (truthy) if key exists.
-let _positionalVariants: Js.Dict.t<bool> = {
-  let d = Js.Dict.empty()
-  Js.Dict.set(d, "low", true)
-  Js.Dict.set(d, "medium", true)
-  Js.Dict.set(d, "high", true)
-  Js.Dict.set(d, "xhigh", true)
+let _positionalVariants: dict<bool> = {
+  let d = Dict.make()
+  Dict.set(d, "low", true)
+  Dict.set(d, "medium", true)
+  Dict.set(d, "high", true)
+  Dict.set(d, "xhigh", true)
   d
 }
 
-let _namedVariants: Js.Dict.t<bool> = {
-  let d = Js.Dict.empty()
-  Js.Dict.set(d, "thinking", true)
-  Js.Dict.set(d, "max", true)
+let _namedVariants: dict<bool> = {
+  let d = Dict.make()
+  Dict.set(d, "thinking", true)
+  Dict.set(d, "max", true)
   d
 }
 
@@ -69,12 +69,12 @@ let _namedVariants: Js.Dict.t<bool> = {
 // Default budget ladder (hardcoded from TS source)
 // ---------------------------------------------------------------------------
 
-let _makeBudgetLadder = (): Js.Dict.t<float> => {
-  let d: Js.Dict.t<float> = Js.Dict.empty()
-  Js.Dict.set(d, "minimal", 1024.0)
-  Js.Dict.set(d, "normal", 4096.0)
-  Js.Dict.set(d, "elevated", 8192.0)
-  Js.Dict.set(d, "max", 16000.0)
+let _makeBudgetLadder = (): dict<float> => {
+  let d: dict<float> = Dict.make()
+  Dict.set(d, "minimal", 1024.0)
+  Dict.set(d, "normal", 4096.0)
+  Dict.set(d, "elevated", 8192.0)
+  Dict.set(d, "max", 16000.0)
   d
 }
 
@@ -94,8 +94,7 @@ let rec inferCapability = (tier: tierConfig): reasoningCapability => {
   switch tier.reasoning {
   | Some(r) =>
     switch r.effort {
-    | Some(_) =>
-      {
+    | Some(_) => {
         kind: "discrete",
         field: "reasoning.effort",
         levels: ["low", "medium", "high"],
@@ -110,8 +109,7 @@ and _step2 = (tier: tierConfig): reasoningCapability =>
   switch tier.thinking {
   | Some(t) =>
     switch t.budgetTokens {
-    | Some(_) =>
-      {
+    | Some(_) => {
         kind: "budgeted",
         field: "thinking.budgetTokens",
         recommended: _makeBudgetLadder(),
@@ -124,18 +122,17 @@ and _step2 = (tier: tierConfig): reasoningCapability =>
 and _step3 = (tier: tierConfig): reasoningCapability =>
   switch tier.variant {
   | Some(v) =>
-    switch Js.Dict.get(_positionalVariants, v) {
+    switch Dict.get(_positionalVariants, v) {
     | Some(_) => {
-        let levels: array<string> = v === "xhigh"
-          ? ["low", "medium", "high", "xhigh"]
-          : ["low", "medium", "high"]
-        { kind: "discrete", field: "variant", levels }
+        let levels: array<string> =
+          v === "xhigh" ? ["low", "medium", "high", "xhigh"] : ["low", "medium", "high"]
+        {kind: "discrete", field: "variant", levels}
       }
     | None =>
-      switch Js.Dict.get(_namedVariants, v) {
-      | Some(_) => { kind: "binary", field: "variant", elevated: v }
-      | None => { kind: "none" }
+      switch Dict.get(_namedVariants, v) {
+      | Some(_) => {kind: "binary", field: "variant", elevated: v}
+      | None => {kind: "none"}
       }
     }
-  | None => { kind: "none" }
+  | None => {kind: "none"}
   }

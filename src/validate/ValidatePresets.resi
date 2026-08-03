@@ -11,10 +11,10 @@
 // ---------------------------------------------------------------------------
 
 // Validate the top-level presets block.
-let validatePresets: (Js.Dict.t<Js.Json.t>) => unit
+let validatePresets: dict<JSON.t> => unit
 
 // Validate a single preset (named by presetName for error messages).
-let validatePreset: (string, Js.Dict.t<Js.Json.t>) => unit
+let validatePreset: (string, dict<JSON.t>) => unit
 
 // Validate a single tier within a preset.
-let validateTier: (string, string, Js.Dict.t<Js.Json.t>) => unit
+let validateTier: (string, string, dict<JSON.t>) => unit

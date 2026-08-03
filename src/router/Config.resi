@@ -107,4 +107,4 @@ type t = {
 }
 
 let reasoningLevels: array<string>
-let parse: Js.Json.t => option<t>
+let parse: JSON.t => option<t>

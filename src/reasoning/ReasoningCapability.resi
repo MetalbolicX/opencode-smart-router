@@ -28,7 +28,7 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: Js.Dict.t<float>,
+  recommended?: dict<float>,
 }
 
 // Minimal TierConfig shape mirroring src/router/config.types.ts.
@@ -36,8 +36,8 @@ type reasoningCapability = {
 type tierConfig = {
   model: string,
   variant?: string,
-  thinking?: { budgetTokens?: int },
-  reasoning?: { effort?: string },
+  thinking?: {budgetTokens?: int},
+  reasoning?: {effort?: string},
   description: string,
   whenToUse: array<string>,
   capability?: reasoningCapability,

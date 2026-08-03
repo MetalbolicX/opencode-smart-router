@@ -19,8 +19,8 @@ type changedFile = {
 
 type parsedTaskResult = {
   finalReturnText: string,
-  childSessionID: Js.Nullable.t<string>,
-  parentSessionID: Js.Nullable.t<string>,
+  childSessionID: Nullable.t<string>,
+  parentSessionID: Nullable.t<string>,
 }
 
 // ---------------------------------------------------------------------------
@@ -40,33 +40,45 @@ let isWriteTool = (tool: string): bool => {
   found.contents
 }
 
-let getStringField = (obj: Js.Dict.t<Js.Json.t>, key: string): string => {
-  switch Js.Dict.get(obj, key) {
+let getStringField = (obj: dict<JSON.t>, key: string): string => {
+  switch Dict.get(obj, key) {
   | Some(v) =>
-    switch Js.Json.classify(v) {
-    | JSONString(s) => s
-    | _ => ""
+    switch JSON.Decode.string(v) {
+    | Some(s) => s
+    | None => ""
     }
   | None => ""
   }
 }
 
-let extractChangedFile = (tool: string, args: Js.Json.t): Js.Nullable.t<changedFile> => {
+let extractChangedFile = (tool: string, args: JSON.t): Nullable.t<changedFile> => {
   if !isWriteTool(tool) {
-    Js.Nullable.null
+    Nullable.null
   } else {
-    let obj = switch Js.Json.classify(args) {
-    | JSONObject(o) => o
-    | _ => Js.Dict.empty()
+    let obj = switch JSON.Decode.object(args) {
+    | Some(o) => o
+    | None => Dict.make()
     }
     let path = getStringField(obj, "filePath")
-    let pathB = if path === "" { getStringField(obj, "path") } else { path }
-    let pathC = if pathB === "" { getStringField(obj, "file") } else { pathB }
-    if pathC === "" {
-      Js.Nullable.null
+    let pathB = if path === "" {
+      getStringField(obj, "path")
     } else {
-      let status = if tool === "write" { "written" } else { "modified" }
-      Js.Nullable.return({ path: pathC, status })
+      path
+    }
+    let pathC = if pathB === "" {
+      getStringField(obj, "file")
+    } else {
+      pathB
+    }
+    if pathC === "" {
+      Nullable.null
+    } else {
+      let status = if tool === "write" {
+        "written"
+      } else {
+        "modified"
+      }
+      Nullable.make({path: pathC, status})
     }
   }
 }
@@ -76,15 +88,15 @@ let extractChangedFile = (tool: string, args: Js.Json.t): Js.Nullable.t<changedF
 // ---------------------------------------------------------------------------
 
 type changedFileStore = {
-  record: (string, string, Js.Json.t) => unit,
-  get: (string) => array<changedFile>,
-  clear: (string) => unit,
+  record: (string, string, JSON.t) => unit,
+  get: string => array<changedFile>,
+  clear: string => unit,
 }
 
-type fileMap = Js.Dict.t<string>
+type fileMap = dict<string>
 
 let recFindPrev = (m: fileMap, path: string): string => {
-  switch Js.Dict.get(m, path) {
+  switch Dict.get(m, path) {
   | Some(v) => v
   | None => ""
   }
@@ -96,10 +108,8 @@ let buildFileArray = (entries: array<(string, string)>): array<changedFile> => {
       acc
     } else {
       switch entries[i] {
-      | Some((path, status)) =>
-        go(i + 1, [...acc, { path, status }])
-      | None =>
-        go(i + 1, acc)
+      | Some((path, status)) => go(i + 1, [...acc, {path, status}])
+      | None => go(i + 1, acc)
       }
     }
   }
@@ -107,59 +117,64 @@ let buildFileArray = (entries: array<(string, string)>): array<changedFile> => {
 }
 
 let createChangedFileStore = (): changedFileStore => {
-  let bySession: Js.Dict.t<fileMap> = Js.Dict.empty()
+  let bySession: dict<fileMap> = Dict.make()
 
-  let record = (sessionID: string, tool: string, args: Js.Json.t): unit => {
+  let record = (sessionID: string, tool: string, args: JSON.t): unit => {
     let cf = extractChangedFile(tool, args)
-    switch cf->Js.Nullable.toOption {
+    switch cf->Nullable.toOption {
     | Some(f) => {
-        let m = switch Js.Dict.get(bySession, sessionID) {
-          | Some(existing) => existing
-          | None => {
-              let newMap: fileMap = Js.Dict.empty()
-              Js.Dict.set(bySession, sessionID, newMap)
-              newMap
-            }
+        let m = switch Dict.get(bySession, sessionID) {
+        | Some(existing) => existing
+        | None => {
+            let newMap: fileMap = Dict.make()
+            Dict.set(bySession, sessionID, newMap)
+            newMap
+          }
         }
         let prev = recFindPrev(m, f.path)
-        let newStatus = if prev === "written" { "written" } else { f.status }
-        Js.Dict.set(m, f.path, newStatus)
+        let newStatus = if prev === "written" {
+          "written"
+        } else {
+          f.status
+        }
+        Dict.set(m, f.path, newStatus)
       }
     | None => ()
     }
   }
 
   let get = (sessionID: string): array<changedFile> => {
-    switch Js.Dict.get(bySession, sessionID) {
+    switch Dict.get(bySession, sessionID) {
     | Some(m) => {
-        let entries = Js.Dict.entries(m)
+        let entries = Dict.toArray(m)
         buildFileArray(entries)
       }
     | None => []
     }
   }
 
-  let clear = (sessionID: string): unit => {
+  let clear = (_sessionID: string): unit => {
     %raw(`delete bySession[sessionID]`)
   }
 
-  { record, get, clear }
+  {record, get, clear}
 }
 
 // ---------------------------------------------------------------------------
 // parseTaskResult
 // ---------------------------------------------------------------------------
 
-let getMetadataField = (metadata: Js.Dict.t<Js.Json.t>, key1: string, key2: string): Js.Nullable.t<string> => {
-  let rec tryKeys = (keys: list<string>): Js.Nullable.t<string> => {
+let getMetadataField = (metadata: dict<JSON.t>, key1: string, key2: string): Nullable.t<string> => {
+  let rec tryKeys = (keys: list<string>): Nullable.t<string> => {
     switch keys {
-    | list{} => Js.Nullable.null
+    | list{} => Nullable.null
+
     | list{key, ...rest} =>
-      switch Js.Dict.get(metadata, key) {
+      switch Dict.get(metadata, key) {
       | Some(v) =>
-        switch Js.Json.classify(v) {
-        | JSONString(s) => Js.Nullable.return(s)
-        | _ => tryKeys(rest)
+    switch JSON.Decode.string(v) {
+        | Some(s) => Nullable.make(s)
+        | None => tryKeys(rest)
         }
       | None => tryKeys(rest)
       }
@@ -171,49 +186,49 @@ let getMetadataField = (metadata: Js.Dict.t<Js.Json.t>, key1: string, key2: stri
 let extractTaskResultContent = (s: string): string => {
   let openTag = "<task_result>"
   let closeTag = "</task_result>"
-  let openIdx = Js.String2.indexOf(openTag, s)
+  let openIdx = String.indexOf(openTag, s)
   let closeIdx = switch openIdx {
-    | -1 => -1
-    | _ => Js.String2.indexOf(closeTag, s)
+  | -1 => -1
+  | _ => String.indexOf(closeTag, s)
   }
   switch (openIdx, closeIdx) {
   | (-1, _) => s
   | (_, -1) => s
   | (oi, ci) =>
-    let start = oi + Js.String2.length(openTag)
+    let start = oi + String.length(openTag)
     if start > ci {
       s
     } else {
-      Js.String2.trim(Js.String2.substring(s, ~from=start, ~to_=ci))
+      String.trim(String.substring(s, ~start, ~end=ci))
     }
   }
 }
 
-let parseTaskResult = (output: Js.Json.t): parsedTaskResult => {
-  let obj = switch Js.Json.classify(output) {
-  | JSONObject(o) => o
-  | _ => Js.Dict.empty()
+let parseTaskResult = (output: JSON.t): parsedTaskResult => {
+  let obj = switch JSON.Decode.object(output) {
+  | Some(o) => o
+  | None => Dict.make()
   }
-  let outputStr = switch Js.Dict.get(obj, "output") {
+  let outputStr = switch Dict.get(obj, "output") {
   | Some(v) =>
-    switch Js.Json.classify(v) {
-    | JSONString(s) => s
-    | _ => ""
+    switch JSON.Decode.string(v) {
+    | Some(s) => s
+    | None => ""
     }
   | None => ""
   }
-  let finalReturnText = Js.String2.trim(extractTaskResultContent(outputStr))
-  let metadata = switch Js.Dict.get(obj, "metadata") {
+  let finalReturnText = String.trim(extractTaskResultContent(outputStr))
+  let metadata = switch Dict.get(obj, "metadata") {
   | Some(v) =>
-    switch Js.Json.classify(v) {
-    | JSONObject(o) => o
-    | _ => Js.Dict.empty()
+    switch JSON.Decode.object(v) {
+    | Some(o) => o
+    | None => Dict.make()
     }
-  | None => Js.Dict.empty()
+  | None => Dict.make()
   }
   let childSessionID = getMetadataField(metadata, "sessionId", "sessionID")
   let parentSessionID = getMetadataField(metadata, "parentSessionId", "parentSessionID")
-  { finalReturnText, childSessionID, parentSessionID }
+  {finalReturnText, childSessionID, parentSessionID}
 }
 
 // ---------------------------------------------------------------------------
@@ -221,39 +236,36 @@ let parseTaskResult = (output: Js.Json.t): parsedTaskResult => {
 // ---------------------------------------------------------------------------
 
 type delegationArgs = {
-  prompt: Js.Nullable.t<string>,
-  description: Js.Nullable.t<string>,
-  acceptance: Js.Nullable.t<string>,
+  prompt: Nullable.t<string>,
+  description: Nullable.t<string>,
+  acceptance: Nullable.t<string>,
 }
 
-let buildDelegationDoD = (
-  args: delegationArgs,
-  hints: inferHints,
-): dod => {
-  let blockSource = switch args.acceptance->Js.Nullable.toOption {
+let buildDelegationDoD = (args: delegationArgs, hints: inferHints): dod => {
+  let blockSource = switch args.acceptance->Nullable.toOption {
+  | Some(v) => v
+  | None =>
+    switch args.prompt->Nullable.toOption {
     | Some(v) => v
     | None =>
-      switch args.prompt->Js.Nullable.toOption {
+      switch args.description->Nullable.toOption {
+      | Some(v) => v
+      | None => ""
+      }
+    }
+  }
+  let explicit = parseDoDFromDispatch(blockSource)
+  switch explicit->Nullable.toOption {
+  | Some(d) => d
+  | None => {
+      let dispatch = switch args.prompt->Nullable.toOption {
       | Some(v) => v
       | None =>
-        switch args.description->Js.Nullable.toOption {
+        switch args.description->Nullable.toOption {
         | Some(v) => v
         | None => ""
         }
       }
-    }
-  let explicit = parseDoDFromDispatch(blockSource)
-  switch explicit->Js.Nullable.toOption {
-  | Some(d) => d
-  | None => {
-      let dispatch = switch args.prompt->Js.Nullable.toOption {
-        | Some(v) => v
-        | None =>
-          switch args.description->Js.Nullable.toOption {
-          | Some(v) => v
-          | None => ""
-          }
-        }
       inferDoD(dispatch, "", hints)
     }
   }
@@ -269,14 +281,14 @@ type tierDefMinimal = {
 
 type protocolTierConfig = {
   activePreset: string,
-  activeMode: Js.Nullable.t<string>,
-  presets: Js.Dict.t<Js.Dict.t<tierDefMinimal>>,
+  activeMode: Nullable.t<string>,
+  presets: dict<dict<tierDefMinimal>>,
   rules: array<string>,
   defaultTier: string,
-  fallback: Js.Nullable.t<{ global: Js.Nullable.t<Js.Dict.t<array<string>>>, presets: Js.Nullable.t<Js.Dict.t<Js.Dict.t<array<string>>>> }>,
-  taskPatterns: Js.Nullable.t<Js.Dict.t<array<string>>>,
-  modes: Js.Nullable.t<Js.Dict.t<{ defaultTier: string, overrideRules: Js.Nullable.t<array<string>> }>>,
-  enforcement: Js.Nullable.t<{ verify: Js.Nullable.t<{ requireExplicitDoD: Js.Nullable.t<bool> }> }>,
+  fallback: Nullable.t<{global: Nullable.t<dict<array<string>>>, fallback_presets: Nullable.t<dict<dict<array<string>>>>}>,
+  taskPatterns: Nullable.t<dict<array<string>>>,
+  modes: Nullable.t<dict<{modes_defaultTier: string, overrideRules: Nullable.t<array<string>>}>>,
+  enforcement: Nullable.t<{verify: Nullable.t<{requireExplicitDoD: Nullable.t<bool>}>}>,
 }
 
 type tierModelResult = {
@@ -284,35 +296,32 @@ type tierModelResult = {
   modelID: string,
 }
 
-let getActiveTiers = (cfg: protocolTierConfig): Js.Dict.t<tierDefMinimal> => {
-  switch Js.Dict.get(cfg.presets, cfg.activePreset) {
+let getActiveTiers = (cfg: protocolTierConfig): dict<tierDefMinimal> => {
+  switch Dict.get(cfg.presets, cfg.activePreset) {
   | Some(tiers) => tiers
-  | None => Js.Dict.empty()
+  | None => Dict.make()
   }
 }
 
-let tierModel = (
-  cfg: protocolTierConfig,
-  tierName: string,
-): Js.Nullable.t<tierModelResult> => {
+let tierModel = (cfg: protocolTierConfig, tierName: string): Nullable.t<tierModelResult> => {
   let tiers = getActiveTiers(cfg)
-  switch Js.Dict.get(tiers, tierName) {
+  switch Dict.get(tiers, tierName) {
   | Some(t) => {
       let model = t.model
       if model === "" {
-        Js.Nullable.null
+        Nullable.null
       } else {
-        let slashIdx = Js.String2.indexOf(model, "/")
+        let slashIdx = String.indexOf(model, "/")
         if slashIdx <= 0 || slashIdx >= String.length(model) - 1 {
-          Js.Nullable.null
+          Nullable.null
         } else {
           let providerID = String.slice(model, ~start=0, ~end=slashIdx)
           let modelID = String.slice(model, ~start=slashIdx + 1, ~end=String.length(model))
-          Js.Nullable.return({ providerID, modelID })
+          Nullable.make({providerID, modelID})
         }
       }
     }
-  | None => Js.Nullable.null
+  | None => Nullable.null
   }
 }
 
@@ -320,19 +329,15 @@ let tierModel = (
 // shouldVerifyTask
 // ---------------------------------------------------------------------------
 
-let shouldVerifyTask = (
-  tool: string,
-  mode: string,
-  require: Js.Nullable.t<string>,
-): bool => {
+let shouldVerifyTask = (tool: string, mode: string, require: Nullable.t<string>): bool => {
   if tool !== "task" {
     false
   } else if mode === "off" {
     false
   } else {
-    let requireStr = switch require->Js.Nullable.toOption {
-      | Some(v) => v
-      | None => "whenDoDPresent"
+    let requireStr = switch require->Nullable.toOption {
+    | Some(v) => v
+    | None => "whenDoDPresent"
     }
     requireStr !== "never"
   }
@@ -343,8 +348,8 @@ let shouldVerifyTask = (
 // ---------------------------------------------------------------------------
 
 type escalationHint = {
-  producerTier: Js.Nullable.t<string>,
-  nextTier: Js.Nullable.t<string>,
+  producerTier: Nullable.t<string>,
+  nextTier: Nullable.t<string>,
 }
 
 let joinReasons = (reasons: array<string>): string => {
@@ -354,7 +359,11 @@ let joinReasons = (reasons: array<string>): string => {
     } else {
       switch reasons[i] {
       | Some(reason) =>
-        let prefix = if acc === "" { "- " } else { "\n- " }
+        let prefix = if acc === "" {
+          "- "
+        } else {
+          "\n- "
+        }
         go(i + 1, acc ++ prefix ++ reason)
       | None => go(i + 1, acc)
       }
@@ -363,34 +372,35 @@ let joinReasons = (reasons: array<string>): string => {
   go(0, "")
 }
 
-let buildForcingNote = (
-  reasons: array<string>,
-  escalation: Js.Nullable.t<escalationHint>,
-): string => {
+let buildForcingNote = (reasons: array<string>, escalation: Nullable.t<escalationHint>): string => {
   let body = if Array.length(reasons) > 0 {
     joinReasons(reasons)
   } else {
     "- (no reasons provided)"
   }
 
-  let next = switch escalation->Js.Nullable.toOption {
-    | Some(e) =>
-      switch e.nextTier->Js.Nullable.toOption {
-      | Some(nextTier) => {
-          let producer = switch e.producerTier->Js.Nullable.toOption {
-            | Some(pt) => " (escalated from " ++ pt ++ ")"
-            | None => ""
-          }
-          "NEXT: address the above, then re-run via `Task(subagent_type=\"" ++
-          nextTier ++ "\")" ++ producer ++ "; do not treat the prior result as complete."
+  let next = switch escalation->Nullable.toOption {
+  | Some(e) =>
+    switch e.nextTier->Nullable.toOption {
+    | Some(nextTier) => {
+        let producer = switch e.producerTier->Nullable.toOption {
+        | Some(pt) => " (escalated from " ++ pt ++ ")"
+        | None => ""
         }
-      | None => "NEXT: address the above and re-run the delegation; do not treat the prior result as complete."
+        "NEXT: address the above, then re-run via `Task(subagent_type=\"" ++
+        nextTier ++
+        "\")" ++
+        producer ++ "; do not treat the prior result as complete."
       }
     | None => "NEXT: address the above and re-run the delegation; do not treat the prior result as complete."
+    }
+  | None => "NEXT: address the above and re-run the delegation; do not treat the prior result as complete."
   }
 
   "[router ⚠ NOT ACCEPTED] The delegated result was not accepted by independent verification:\n" ++
-  body ++ "\n" ++ next
+  body ++
+  "\n" ++
+  next
 }
 
 // ---------------------------------------------------------------------------

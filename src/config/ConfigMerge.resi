@@ -11,4 +11,4 @@
 
 /** Recursively deep-merge two JSON values.
     Override wins for non-object values (scalar/array replacement). */
-let deepMerge: (Js.Json.t, Js.Json.t) => Js.Json.t
+let deepMerge: (JSON.t, JSON.t) => JSON.t

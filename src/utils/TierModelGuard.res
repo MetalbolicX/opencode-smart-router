@@ -35,17 +35,17 @@ type result = {
 
 let resolveTierModelGuard = (cfg: Config.t, tierName: string): result => {
   // Get active preset tiers — same logic as dispatch.ts getActiveTiers + tierModel
-  switch Js.Dict.get(cfg.presets, cfg.activePreset) {
-  | None => { ok: false, reason: "invalid model or provider configuration" }
+  switch Dict.get(cfg.presets, cfg.activePreset) {
+  | None => {ok: false, reason: "invalid model or provider configuration"}
   | Some(tiers) =>
-    switch Js.Dict.get(tiers, tierName) {
-    | None => { ok: false, reason: "invalid model or provider configuration" }
+    switch Dict.get(tiers, tierName) {
+    | None => {ok: false, reason: "invalid model or provider configuration"}
     | Some(tier) =>
       // model field must be a non-empty string with a slash not at boundaries
       let modelStr = tier.model
       let slashPos = modelStr->String.indexOf("/")
       if slashPos <= 0 || slashPos >= String.length(modelStr) - 1 {
-        { ok: false, reason: "invalid model or provider configuration" }
+        {ok: false, reason: "invalid model or provider configuration"}
       } else {
         {
           ok: true,

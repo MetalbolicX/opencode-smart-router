@@ -35,30 +35,30 @@ let stringContains = (haystack: string, needle: string): bool =>
 // ---------------------------------------------------------------------------
 
 /** Parse a JSON string to Js.Json.t. */
-let parse = (s: string): Js.Json.t => Js.Json.parseExn(s)
+let parse = (s: string): JSON.t => JSON.parseOrThrow(s)
 
 // ---------------------------------------------------------------------------
 // Identity fixtures — merging with empty / merging with self
 // ---------------------------------------------------------------------------
 
 test("deepMerge: two empty objects produce empty object", () => {
-  let base: Js.Json.t = %raw(`{}`)
-  let override: Js.Json.t = %raw(`{}`)
+  let base: JSON.t = %raw(`{}`)
+  let override: JSON.t = %raw(`{}`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`{}`))
 })
 
 test("deepMerge: merging empty with self returns self", () => {
-  let base: Js.Json.t = %raw(`{}`)
+  let base: JSON.t = %raw(`{}`)
   deepEqual(ConfigMerge.deepMerge(base, base), base)
 })
 
 test("deepMerge: undefined base returns override", () => {
-  let override: Js.Json.t = %raw(`{}`)
+  let override: JSON.t = %raw(`{}`)
   deepEqual(ConfigMerge.deepMerge(%raw("undefined"), override), override)
 })
 
 test("deepMerge: undefined override returns base", () => {
-  let base: Js.Json.t = %raw(`{}`)
+  let base: JSON.t = %raw(`{}`)
   deepEqual(ConfigMerge.deepMerge(base, %raw("undefined")), base)
 })
 
@@ -100,8 +100,8 @@ test("deepMerge: override adds new keys", () => {
   let resultStr = JSON.stringify(result)
   assertion(
     ~operator="hasBoth",
-    (_a, _b) => stringContains(resultStr, "\"a\"") === true &&
-      stringContains(resultStr, "\"b\"") === true,
+    (_a, _b) =>
+      stringContains(resultStr, "\"a\"") === true && stringContains(resultStr, "\"b\"") === true,
     true,
     true,
   )
@@ -141,8 +141,8 @@ test("deepMerge: array override replaces base (not concat)", () => {
   let resultStr = JSON.stringify(result)
   assertion(
     ~operator="arrayReplaced",
-    (_a, _b) => stringContains(resultStr, "\"c\"") === true &&
-      stringContains(resultStr, "\"a\"") === false,
+    (_a, _b) =>
+      stringContains(resultStr, "\"c\"") === true && stringContains(resultStr, "\"a\"") === false,
     true,
     true,
   )
@@ -167,8 +167,9 @@ test("deepMerge: nested array also replaces", () => {
   let resultStr = JSON.stringify(result)
   assertion(
     ~operator="nestedArrayReplaced",
-    (_a, _b) => stringContains(resultStr, "\"new\"") === true &&
-      stringContains(resultStr, "\"old1\"") === false,
+    (_a, _b) =>
+      stringContains(resultStr, "\"new\"") === true &&
+        stringContains(resultStr, "\"old1\"") === false,
     true,
     true,
   )
@@ -179,32 +180,32 @@ test("deepMerge: nested array also replaces", () => {
 // ---------------------------------------------------------------------------
 
 test("deepMerge: string override replaces string base", () => {
-  let base: Js.Json.t = %raw(`"hello"`)
-  let override: Js.Json.t = %raw(`"world"`)
+  let base: JSON.t = %raw(`"hello"`)
+  let override: JSON.t = %raw(`"world"`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`"world"`))
 })
 
 test("deepMerge: number override replaces number base", () => {
-  let base: Js.Json.t = %raw(`10`)
-  let override: Js.Json.t = %raw(`20`)
+  let base: JSON.t = %raw(`10`)
+  let override: JSON.t = %raw(`20`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`20`))
 })
 
 test("deepMerge: boolean override replaces boolean base", () => {
-  let base: Js.Json.t = %raw(`false`)
-  let override: Js.Json.t = %raw(`true`)
+  let base: JSON.t = %raw(`false`)
+  let override: JSON.t = %raw(`true`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`true`))
 })
 
 test("deepMerge: object override replaces scalar base", () => {
-  let base: Js.Json.t = %raw(`42`)
+  let base: JSON.t = %raw(`42`)
   let override = parse(`{"key": "value"}`)
   deepEqual(ConfigMerge.deepMerge(base, override), override)
 })
 
 test("deepMerge: scalar override replaces object base", () => {
   let base = parse(`{"key": "value"}`)
-  let override: Js.Json.t = %raw(`42`)
+  let override: JSON.t = %raw(`42`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`42`))
 })
 
@@ -213,13 +214,13 @@ test("deepMerge: scalar override replaces object base", () => {
 // ---------------------------------------------------------------------------
 
 test("deepMerge: null override replaces non-null base", () => {
-  let base: Js.Json.t = %raw(`"hello"`)
-  let override: Js.Json.t = %raw(`null`)
+  let base: JSON.t = %raw(`"hello"`)
+  let override: JSON.t = %raw(`null`)
   deepEqual(ConfigMerge.deepMerge(base, override), %raw(`null`))
 })
 
 test("deepMerge: null base is preserved (null !== undefined)", () => {
-  let override: Js.Json.t = %raw(`"override"`)
+  let override: JSON.t = %raw(`"override"`)
   deepEqual(ConfigMerge.deepMerge(%raw(`null`), override), override)
 })
 
@@ -253,8 +254,9 @@ test("deepMerge: null in nested object merges correctly", () => {
   // kind should be "binary" (overridden), field should be preserved from base
   assertion(
     ~operator="fieldPreserved",
-    (_a, _b) => stringContains(resultStr, "\"field\"") === true &&
-      stringContains(resultStr, "\"binary\"") === true,
+    (_a, _b) =>
+      stringContains(resultStr, "\"field\"") === true &&
+        stringContains(resultStr, "\"binary\"") === true,
     true,
     true,
   )
@@ -282,7 +284,8 @@ test("deepMerge: three-way chained merge (bundled → global → local)", () => 
   let resultStr = JSON.stringify(step2)
   assertion(
     ~operator="threeWay",
-    (_a, _b) => stringContains(resultStr, "\"custom\"") === true &&
+    (_a, _b) =>
+      stringContains(resultStr, "\"custom\"") === true &&
       stringContains(resultStr, "\"local-rule\"") === true &&
       stringContains(resultStr, "\"a/fast\"") === true,
     true,

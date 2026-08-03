@@ -56,7 +56,7 @@ type adaptivePolicyConfig = {
   trivialLevel: option<string>,
   defaultLevel: option<string>,
   keywordRules: option<array<keywordRule>>,
-  tierDefaults: option<Js.Dict.t<string>>,
+  tierDefaults: option<dict<string>>,
   surfaceDecision: option<bool>,
 }
 
@@ -70,7 +70,7 @@ type reasoningPolicyConfig = {
 
 // Return type: level is nullable at the TS boundary (Js.Nullable.t<reasoningLevel>)
 type adaptiveDecision = {
-  level: Js.Nullable.t<reasoningLevel>,
+  level: Nullable.t<reasoningLevel>,
   reason: string,
 }
 
@@ -80,36 +80,36 @@ type adaptiveDecision = {
 
 // %raw helper: return explicit JS null for nullable level fields
 @setRuntimeSideEffects
-let _nullLevel = (): Js.Nullable.t<reasoningLevel> => {
+let _nullLevel = (): Nullable.t<reasoningLevel> => {
   %raw("null")
 }
 
 // IIFE helpers to safely extract nullable record fields from JS boundary.
 // %raw at module scope (not inside switch/if) CAN capture function params via IIFE.
 @setRuntimeSideEffects
-let _getTrivialLevel = (ac): option<string> => {
+let _getTrivialLevel = (_ac): option<string> => {
   %raw(`(function(ac) { return ac.trivialLevel == null ? undefined : ac.trivialLevel; })(arguments[0])`)
 }
 @setRuntimeSideEffects
-let _getTierDefaults = (ac): option<Js.Dict.t<string>> => {
+let _getTierDefaults = (_ac): option<dict<string>> => {
   %raw(`(function(ac) { return ac.tierDefaults == null ? undefined : ac.tierDefaults; })(arguments[0])`)
 }
 @setRuntimeSideEffects
-let _getKeywordRules = (ac): option<array<keywordRule>> => {
+let _getKeywordRules = (_ac): option<array<keywordRule>> => {
   %raw(`(function(ac) { return ac.keywordRules == null ? undefined : ac.keywordRules; })(arguments[0])`)
 }
 @setRuntimeSideEffects
-let _getDefaultLevel = (ac): option<string> => {
+let _getDefaultLevel = (_ac): option<string> => {
   %raw(`(function(ac) { return ac.defaultLevel == null ? undefined : ac.defaultLevel; })(arguments[0])`)
 }
 
 // Convert string level to reasoningLevel variant, or return null
-let _levelFromString = (s: string): Js.Nullable.t<reasoningLevel> => {
+let _levelFromString = (s: string): Nullable.t<reasoningLevel> => {
   switch s {
-  | "minimal" => Js.Nullable.return(#minimal)
-  | "normal" => Js.Nullable.return(#normal)
-  | "elevated" => Js.Nullable.return(#elevated)
-  | "max" => Js.Nullable.return(#max)
+  | "minimal" => Nullable.make(#minimal)
+  | "normal" => Nullable.make(#normal)
+  | "elevated" => Nullable.make(#elevated)
+  | "max" => Nullable.make(#max)
   | _ => _nullLevel()
   }
 }
@@ -133,13 +133,18 @@ let _getExclusions = (ex: option<array<string>>): array<string> => {
 }
 
 // Check if any exclusion keyword matches (fail-soft: non-string/empty = non-matching)
-let _isExcluded = (exclusions: array<string>, prompt: string, description: string, mode: matchMode): bool => {
-  let excluded = exclusions->Array.some((k) => {
+let _isExcluded = (
+  exclusions: array<string>,
+  prompt: string,
+  description: string,
+  mode: matchMode,
+): bool => {
+  let excluded = exclusions->Array.some(k => {
     if k === "" {
       false
     } else {
       ReasoningMatch.matchSignal(prompt, k, mode) ||
-        ReasoningMatch.matchSignal(description, k, mode)
+      ReasoningMatch.matchSignal(description, k, mode)
     }
   })
   excluded
@@ -147,12 +152,9 @@ let _isExcluded = (exclusions: array<string>, prompt: string, description: strin
 
 // Check a single rule and return Some(decision) if it matches, None otherwise
 // Uses `and` for mutual recursion with _scanRules
-let rec _checkRule = (
-  rule: keywordRule,
-  idx: int,
-  prompt: string,
-  description: string,
-): option<adaptiveDecision> => {
+let rec _checkRule = (rule: keywordRule, idx: int, prompt: string, description: string): option<
+  adaptiveDecision,
+> => {
   // Fail-soft: skip rules with empty keywords array
   if rule.keywords->Array.length === 0 {
     None
@@ -171,7 +173,7 @@ let rec _checkRule = (
       None
     } else {
       // Find first matching keyword within this rule's keywords
-      let matched = rule.keywords->Array.find((kw) => {
+      let matched = rule.keywords->Array.find(kw => {
         if kw === "" {
           false
         } else if ReasoningMatch.matchSignal(prompt, kw, mode) {
@@ -197,23 +199,18 @@ let rec _checkRule = (
   }
 }
 // Mutually recursive: _scanRules calls _checkRule
-and _scanRules = (
-  rules: array<keywordRule>,
-  idx: int,
-  prompt: string,
-  description: string,
-): option<adaptiveDecision> => {
+and _scanRules = (rules: array<keywordRule>, idx: int, prompt: string, description: string): option<
+  adaptiveDecision,
+> => {
   let rulesLen = rules->Array.length
   if idx >= rulesLen {
     None
   } else {
     switch rules->Array.get(idx) {
     | None => _scanRules(rules, idx + 1, prompt, description)
-    | Some(rule) => {
-        switch _checkRule(rule, idx, prompt, description) {
-        | Some(d) => Some(d)
-        | None => _scanRules(rules, idx + 1, prompt, description)
-        }
+    | Some(rule) => switch _checkRule(rule, idx, prompt, description) {
+      | Some(d) => Some(d)
+      | None => _scanRules(rules, idx + 1, prompt, description)
       }
     }
   }
@@ -225,21 +222,21 @@ and _scanRules = (
 
 let selectAdaptiveLevel = (
   signals: adaptiveSignals,
-  policy: option<reasoningPolicyConfig>,
+  _policy: option<reasoningPolicyConfig>,
 ): adaptiveDecision => {
   // Step 0: handle JS null policy (the option type only covers undefined, not null)
   // %raw here CAN capture `policy` because it's at function scope
-  let p = %raw(`policy == null ? undefined : policy`);
+  let p = %raw(`policy == null ? undefined : policy`)
   let effectivePolicy: option<reasoningPolicyConfig> = switch p {
   | Some(pp) => Some(pp)
   | None => None
-  };
+  }
   let adaptive: option<adaptivePolicyConfig> = switch effectivePolicy {
   | Some(pp) => pp.adaptive
   | None => None
-  };
+  }
   switch adaptive {
-  | None => { level: _nullLevel(), reason: "no adaptive config" }
+  | None => {level: _nullLevel(), reason: "no adaptive config"}
 
   | Some(ac) => {
       // Use IIFE helpers to safely extract nullable fields from `ac`
@@ -254,16 +251,16 @@ let selectAdaptiveLevel = (
         | Some(s) => _levelFromString(s)
         | None => _nullLevel()
         }
-        { level: lvl, reason: "trivial" }
+        {level: lvl, reason: "trivial"}
       } else {
-        let tierDefaults: Js.Dict.t<string> = switch acTierDefaults {
+        let tierDefaults: dict<string> = switch acTierDefaults {
         | Some(td) => td
-        | None => Js.Dict.empty()
+        | None => Dict.make()
         }
-        switch Js.Dict.get(tierDefaults, signals.tierName) {
+        switch Dict.get(tierDefaults, signals.tierName) {
         | Some(tierLevel) => {
             let lvl = _levelFromString(tierLevel)
-            { level: lvl, reason: `tier default: ${signals.tierName}` }
+            {level: lvl, reason: `tier default: ${signals.tierName}`}
           }
         | None => {
             let keywordRules: array<keywordRule> = switch acKeywordRules {
@@ -277,7 +274,7 @@ let selectAdaptiveLevel = (
                 | Some(s) => _levelFromString(s)
                 | None => _nullLevel()
                 }
-                { level: lvl, reason: "default level" }
+                {level: lvl, reason: "default level"}
               }
             }
           }
@@ -292,13 +289,13 @@ let selectAdaptiveLevel = (
 // ---------------------------------------------------------------------------
 
 // Get the level as Js.Nullable.t<reasoningLevel> (for parity assertions)
-let getLevelNull = (d: adaptiveDecision): Js.Nullable.t<reasoningLevel> => {
+let getLevelNull = (d: adaptiveDecision): Nullable.t<reasoningLevel> => {
   d.level
 }
 
 // Get the level as option<reasoningLevel> (for test comparisons)
 let getLevelOption = (d: adaptiveDecision): option<reasoningLevel> => {
-  Js.Nullable.toOption(d.level)
+  Nullable.toOption(d.level)
 }
 
 // Get the reason string
@@ -315,6 +312,6 @@ let makePolicyWithAdaptive = (adaptive: option<adaptivePolicyConfig>): reasoning
     mode: Some("adaptive"),
     defaultLevel: None,
     surfaceLimits: None,
-    adaptive: adaptive,
+    adaptive,
   }
 }

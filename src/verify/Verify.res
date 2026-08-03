@@ -1,8 +1,7 @@
 // src/verify/Verify.res
 // Public facade re-exporting DoD parser and pure dispatch core.
 
-open VerifyDoD
-open VerifyDispatchCore
+// NOTE: VerifyDoD and VerifyDispatchCore module opens removed - unused
 
 // Re-export all DoD types (type aliases — no export keyword needed for types)
 type checkKind = VerifyDoD.checkKind

@@ -47,15 +47,15 @@ let assertionContains = (~operator: string, needle: string, haystack: string): u
 // ---------------------------------------------------------------------------
 
 // Minimal tier factory
-let tier = (model: string): Js.Dict.t<Js.Json.t> => {
-  Js.Dict.fromArray([
-    ("model", Js.Json.string(model)),
-    ("description", Js.Json.string("d")),
-    ("whenToUse", Js.Json.array([Js.Json.string("x")])),
+let tier = (model: string): dict<JSON.t> => {
+  Dict.fromArray([
+    ("model", JSON.Encode.string(model)),
+    ("description", JSON.Encode.string("d")),
+    ("whenToUse", JSON.Encode.array([JSON.Encode.string("x")])),
   ])
 }
 
-let minimalCfg: Js.Dict.t<Js.Json.t> = %raw(`{
+let minimalCfg: dict<JSON.t> = %raw(`{
   activePreset: "p",
   presets: { p: { only: { model: "prov/model-x", description: "d", whenToUse: ["x"] } } },
   rules: ["alpha", "beta"],
@@ -66,7 +66,7 @@ let minimalCfg: Js.Dict.t<Js.Json.t> = %raw(`{
 // Test fixtures — rich config (multi-tier, costRatio, variant, modes, taskPatterns, fallback)
 // ---------------------------------------------------------------------------
 
-let richCfg: Js.Dict.t<Js.Json.t> = %raw(`{
+let richCfg: dict<JSON.t> = %raw(`{
   activePreset: "anthropic",
   activeMode: "budget",
   presets: {
@@ -89,18 +89,18 @@ let richCfg: Js.Dict.t<Js.Json.t> = %raw(`{
 
 test("getActiveTiers: returns the active preset's tiers", () => {
   let tiers = Protocol.getActiveTiers(Protocol.tierConfigFromDict(minimalCfg))
-  assertionEqual(~operator="key count", "only", Array.unsafe_get(Js.Dict.keys(tiers), 0))
+  assertionEqual(~operator="key count", "only", Array.getUnsafe(Dict.keysToArray(tiers), 0))
 })
 
 test("getActiveTiers: falls back to first preset when activePreset unknown", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "missing",
     presets: { p: { only: { model: "prov/model-x", description: "d", whenToUse: ["x"] } } },
     rules: [],
     defaultTier: "only"
   }`)
   let tiers = Protocol.getActiveTiers(Protocol.tierConfigFromDict(cfg))
-  assertionTrue(~operator="tiers defined", Array.length(Js.Dict.keys(tiers)) > 0)
+  assertionTrue(~operator="tiers defined", Array.length(Dict.keysToArray(tiers)) > 0)
 })
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ test("getActiveMode: returns undefined when modes absent", () => {
 })
 
 test("getActiveMode: returns undefined when activeMode absent", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "p",
     presets: { p: { only: { model: "prov/model-x", description: "d", whenToUse: ["x"] } } },
     rules: [],
@@ -142,7 +142,11 @@ test("getActiveMode: returns active mode when present", () => {
 // ---------------------------------------------------------------------------
 
 test("buildTaskTaxonomy: returns empty string when taskPatterns absent", () => {
-  assertionEqual(~operator="empty", "", Protocol.buildTaskTaxonomy(Protocol.tierConfigFromDict(minimalCfg)))
+  assertionEqual(
+    ~operator="empty",
+    "",
+    Protocol.buildTaskTaxonomy(Protocol.tierConfigFromDict(minimalCfg)),
+  )
 })
 
 test("buildTaskTaxonomy: builds R: line when taskPatterns present", () => {
@@ -152,7 +156,7 @@ test("buildTaskTaxonomy: builds R: line when taskPatterns present", () => {
 })
 
 test("buildTaskTaxonomy: skips empty pattern arrays", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "p",
     presets: { p: { only: { model: "prov/model-x", description: "d", whenToUse: ["x"] } } },
     rules: [],
@@ -167,15 +171,23 @@ test("buildTaskTaxonomy: skips empty pattern arrays", () => {
 // ---------------------------------------------------------------------------
 
 test("buildDecomposeHint: returns empty when active mode has overrideRules", () => {
-  assertionEqual(~operator="overrideRules present", "", Protocol.buildDecomposeHint(Protocol.tierConfigFromDict(richCfg)))
+  assertionEqual(
+    ~operator="overrideRules present",
+    "",
+    Protocol.buildDecomposeHint(Protocol.tierConfigFromDict(richCfg)),
+  )
 })
 
 test("buildDecomposeHint: returns empty when fewer than 2 tiers", () => {
-  assertionEqual(~operator="only one tier", "", Protocol.buildDecomposeHint(Protocol.tierConfigFromDict(minimalCfg)))
+  assertionEqual(
+    ~operator="only one tier",
+    "",
+    Protocol.buildDecomposeHint(Protocol.tierConfigFromDict(minimalCfg)),
+  )
 })
 
 test("buildDecomposeHint: returns explore→execute hint for 2+ tiers in normal mode", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "anthropic",
     presets: {
       anthropic: {
@@ -195,7 +207,11 @@ test("buildDecomposeHint: returns explore→execute hint for 2+ tiers in normal 
 // ---------------------------------------------------------------------------
 
 test("buildFallbackInstructions: returns empty when no fallback configured", () => {
-  assertionEqual(~operator="no fallback", "", Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(minimalCfg)))
+  assertionEqual(
+    ~operator="no fallback",
+    "",
+    Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(minimalCfg)),
+  )
 })
 
 test("buildFallbackInstructions: uses fb.global when no preset-specific map", () => {
@@ -204,7 +220,7 @@ test("buildFallbackInstructions: uses fb.global when no preset-specific map", ()
 })
 
 test("buildFallbackInstructions: prefers non-empty preset-specific map over global", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "anthropic",
     activeMode: "budget",
     presets: {
@@ -223,7 +239,7 @@ test("buildFallbackInstructions: prefers non-empty preset-specific map over glob
 })
 
 test("buildFallbackInstructions: returns empty when chain map yields no valid targets", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "anthropic",
     activeMode: "budget",
     presets: {
@@ -237,11 +253,15 @@ test("buildFallbackInstructions: returns empty when chain map yields no valid ta
     modes: { budget: { defaultTier: "fast", description: "cheap", overrideRules: ["o1", "o2"] } },
     fallback: { global: { anthropic: ["nonexistent"] } },
   }`)
-  assertionEqual(~operator="no valid targets", "", Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(cfg)))
+  assertionEqual(
+    ~operator="no valid targets",
+    "",
+    Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(cfg)),
+  )
 })
 
 test("buildFallbackInstructions: skips non-array chain entries", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "anthropic",
     activeMode: "budget",
     presets: {
@@ -255,7 +275,11 @@ test("buildFallbackInstructions: skips non-array chain entries", () => {
     modes: { budget: { defaultTier: "fast", description: "cheap", overrideRules: ["o1", "o2"] } },
     fallback: { global: { anthropic: "openai" } },
   }`)
-  assertionEqual(~operator="non-array", "", Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(cfg)))
+  assertionEqual(
+    ~operator="non-array",
+    "",
+    Protocol.buildFallbackInstructions(Protocol.tierConfigFromDict(cfg)),
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -285,23 +309,29 @@ test("buildDelegationProtocol: renders rich config with variant, costRatio, mode
 // ---------------------------------------------------------------------------
 
 test("isClaudeModel: undefined returns false", () => {
-  assertionFalse(~operator="undefined", Protocol.isClaudeModel(Js.Nullable.null))
+  assertionFalse(~operator="undefined", Protocol.isClaudeModel(Nullable.null))
 })
 
 test("isClaudeModel: anthropic/ prefix returns true", () => {
-  assertionTrue(~operator="anthropic/", Protocol.isClaudeModel(Js.Nullable.return("anthropic/claude-haiku-4-5")))
+  assertionTrue(
+    ~operator="anthropic/",
+    Protocol.isClaudeModel(Nullable.make("anthropic/claude-haiku-4-5")),
+  )
 })
 
 test("isClaudeModel: claude- in path returns true", () => {
-  assertionTrue(~operator="bedrock/claude-3-sonnet", Protocol.isClaudeModel(Js.Nullable.return("bedrock/claude-3-sonnet")))
+  assertionTrue(
+    ~operator="bedrock/claude-3-sonnet",
+    Protocol.isClaudeModel(Nullable.make("bedrock/claude-3-sonnet")),
+  )
 })
 
 test("isClaudeModel: leading claude- returns true", () => {
-  assertionTrue(~operator="claude-3-opus", Protocol.isClaudeModel(Js.Nullable.return("claude-3-opus")))
+  assertionTrue(~operator="claude-3-opus", Protocol.isClaudeModel(Nullable.make("claude-3-opus")))
 })
 
 test("isClaudeModel: non-claude returns false", () => {
-  assertionFalse(~operator="openai/gpt-5", Protocol.isClaudeModel(Js.Nullable.return("openai/gpt-5")))
+  assertionFalse(~operator="openai/gpt-5", Protocol.isClaudeModel(Nullable.make("openai/gpt-5")))
 })
 
 // ---------------------------------------------------------------------------
@@ -309,27 +339,33 @@ test("isClaudeModel: non-claude returns false", () => {
 // ---------------------------------------------------------------------------
 
 test("CLAUDE_TIER_PREFIX: has fast key", () => {
-  assertionTrue(~operator="has fast", Protocol.claudeTierPrefix->Js.Dict.get("fast")->Option.isSome)
+  assertionTrue(~operator="has fast", Protocol.claudeTierPrefix->Dict.get("fast")->Option.isSome)
 })
 
 test("CLAUDE_TIER_PREFIX: has medium key", () => {
-  assertionTrue(~operator="has medium", Protocol.claudeTierPrefix->Js.Dict.get("medium")->Option.isSome)
+  assertionTrue(
+    ~operator="has medium",
+    Protocol.claudeTierPrefix->Dict.get("medium")->Option.isSome,
+  )
 })
 
 test("CLAUDE_TIER_PREFIX: has heavy key", () => {
-  assertionTrue(~operator="has heavy", Protocol.claudeTierPrefix->Js.Dict.get("heavy")->Option.isSome)
+  assertionTrue(~operator="has heavy", Protocol.claudeTierPrefix->Dict.get("heavy")->Option.isSome)
 })
 
 test("CLAUDE_TIER_PREFIX: has light key", () => {
-  assertionTrue(~operator="has light", Protocol.claudeTierPrefix->Js.Dict.get("light")->Option.isSome)
+  assertionTrue(~operator="has light", Protocol.claudeTierPrefix->Dict.get("light")->Option.isSome)
 })
 
 test("CLAUDE_TIER_PREFIX: has focused key", () => {
-  assertionTrue(~operator="has focused", Protocol.claudeTierPrefix->Js.Dict.get("focused")->Option.isSome)
+  assertionTrue(
+    ~operator="has focused",
+    Protocol.claudeTierPrefix->Dict.get("focused")->Option.isSome,
+  )
 })
 
 test("CLAUDE_TIER_PREFIX: fast prefix is non-empty string", () => {
-  let v = Js.Dict.get(Protocol.claudeTierPrefix, "fast")
+  let v = Dict.get(Protocol.claudeTierPrefix, "fast")
   switch v {
   | Some(s) => assertionTrue(~operator="non-empty", String.length(s) > 0)
   | None => assertion(~operator="should exist", (_a, _b) => false, true, false)
@@ -337,7 +373,7 @@ test("CLAUDE_TIER_PREFIX: fast prefix is non-empty string", () => {
 })
 
 test("CLAUDE_TIER_PREFIX: light prefix is non-empty string", () => {
-  let v = Js.Dict.get(Protocol.claudeTierPrefix, "light")
+  let v = Dict.get(Protocol.claudeTierPrefix, "light")
   switch v {
   | Some(s) => assertionTrue(~operator="non-empty", String.length(s) > 0)
   | None => assertion(~operator="should exist", (_a, _b) => false, true, false)
@@ -351,7 +387,7 @@ test("CLAUDE_TIER_PREFIX: light prefix is non-empty string", () => {
 test("assembleSystemPrompt: prepends Claude override for Claude orchestrators", () => {
   let out = Protocol.assembleSystemPrompt(
     Protocol.tierConfigFromDict(minimalCfg),
-    Js.Nullable.return("anthropic/claude-haiku-4-5"),
+    Nullable.make("anthropic/claude-haiku-4-5"),
     false,
   )
   assertionContains(~operator="authority override", "AUTHORITY OVERRIDE", out)
@@ -362,17 +398,20 @@ test("assembleSystemPrompt: prepends Claude override for Claude orchestrators", 
 test("assembleSystemPrompt: returns bare protocol for non-Claude orchestrators", () => {
   let out = Protocol.assembleSystemPrompt(
     Protocol.tierConfigFromDict(minimalCfg),
-    Js.Nullable.return("openai/gpt-5"),
+    Nullable.make("openai/gpt-5"),
     false,
   )
-  assertionTrue(~operator="starts with delegation", Js.String2.startsWith(out, "## Model Delegation Protocol"))
+  assertionTrue(
+    ~operator="starts with delegation",
+    String.startsWith(out, "## Model Delegation Protocol"),
+  )
   assertionFalse(~operator="no authority override", String.indexOf(out, "AUTHORITY OVERRIDE") >= 0)
 })
 
 test("assembleSystemPrompt: appends DoD section when enforcementOn is true", () => {
   let out = Protocol.assembleSystemPrompt(
     Protocol.tierConfigFromDict(minimalCfg),
-    Js.Nullable.null,
+    Nullable.null,
     true,
   )
   assertionContains(~operator="acceptance block", "[acceptance]", out)
@@ -382,7 +421,7 @@ test("assembleSystemPrompt: appends DoD section when enforcementOn is true", () 
 test("assembleSystemPrompt: no DoD section when enforcementOn is false", () => {
   let out = Protocol.assembleSystemPrompt(
     Protocol.tierConfigFromDict(minimalCfg),
-    Js.Nullable.null,
+    Nullable.null,
     false,
   )
   assertionFalse(~operator="no acceptance block", String.indexOf(out, "[acceptance]") >= 0)
@@ -406,7 +445,7 @@ test("buildDoDProtocolSection: auto-inferred wording by default", () => {
 })
 
 test("buildDoDProtocolSection: REQUIRED wording when requireExplicitDoD is true", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "p",
     presets: { p: { only: { model: "prov/model-x", description: "d", whenToUse: ["x"] } } },
     rules: [],
@@ -425,7 +464,10 @@ test("buildDoDProtocolSection: REQUIRED wording when requireExplicitDoD is true"
 test("buildDelegationProtocol: minimal prompt exact snapshot", () => {
   let out = Protocol.buildDelegationProtocol(Protocol.tierConfigFromDict(minimalCfg))
   // Snapshot the exact prefix to verify byte-level parity
-  assertionTrue(~operator="starts with header", Js.String2.startsWith(out, "## Model Delegation Protocol"))
+  assertionTrue(
+    ~operator="starts with header",
+    String.startsWith(out, "## Model Delegation Protocol"),
+  )
   assertionContains(~operator="HARD ROUTING section", "### HARD ROUTING (non-negotiable)", out)
   assertionContains(~operator="ROLE CONTRACT section", "### ROLE CONTRACT", out)
   assertionContains(~operator="@fast contract", "### @fast contract", out)
@@ -445,7 +487,7 @@ test("buildDelegationProtocol: minimal prompt exact snapshot", () => {
 // ---------------------------------------------------------------------------
 
 test("buildTaskTaxonomy: includes light and focused patterns in five-tier config", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "multi-provider",
     activeMode: "normal",
     presets: {
@@ -480,7 +522,7 @@ test("buildTaskTaxonomy: includes light and focused patterns in five-tier config
 // ---------------------------------------------------------------------------
 
 test("buildDelegationProtocol: renders light tier in tier line", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "multi-provider",
     activeMode: "normal",
     presets: {
@@ -502,7 +544,7 @@ test("buildDelegationProtocol: renders light tier in tier line", () => {
 })
 
 test("buildDelegationProtocol: contains @light contract section", () => {
-  let cfg: Js.Dict.t<Js.Json.t> = %raw(`{
+  let cfg: dict<JSON.t> = %raw(`{
     activePreset: "multi-provider",
     activeMode: "normal",
     presets: {

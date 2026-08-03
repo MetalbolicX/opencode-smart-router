@@ -12,12 +12,12 @@
 
 // Validate the tierCaps block: each cap must be a finite positive integer.
 // tierCaps is optional — no-op if absent.
-let validateTierCaps: (Js.Dict.t<Js.Json.t>) => unit
+let validateTierCaps: dict<JSON.t> => unit
 
 // Validate the tierPrompts block: each prompt must be a string.
 // tierPrompts is optional — no-op if absent.
-let validateTierPrompts: (Js.Dict.t<Js.Json.t>) => unit
+let validateTierPrompts: dict<JSON.t> => unit
 
 // Validate the taskPatterns block: each patterns value must be an array of strings.
 // taskPatterns is optional — no-op if absent.
-let validateTaskPatterns: (Js.Dict.t<Js.Json.t>) => unit
+let validateTaskPatterns: dict<JSON.t> => unit

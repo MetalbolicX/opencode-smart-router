@@ -32,12 +32,12 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: Js.Dict.t<float>,
+  recommended?: dict<float>,
 }
 
 type resolvedReasoning = {
   variant?: string,
-  options?: Js.Dict.t<unknown>,
+  options?: dict<unknown>,
 }
 
 // ---------------------------------------------------------------------------
@@ -46,19 +46,19 @@ type resolvedReasoning = {
 
 // Build { reasoning_effort: picked }
 @setRuntimeSideEffects
-let _effortOpts = (picked: string): Js.Dict.t<unknown> => {
+let _effortOpts = (_picked: string): dict<unknown> => {
   %raw(`(function(p) { return { "reasoning_effort": p }; })(arguments[0])`)
 }
 
 // Build { budget_tokens: tokens }
 @setRuntimeSideEffects
-let _budgetOpts = (tokens: float): Js.Dict.t<unknown> => {
+let _budgetOpts = (_tokens: float): dict<unknown> => {
   %raw(`(function(t) { return { "budget_tokens": t }; })(arguments[0])`)
 }
 
 // Compute Math.round((rank / 3) * (len - 1)) — %raw cannot capture let bindings
 @setRuntimeSideEffects
-let _clampIdx = (rank: int, len: int): int => {
+let _clampIdx = (_rank: int, _len: int): int => {
   %raw(`(function(rank, len) { return Math.round((rank / 3) * (len - 1)); })(arguments[0], arguments[1])`)
 }
 
@@ -66,12 +66,12 @@ let _clampIdx = (rank: int, len: int): int => {
 // DISCRETE_RANK — maps normalized level to ordinal position
 // ---------------------------------------------------------------------------
 
-let discreteRank: Js.Dict.t<int> = {
-  let d = Js.Dict.empty()
-  Js.Dict.set(d, "minimal", 0)
-  Js.Dict.set(d, "normal", 1)
-  Js.Dict.set(d, "elevated", 2)
-  Js.Dict.set(d, "max", 3)
+let discreteRank: dict<int> = {
+  let d = Dict.make()
+  Dict.set(d, "minimal", 0)
+  Dict.set(d, "normal", 1)
+  Dict.set(d, "elevated", 2)
+  Dict.set(d, "max", 3)
   d
 }
 
@@ -79,7 +79,9 @@ let discreteRank: Js.Dict.t<int> = {
 // translateLevel — pure capability-to-patch translator
 // ---------------------------------------------------------------------------
 
-let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<resolvedReasoning> => {
+let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<
+  resolvedReasoning,
+> => {
   // Switch on kind string — matches TS discriminated union via string literals
   switch cap.kind {
   | "none" => None
@@ -88,12 +90,12 @@ let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<r
       let isElevated = level === #elevated || level === #max
       if isElevated {
         switch cap.elevated {
-        | Some(v) => Some({ variant: v })
+        | Some(v) => Some({variant: v})
         | None => None
         }
       } else {
         switch cap.baseline {
-        | Some(b) => Some({ variant: b })
+        | Some(b) => Some({variant: b})
         | None => None
         }
       }
@@ -107,7 +109,7 @@ let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<r
       | #elevated => "elevated"
       | #max => "max"
       }
-      let rank = switch Js.Dict.get(discreteRank, levelName) {
+      let rank = switch Dict.get(discreteRank, levelName) {
       | Some(r) => r
       | None => 0
       }
@@ -130,10 +132,10 @@ let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<r
           None
         } else {
           switch cap.field {
-          | Some("variant") => Some({ variant: picked })
+          | Some("variant") => Some({variant: picked})
           | _ => {
               let opts = _effortOpts(picked)
-              Some({ options: opts })
+              Some({options: opts})
             }
           }
         }
@@ -149,16 +151,16 @@ let translateLevel = (cap: reasoningCapability, level: reasoningLevel): option<r
       }
       let rec_ = switch cap.recommended {
       | Some(r) => r
-      | None => Js.Dict.empty()
+      | None => Dict.make()
       }
-      let tokens = switch Js.Dict.get(rec_, levelName) {
+      let tokens = switch Dict.get(rec_, levelName) {
       | Some(t) => Some(t)
-      | None => Js.Dict.get(rec_, "normal")
+      | None => Dict.get(rec_, "normal")
       }
       switch tokens {
       | Some(t) => {
           let opts = _budgetOpts(t)
-          Some({ options: opts })
+          Some({options: opts})
         }
       | None => None
       }

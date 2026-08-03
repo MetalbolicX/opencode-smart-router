@@ -32,14 +32,14 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: Js.Dict.t<float>,
+  recommended?: dict<float>,
 }
 
 // Provider-specific patch returned by translateLevel.
 // null = no-op / capability can't satisfy this level.
 type resolvedReasoning = {
   variant?: string,
-  options?: Js.Dict.t<unknown>,
+  options?: dict<unknown>,
 }
 
 // translateLevel: pure function — no side effects, no IO.

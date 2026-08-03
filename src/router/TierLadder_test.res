@@ -12,20 +12,10 @@ open Test
 // ---------------------------------------------------------------------------
 
 let arrayEqual = (a: array<string>, b: array<string>): unit =>
-  assertion(
-    ~operator="arrayEqual",
-    (a, b) => Belt.Array.eq(a, b, (x, y) => x === y),
-    a,
-    b,
-  )
+  assertion(~operator="arrayEqual", (a, b) => Belt.Array.eq(a, b, (x, y) => x === y), a, b)
 
 let notSameRef = (a: array<string>, b: array<string>): unit =>
-  assertion(
-    ~operator="notSameRef",
-    (a, b) => a !== b,
-    a,
-    b,
-  )
+  assertion(~operator="notSameRef", (a, b) => a !== b, a, b)
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -38,7 +28,8 @@ let makeCfg = (
   tiers: array<(string, string, option<float>)>,
   explicitLadder: option<array<string>>,
 ): Config.t => {
-  let tiersJson = tiers
+  let tiersJson =
+    tiers
     ->Array.map(((name, model, costRatio)) => {
       let costPart = switch costRatio {
       | Some(r) => `,"costRatio":${Float.toString(r)}`
@@ -46,11 +37,11 @@ let makeCfg = (
       }
       `    "${name}":{"model":"${model}","description":"","whenToUse":[]${costPart}}`
     })
-    ->Js.Array2.joinWith(",\n")
+    ->Array.joinUnsafe(",\n")
 
   let ladderJson = switch explicitLadder {
   | Some(arr) => {
-      let items = arr->Array.map(s => `"${s}"`)->Js.Array2.joinWith(",")
+      let items = arr->Array.map(s => `"${s}"`)->Array.joinUnsafe(",")
       `,"enforcement":{"escalate":{"ladder":[${items}]}}`
     }
   | None => ""
@@ -65,9 +56,9 @@ ${tiersJson}
   "defaultTier": "medium"${ladderJson}
 }`
 
-  switch Config.parse(Js.Json.parseExn(jsonStr)) {
+  switch Config.parse(JSON.parseOrThrow(jsonStr)) {
   | Some(cfg) => cfg
-  | None => Js.Exn.raiseError("makeCfg: failed to parse constructed JSON")
+  | None => JsError.throwWithMessage("makeCfg: failed to parse constructed JSON")
   }
 }
 
@@ -76,19 +67,13 @@ ${tiersJson}
 // ---------------------------------------------------------------------------
 
 test("explicit enforcement.escalate.ladder is returned unchanged", () => {
-  let cfg = makeCfg(
-    [(("fast", "a/f", None))],
-    Some([("medium"), ("heavy")]),
-  )
+  let cfg = makeCfg([("fast", "a/f", None)], Some(["medium", "heavy"]))
   let result = TierLadder.resolveLadder(cfg)
   arrayEqual(result, ["medium", "heavy"])
 })
 
 test("explicit ladder is copied (not the same array reference)", () => {
-  let cfg = makeCfg(
-    [(("fast", "a/f", None))],
-    Some([("medium"), ("heavy")]),
-  )
+  let cfg = makeCfg([("fast", "a/f", None)], Some(["medium", "heavy"]))
   let result = TierLadder.resolveLadder(cfg)
   notSameRef(result, ["medium", "heavy"])
   arrayEqual(result, ["medium", "heavy"])
@@ -96,12 +81,8 @@ test("explicit ladder is copied (not the same array reference)", () => {
 
 test("explicit ladder wins over preset costRatio ordering", () => {
   let cfg = makeCfg(
-    [
-      ("fast", "a/f", Some(1.0)),
-      ("medium", "a/m", Some(5.0)),
-      ("heavy", "a/h", Some(20.0)),
-    ],
-    Some([("heavy"), ("fast")]),
+    [("fast", "a/f", Some(1.0)), ("medium", "a/m", Some(5.0)), ("heavy", "a/h", Some(20.0))],
+    Some(["heavy", "fast"]),
   )
   arrayEqual(TierLadder.resolveLadder(cfg), ["heavy", "fast"])
 })
@@ -111,32 +92,33 @@ test("explicit ladder wins over preset costRatio ordering", () => {
 // ---------------------------------------------------------------------------
 
 test("preset tiers sorted by costRatio ascending", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(1.0)),
-    ("light", "a/l", Some(2.0)),
-    ("medium", "a/m", Some(5.0)),
-    ("focused", "a/fc", Some(10.0)),
-    ("heavy", "a/h", Some(20.0)),
-  ], None)
+  let cfg = makeCfg(
+    [
+      ("fast", "a/f", Some(1.0)),
+      ("light", "a/l", Some(2.0)),
+      ("medium", "a/m", Some(5.0)),
+      ("focused", "a/fc", Some(10.0)),
+      ("heavy", "a/h", Some(20.0)),
+    ],
+    None,
+  )
   arrayEqual(TierLadder.resolveLadder(cfg), ["fast", "light", "medium", "focused", "heavy"])
 })
 
 test("missing costRatio sorts to end (stable insertion order tie-break)", () => {
-  let cfg = makeCfg([
-    ("alpha", "a/a", None),
-    ("beta", "a/b", Some(1.0)),
-    ("gamma", "a/g", None),
-  ], None)
+  let cfg = makeCfg(
+    [("alpha", "a/a", None), ("beta", "a/b", Some(1.0)), ("gamma", "a/g", None)],
+    None,
+  )
   // beta has costRatio=1, so it comes first; alpha and gamma have no costRatio, insertion order preserved
   arrayEqual(TierLadder.resolveLadder(cfg), ["beta", "alpha", "gamma"])
 })
 
 test("equal costRatio preserves insertion order (stable sort)", () => {
-  let cfg = makeCfg([
-    ("first", "a/f", Some(5.0)),
-    ("second", "a/s", Some(5.0)),
-    ("third", "a/t", Some(5.0)),
-  ], None)
+  let cfg = makeCfg(
+    [("first", "a/f", Some(5.0)), ("second", "a/s", Some(5.0)), ("third", "a/t", Some(5.0))],
+    None,
+  )
   // Stable sort: insertion order preserved for equal costRatio
   arrayEqual(TierLadder.resolveLadder(cfg), ["first", "second", "third"])
 })
@@ -146,19 +128,15 @@ test("equal costRatio preserves insertion order (stable sort)", () => {
 // ---------------------------------------------------------------------------
 
 test("three-tier preset returns exactly three rungs", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(1.0)),
-    ("medium", "a/m", Some(5.0)),
-    ("heavy", "a/h", Some(20.0)),
-  ], None)
+  let cfg = makeCfg(
+    [("fast", "a/f", Some(1.0)), ("medium", "a/m", Some(5.0)), ("heavy", "a/h", Some(20.0))],
+    None,
+  )
   arrayEqual(TierLadder.resolveLadder(cfg), ["fast", "medium", "heavy"])
 })
 
 test("two-tier preset returns exactly two rungs", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(1.0)),
-    ("heavy", "a/h", Some(20.0)),
-  ], None)
+  let cfg = makeCfg([("fast", "a/f", Some(1.0)), ("heavy", "a/h", Some(20.0))], None)
   arrayEqual(TierLadder.resolveLadder(cfg), ["fast", "heavy"])
 })
 
@@ -168,10 +146,7 @@ test("single-tier preset returns exactly one rung", () => {
 })
 
 test("preset with no costRatio returns present tiers in insertion order", () => {
-  let cfg = makeCfg([
-    ("zebra", "a/z", None),
-    ("alpha", "a/a", None),
-  ], None)
+  let cfg = makeCfg([("zebra", "a/z", None), ("alpha", "a/a", None)], None)
   arrayEqual(TierLadder.resolveLadder(cfg), ["zebra", "alpha"])
 })
 
@@ -180,13 +155,7 @@ test("preset with no costRatio returns present tiers in insertion order", () => 
 // ---------------------------------------------------------------------------
 
 test("does not mutate the input cfg", () => {
-  let cfg = makeCfg(
-    [
-      ("fast", "a/f", Some(1.0)),
-      ("medium", "a/m", Some(5.0)),
-    ],
-    Some([("medium")]),
-  )
+  let cfg = makeCfg([("fast", "a/f", Some(1.0)), ("medium", "a/m", Some(5.0))], Some(["medium"]))
   let ladderBefore = cfg.enforcement
   TierLadder.resolveLadder(cfg)->ignore
   assertion(
@@ -198,10 +167,7 @@ test("does not mutate the input cfg", () => {
 })
 
 test("does not mutate the explicit ladder array", () => {
-  let cfg = makeCfg(
-    [(("fast", "a/f", None))],
-    Some([("medium"), ("heavy")]),
-  )
+  let cfg = makeCfg([("fast", "a/f", None)], Some(["medium", "heavy"]))
   let getLadder = (cfg: Config.t): array<string> =>
     switch cfg.enforcement {
     | Some(e) =>
@@ -227,10 +193,7 @@ test("does not mutate the explicit ladder array", () => {
 })
 
 test("returns a fresh array on every call", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(1.0)),
-    ("medium", "a/m", Some(5.0)),
-  ], None)
+  let cfg = makeCfg([("fast", "a/f", Some(1.0)), ("medium", "a/m", Some(5.0))], None)
   let r1 = TierLadder.resolveLadder(cfg)
   let r2 = TierLadder.resolveLadder(cfg)
   notSameRef(r1, r2)
@@ -242,26 +205,17 @@ test("returns a fresh array on every call", () => {
 // ---------------------------------------------------------------------------
 
 test("custom three-tier preset resolves to 3 rungs with no extra tiers", () => {
-  let cfg = makeCfg([
-    ("turbo", "a/t", Some(15.0)),
-    ("fast", "a/f", Some(1.0)),
-    ("heavy", "a/h", Some(20.0)),
-  ], None)
-  let result = TierLadder.resolveLadder(cfg)
-  assertion(
-    ~operator="length3",
-    (r, _) => r == 3,
-    result->Array.length,
-    3,
+  let cfg = makeCfg(
+    [("turbo", "a/t", Some(15.0)), ("fast", "a/f", Some(1.0)), ("heavy", "a/h", Some(20.0))],
+    None,
   )
+  let result = TierLadder.resolveLadder(cfg)
+  assertion(~operator="length3", (r, _) => r == 3, result->Array.length, 3)
   arrayEqual(result, ["fast", "turbo", "heavy"])
 })
 
 test("enforcement absent returns preset tiers sorted by costRatio", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(3.0)),
-    ("heavy", "a/h", Some(1.0)),
-  ], None)
+  let cfg = makeCfg([("fast", "a/f", Some(3.0)), ("heavy", "a/h", Some(1.0))], None)
   arrayEqual(TierLadder.resolveLadder(cfg), ["heavy", "fast"])
 })
 
@@ -270,10 +224,9 @@ test("enforcement absent returns preset tiers sorted by costRatio", () => {
 // ---------------------------------------------------------------------------
 
 test("returns all tiers when skipTiers is not set", () => {
-  let cfg = makeCfg([
-    ("fast", "a/f", Some(1.0)),
-    ("medium", "a/m", Some(5.0)),
-    ("heavy", "a/h", Some(20.0)),
-  ], None)
+  let cfg = makeCfg(
+    [("fast", "a/f", Some(1.0)), ("medium", "a/m", Some(5.0)), ("heavy", "a/h", Some(20.0))],
+    None,
+  )
   arrayEqual(TierLadder.resolveLadder(cfg), ["fast", "medium", "heavy"])
 })

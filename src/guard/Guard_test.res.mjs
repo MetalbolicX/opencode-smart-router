@@ -2,7 +2,6 @@
 
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Guard from "./Guard.res.mjs";
-import * as Js_dict from "@rescript/runtime/lib/es6/Js_dict.js";
 import * as Js_string from "@rescript/runtime/lib/es6/Js_string.js";
 import * as Primitive_option from "@rescript/runtime/lib/es6/Primitive_option.js";
 
@@ -35,21 +34,21 @@ function assertionNullableEqual(operator, actual, expected) {
 }
 
 function argsDict(d) {
-  return Js_dict.fromArray([[
+  return Object.fromEntries([[
       "filePath",
       d.filePath
     ]]);
 }
 
 function commandDict(d) {
-  return Js_dict.fromArray([[
+  return Object.fromEntries([[
       "command",
       d.command
     ]]);
 }
 
 function grepArgsDict(pattern, path) {
-  return Js_dict.fromArray([
+  return Object.fromEntries([
     [
       "pattern",
       pattern

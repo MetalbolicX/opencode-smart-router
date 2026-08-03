@@ -25,19 +25,31 @@ open Test
 // For GREEN phase: valid input → no throw → assertion(0, 0) → PASS
 // For RED phase: function missing → ReferenceError → test fails
 let assertionNoThrow = (~operator: string, fn: unit => unit): unit =>
-  assertion(~operator, (_a, _b) => true, { fn(); 0 }, 0)
+  assertion(
+    ~operator,
+    (_a, _b) => true,
+    {
+      fn()
+      0
+    },
+    0,
+  )
 
 // ---------------------------------------------------------------------------
 // validatePresets tests
 // ---------------------------------------------------------------------------
 
 test("validatePresets: accepts a valid presets object with one preset", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{presets: {fast: {tier1: {model: "anthropic/claude-3-5-sonnet", description: "Fast tier", whenToUse: ["quick tasks"]}}}}`)
+  let dict: dict<
+    JSON.t,
+  > = %raw(`{presets: {fast: {tier1: {model: "anthropic/claude-3-5-sonnet", description: "Fast tier", whenToUse: ["quick tasks"]}}}}`)
   assertionNoThrow(~operator="valid single-preset", () => ValidatePresets.validatePresets(dict))
 })
 
 test("validatePresets: accepts multiple presets", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{presets: {fast: {tier1: {model: "anthropic/claude-3-5-sonnet", description: "Fast", whenToUse: ["quick"]}}, heavy: {tier1: {model: "anthropic/claude-3-5-opus", description: "Heavy", whenToUse: ["complex"]}}}}`)
+  let dict: dict<
+    JSON.t,
+  > = %raw(`{presets: {fast: {tier1: {model: "anthropic/claude-3-5-sonnet", description: "Fast", whenToUse: ["quick"]}}, heavy: {tier1: {model: "anthropic/claude-3-5-opus", description: "Heavy", whenToUse: ["complex"]}}}}`)
   assertionNoThrow(~operator="valid multi-preset", () => ValidatePresets.validatePresets(dict))
 })
 
@@ -46,13 +58,21 @@ test("validatePresets: accepts multiple presets", () => {
 // ---------------------------------------------------------------------------
 
 test("validatePreset: accepts a preset with a single tier", () => {
-  let preset: Js.Dict.t<Js.Json.t> = %raw(`{standard: {model: "openai/gpt-4o", description: "Standard tier", whenToUse: ["general"]}}`)
-  assertionNoThrow(~operator="preset single tier", () => ValidatePresets.validatePreset("myPreset", preset))
+  let preset: dict<
+    JSON.t,
+  > = %raw(`{standard: {model: "openai/gpt-4o", description: "Standard tier", whenToUse: ["general"]}}`)
+  assertionNoThrow(~operator="preset single tier", () =>
+    ValidatePresets.validatePreset("myPreset", preset)
+  )
 })
 
 test("validatePreset: accepts a preset with multiple tiers", () => {
-  let preset: Js.Dict.t<Js.Json.t> = %raw(`{tier1: {model: "openai/gpt-4o", description: "Standard", whenToUse: ["general"]}, tier2: {model: "anthropic/claude-3-5-opus", description: "Premium", whenToUse: ["complex"]}}`)
-  assertionNoThrow(~operator="preset multi tier", () => ValidatePresets.validatePreset("myPreset", preset))
+  let preset: dict<
+    JSON.t,
+  > = %raw(`{tier1: {model: "openai/gpt-4o", description: "Standard", whenToUse: ["general"]}, tier2: {model: "anthropic/claude-3-5-opus", description: "Premium", whenToUse: ["complex"]}}`)
+  assertionNoThrow(~operator="preset multi tier", () =>
+    ValidatePresets.validatePreset("myPreset", preset)
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -60,16 +80,26 @@ test("validatePreset: accepts a preset with multiple tiers", () => {
 // ---------------------------------------------------------------------------
 
 test("validateTier: accepts a fully-specified valid tier", () => {
-  let tier: Js.Dict.t<Js.Json.t> = %raw(`{model: "anthropic/claude-3-5-sonnet-20241022", description: "Fast and capable", whenToUse: ["quick tasks", "simple queries"]}`)
-  assertionNoThrow(~operator="valid full tier", () => ValidatePresets.validateTier("myPreset", "fast", tier))
+  let tier: dict<
+    JSON.t,
+  > = %raw(`{model: "anthropic/claude-3-5-sonnet-20241022", description: "Fast and capable", whenToUse: ["quick tasks", "simple queries"]}`)
+  assertionNoThrow(~operator="valid full tier", () =>
+    ValidatePresets.validateTier("myPreset", "fast", tier)
+  )
 })
 
 test("validateTier: accepts model with provider/model slash format", () => {
-  let tier: Js.Dict.t<Js.Json.t> = %raw(`{model: "x/x", description: "Minimal", whenToUse: ["test"]}`)
-  assertionNoThrow(~operator="valid slash model", () => ValidatePresets.validateTier("myPreset", "x", tier))
+  let tier: dict<JSON.t> = %raw(`{model: "x/x", description: "Minimal", whenToUse: ["test"]}`)
+  assertionNoThrow(~operator="valid slash model", () =>
+    ValidatePresets.validateTier("myPreset", "x", tier)
+  )
 })
 
 test("validateTier: accepts whenToUse array with single element", () => {
-  let tier: Js.Dict.t<Js.Json.t> = %raw(`{model: "anthropic/claude-3-5-sonnet", description: "Desc", whenToUse: ["only"]}`)
-  assertionNoThrow(~operator="single whenToUse", () => ValidatePresets.validateTier("myPreset", "t1", tier))
+  let tier: dict<
+    JSON.t,
+  > = %raw(`{model: "anthropic/claude-3-5-sonnet", description: "Desc", whenToUse: ["only"]}`)
+  assertionNoThrow(~operator="single whenToUse", () =>
+    ValidatePresets.validateTier("myPreset", "t1", tier)
+  )
 })

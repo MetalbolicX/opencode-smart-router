@@ -3,8 +3,8 @@
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Config from "./Config.res.mjs";
 import * as Belt_Array from "@rescript/runtime/lib/es6/Belt_Array.js";
-import * as Stdlib_Exn from "@rescript/runtime/lib/es6/Stdlib_Exn.js";
 import * as TierLadder from "./TierLadder.res.mjs";
+import * as Stdlib_JsError from "@rescript/runtime/lib/es6/Stdlib_JsError.js";
 
 function arrayEqual(a, b) {
   Test.assertion(undefined, "arrayEqual", (a, b) => Belt_Array.eq(a, b, (x, y) => x === y), a, b);
@@ -39,7 +39,7 @@ function makeCfg(tiers, explicitLadder) {
   if (cfg !== undefined) {
     return cfg;
   } else {
-    return Stdlib_Exn.raiseError("makeCfg: failed to parse constructed JSON");
+    return Stdlib_JsError.throwWithMessage("makeCfg: failed to parse constructed JSON");
   }
 }
 

@@ -20,12 +20,12 @@ open Test
 // assertionNull: check that actual is null.
 // Handles both None (undefined) and Some(null) — loose equality makes both pass.
 let assertionNull = (~operator: string, actual: option<'a>): unit =>
-  assertion(~operator, (a, _b) => a == null, Js.Nullable.fromOption(actual), Js.Nullable.null)
+  assertion(~operator, (a, _b) => a == null, Nullable.fromOption(actual), Nullable.null)
 
 // assertionNotNull: check that actual is not null (not undefined).
 // Returns true when actual is not null.
 let assertionNotNull = (~operator: string, actual: option<'a>): unit =>
-  assertion(~operator, (a, _b) => a != null, Js.Nullable.fromOption(actual), Js.Nullable.null)
+  assertion(~operator, (a, _b) => a != null, Nullable.fromOption(actual), Nullable.null)
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -47,13 +47,13 @@ let binaryTier: ReasoningPolicy.tierConfig = {
 // Tier with discrete capability (reasoning.effort)
 let discreteTier: ReasoningPolicy.tierConfig = {
   ...baseTier,
-  reasoning: { effort: "high" },
+  reasoning: {effort: "high"},
 }
 
 // Tier with budgeted capability
 let budgetedTier: ReasoningPolicy.tierConfig = {
   ...baseTier,
-  thinking: { budgetTokens: 4096 },
+  thinking: {budgetTokens: 4096},
 }
 
 // Tier with none capability (no reasoning fields)
@@ -106,22 +106,42 @@ let emptySignals: ReasoningPolicy.adaptiveSignals = {
 test("resolveReasoningOverride: static returns null for every level", () => {
   assertionNull(
     ~operator="minimal",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(staticPolicy), Some(#minimal), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(staticPolicy),
+      Some(#minimal),
+      emptySignals,
+    ),
   )
   assertionNull(
     ~operator="elevated",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(staticPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(staticPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
   assertionNull(
     ~operator="max",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(staticPolicy), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(staticPolicy),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
 test("resolveReasoningOverride: static ignores session override", () => {
   assertionNull(
     ~operator="with-override",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(staticPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(staticPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
 })
 
@@ -140,11 +160,21 @@ test("resolveReasoningOverride: manual translates session override (binary)", ()
   // binary: elevated/max → {variant: "thinking"}, minimal/normal → null (no baseline defined)
   assertionNotNull(
     ~operator="elevated",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(manualPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
   assertionNotNull(
     ~operator="max",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicy), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(manualPolicy),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
@@ -152,7 +182,12 @@ test("resolveReasoningOverride: manual uses defaultLevel when no override", () =
   // binary: elevated → {variant: "thinking"}
   assertionNotNull(
     ~operator="with-default",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicyWithDefault("elevated")), None, emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(manualPolicyWithDefault("elevated")),
+      None,
+      emptySignals,
+    ),
   )
 })
 
@@ -168,7 +203,12 @@ test("resolveReasoningOverride: manual session override wins over defaultLevel",
   // binary: max → elevated variant ("thinking")
   assertionNotNull(
     ~operator="override-wins",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(manualPolicyWithDefault("minimal")), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(manualPolicyWithDefault("minimal")),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
@@ -180,7 +220,12 @@ test("resolveReasoningOverride: manual with discrete tier (reasoning.effort)", (
   // discrete: elevated → medium (3-level ladder)
   assertionNotNull(
     ~operator="discrete",
-    ReasoningPolicy.resolveReasoningOverride(discreteTier, Some(manualPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      discreteTier,
+      Some(manualPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
 })
 
@@ -188,18 +233,33 @@ test("resolveReasoningOverride: manual with budgeted tier", () => {
   // budgeted: max → 16000
   assertionNotNull(
     ~operator="budgeted",
-    ReasoningPolicy.resolveReasoningOverride(budgetedTier, Some(manualPolicy), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      budgetedTier,
+      Some(manualPolicy),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
 test("resolveReasoningOverride: manual with none-capability tier returns null", () => {
   assertionNull(
     ~operator="none-cap",
-    ReasoningPolicy.resolveReasoningOverride(noneTier, Some(manualPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      noneTier,
+      Some(manualPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
   assertionNull(
     ~operator="none-cap-max",
-    ReasoningPolicy.resolveReasoningOverride(noneTier, Some(manualPolicy), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      noneTier,
+      Some(manualPolicy),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
@@ -216,7 +276,12 @@ test("resolveReasoningOverride: explicit capability wins over inference", () => 
   // explicit cap says elevated="max", not "thinking"
   assertionNotNull(
     ~operator="explicit-cap",
-    ReasoningPolicy.resolveReasoningOverride(tierWithCap, Some(manualPolicy), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      tierWithCap,
+      Some(manualPolicy),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
 })
 
@@ -227,22 +292,42 @@ test("resolveReasoningOverride: explicit capability wins over inference", () => 
 test("resolveReasoningOverride: unknown mode returns null", () => {
   assertionNull(
     ~operator="typo-mode",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(unknownPolicy("adaptive-typo")), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(unknownPolicy("adaptive-typo")),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
   assertionNull(
     ~operator="auto-mode",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(unknownPolicy("auto")), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(unknownPolicy("auto")),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
   assertionNull(
     ~operator="empty-mode",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(unknownPolicy("")), Some(#elevated), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(unknownPolicy("")),
+      Some(#elevated),
+      emptySignals,
+    ),
   )
 })
 
 test("resolveReasoningOverride: unknown mode ignores session override", () => {
   assertionNull(
     ~operator="override-ignored",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(unknownPolicy("adaptive-typo")), Some(#max), emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(unknownPolicy("adaptive-typo")),
+      Some(#max),
+      emptySignals,
+    ),
   )
 })
 
@@ -256,7 +341,12 @@ test("resolveReasoningOverride: unknown mode ignores adaptive block", () => {
   }
   assertionNull(
     ~operator="adaptive-block-ignored",
-    ReasoningPolicy.resolveReasoningOverride(binaryTier, Some(policyWithAdaptive), None, emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      binaryTier,
+      Some(policyWithAdaptive),
+      None,
+      emptySignals,
+    ),
   )
 })
 
@@ -274,6 +364,11 @@ test("resolveReasoningOverride: adaptive mode returns null (Phase 1 stub)", () =
   // Phase 1 stub: adaptive returns null until selectAdaptiveLevel is ported
   assertionNull(
     ~operator="adaptive-stub",
-    ReasoningPolicy.resolveReasoningOverride(discreteTier, Some(adaptivePolicy), None, emptySignals),
+    ReasoningPolicy.resolveReasoningOverride(
+      discreteTier,
+      Some(adaptivePolicy),
+      None,
+      emptySignals,
+    ),
   )
 })

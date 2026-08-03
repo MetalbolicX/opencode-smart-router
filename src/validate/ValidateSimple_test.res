@@ -25,29 +25,37 @@ open Test
 // For GREEN phase: valid input → no throw → assertion(0, 0) → PASS
 // For RED phase: function missing → ReferenceError → test fails
 let assertionNoThrow = (~operator: string, fn: unit => unit): unit =>
-  assertion(~operator, (_a, _b) => true, { fn(); 0 }, 0)
+  assertion(
+    ~operator,
+    (_a, _b) => true,
+    {
+      fn()
+      0
+    },
+    0,
+  )
 
 // ---------------------------------------------------------------------------
 // validateTierCaps tests
 // ---------------------------------------------------------------------------
 
 test("validateTierCaps: accepts a valid tierCaps object with one cap", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierCaps: {fast: 100, heavy: 50}}`)
+  let dict: dict<JSON.t> = %raw(`{tierCaps: {fast: 100, heavy: 50}}`)
   assertionNoThrow(~operator="valid caps", () => ValidateSimple.validateTierCaps(dict))
 })
 
 test("validateTierCaps: accepts tierCaps with various positive integers", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierCaps: {tier1: 1, tier2: 10, tier3: 1000}}`)
+  let dict: dict<JSON.t> = %raw(`{tierCaps: {tier1: 1, tier2: 10, tier3: 1000}}`)
   assertionNoThrow(~operator="various positive ints", () => ValidateSimple.validateTierCaps(dict))
 })
 
 test("validateTierCaps: passes silently when tierCaps is absent", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{activePreset: "default"}`)
+  let dict: dict<JSON.t> = %raw(`{activePreset: "default"}`)
   assertionNoThrow(~operator="absent tierCaps", () => ValidateSimple.validateTierCaps(dict))
 })
 
 test("validateTierCaps: accepts tierCaps with large positive integers", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierCaps: {big: 999999999}}`)
+  let dict: dict<JSON.t> = %raw(`{tierCaps: {big: 999999999}}`)
   assertionNoThrow(~operator="large positive int", () => ValidateSimple.validateTierCaps(dict))
 })
 
@@ -56,22 +64,26 @@ test("validateTierCaps: accepts tierCaps with large positive integers", () => {
 // ---------------------------------------------------------------------------
 
 test("validateTierPrompts: accepts a valid tierPrompts object with one prompt", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierPrompts: {fast: "Use fast model", heavy: "Use heavy model"}}`)
+  let dict: dict<JSON.t> = %raw(`{tierPrompts: {fast: "Use fast model", heavy: "Use heavy model"}}`)
   assertionNoThrow(~operator="valid prompts", () => ValidateSimple.validateTierPrompts(dict))
 })
 
 test("validateTierPrompts: accepts tierPrompts with various string values", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierPrompts: {tier1: "", tier2: "Hello", tier3: "Multi-word prompt"}}`)
-  assertionNoThrow(~operator="various string prompts", () => ValidateSimple.validateTierPrompts(dict))
+  let dict: dict<
+    JSON.t,
+  > = %raw(`{tierPrompts: {tier1: "", tier2: "Hello", tier3: "Multi-word prompt"}}`)
+  assertionNoThrow(~operator="various string prompts", () =>
+    ValidateSimple.validateTierPrompts(dict)
+  )
 })
 
 test("validateTierPrompts: passes silently when tierPrompts is absent", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{activePreset: "default"}`)
+  let dict: dict<JSON.t> = %raw(`{activePreset: "default"}`)
   assertionNoThrow(~operator="absent tierPrompts", () => ValidateSimple.validateTierPrompts(dict))
 })
 
 test("validateTierPrompts: accepts tierPrompts with empty string values", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{tierPrompts: {empty: ""}}`)
+  let dict: dict<JSON.t> = %raw(`{tierPrompts: {empty: ""}}`)
   assertionNoThrow(~operator="empty string prompt", () => ValidateSimple.validateTierPrompts(dict))
 })
 
@@ -80,21 +92,23 @@ test("validateTierPrompts: accepts tierPrompts with empty string values", () => 
 // ---------------------------------------------------------------------------
 
 test("validateTaskPatterns: accepts a valid taskPatterns object with one pattern array", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{taskPatterns: {read: ["*.md", "*.txt"], write: ["*.ts"]}}`)
+  let dict: dict<JSON.t> = %raw(`{taskPatterns: {read: ["*.md", "*.txt"], write: ["*.ts"]}}`)
   assertionNoThrow(~operator="valid patterns", () => ValidateSimple.validateTaskPatterns(dict))
 })
 
 test("validateTaskPatterns: accepts taskPatterns with empty arrays", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{taskPatterns: {empty: []}}`)
-  assertionNoThrow(~operator="empty pattern arrays", () => ValidateSimple.validateTaskPatterns(dict))
+  let dict: dict<JSON.t> = %raw(`{taskPatterns: {empty: []}}`)
+  assertionNoThrow(~operator="empty pattern arrays", () =>
+    ValidateSimple.validateTaskPatterns(dict)
+  )
 })
 
 test("validateTaskPatterns: passes silently when taskPatterns is absent", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{activePreset: "default"}`)
+  let dict: dict<JSON.t> = %raw(`{activePreset: "default"}`)
   assertionNoThrow(~operator="absent taskPatterns", () => ValidateSimple.validateTaskPatterns(dict))
 })
 
 test("validateTaskPatterns: accepts taskPatterns with multiple patterns", () => {
-  let dict: Js.Dict.t<Js.Json.t> = %raw(`{taskPatterns: {docs: ["*.md", "*.rst", "*.adoc"]}}`)
+  let dict: dict<JSON.t> = %raw(`{taskPatterns: {docs: ["*.md", "*.rst", "*.adoc"]}}`)
   assertionNoThrow(~operator="multi-pattern array", () => ValidateSimple.validateTaskPatterns(dict))
 })
