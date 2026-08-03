@@ -46,11 +46,11 @@ let makeCfg = (
       }
       `    "${name}":{"model":"${model}","description":"","whenToUse":[]${costPart}}`
     })
-    ->Js.Array2.joinWith(",\n")
+    ->Stdlib.Array.join(",\n")
 
   let ladderJson = switch explicitLadder {
   | Some(arr) => {
-      let items = arr->Array.map(s => `"${s}"`)->Js.Array2.joinWith(",")
+      let items = arr->Array.map(s => `"${s}"`)->Stdlib.Array.join(",")
       `,"enforcement":{"escalate":{"ladder":[${items}]}}`
     }
   | None => ""
@@ -65,9 +65,9 @@ ${tiersJson}
   "defaultTier": "medium"${ladderJson}
 }`
 
-  switch Config.parse(Js.Json.parseExn(jsonStr)) {
+  switch Config.parse(JSON.parseOrThrow(jsonStr)) {
   | Some(cfg) => cfg
-  | None => Js.Exn.raiseError("makeCfg: failed to parse constructed JSON")
+  | None => failwith("makeCfg: failed to parse constructed JSON")
   }
 }
 
