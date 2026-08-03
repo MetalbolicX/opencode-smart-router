@@ -49,20 +49,15 @@ let isReasoningLevel = (v: JSON.t): bool => {
 }
 
 // Guard: throws if val is not a plain object (for sub-object checks)
-let _ensureIsObjectVal = (val: JSON.t, path: string): unit => {
-  if JSON.Decode.object(val)->Option.isNone {
+let _ensureIsObjectVal = (_val: JSON.t, path: string): unit => {
+  if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
     throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
   }
 }
 
-// Test if a string is a valid regex via RegExp.fromString
-let _testRegex = (s: string): bool => {
-  try {
-    let _ = RegExp.fromString(s)
-    true
-  } catch {
-  | _ => false
-  }
+// Test if a string is a valid regex via new RegExp()
+let _testRegex = (_s: string): bool => {
+  %raw(`(function(s) { try { new RegExp(s); return true; } catch(e) { return false; } })(arguments[0])`)
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +68,7 @@ let _testRegex = (s: string): bool => {
 // validateKeywordRule must come before validateKeywordRules (called by it)
 let rec validateKeywordRule = (ruleJson: JSON.t, index: int): unit => {
   let prefix = `reasoningPolicy.adaptive.keywordRules[${Belt.Int.toString(index)}]`
-  if JSON.Decode.object(ruleJson)->Option.isNone {
+  if %raw(`!(ruleJson && typeof ruleJson === 'object' && !Array.isArray(ruleJson))`) {
     throw(JsError.throwWithMessage(`tiers.json: ${prefix} must be an object`))
   }
   switch JSON.Decode.object(ruleJson) {
@@ -273,7 +268,7 @@ and validateKeywordRules = (adaptive: dict<JSON.t>): unit => {
 and validateAdaptiveTierDefaults = (adaptive: dict<JSON.t>): unit => {
   switch Dict.get(adaptive, "tierDefaults") {
   | Some(json) => {
-      if JSON.Decode.object(json)->Option.isNone {
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
         throw(
           JsError.throwWithMessage(
             "tiers.json: reasoningPolicy.adaptive.tierDefaults must be an object",
@@ -339,18 +334,18 @@ and validateAdaptiveSurfaceDecision = (adaptive: dict<JSON.t>): unit => {
 and validateLevelOrNull = (obj: dict<JSON.t>, key: string, path: string): unit => {
   switch Dict.get(obj, key) {
   | Some(json) =>
-    switch JSON.Decode.null(json) {
-    | Some(_) => () // null is allowed
-    | None =>
-      if !isReasoningLevel(json) {
-        throw(
-          JsError.throwWithMessage(
-            `tiers.json: ${path} must be one of minimal|normal|elevated|max or null (got ${JSON.stringify(
-                json,
-              )})`,
-          ),
-        )
-      }
+    if %raw(`json === null`) {
+      () // null is allowed
+    } else if !isReasoningLevel(json) {
+      throw(
+        JsError.throwWithMessage(
+          `tiers.json: ${path} must be one of minimal|normal|elevated|max or null (got ${JSON.stringify(
+              json,
+            )})`,
+        ),
+      )
+    } else {
+      ()
     }
   | None => ()
   }
@@ -359,7 +354,7 @@ and validateLevelOrNull = (obj: dict<JSON.t>, key: string, path: string): unit =
 and validateAdaptivePolicy = (policy: dict<JSON.t>): unit => {
   switch Dict.get(policy, "adaptive") {
   | Some(json) => {
-      if JSON.Decode.object(json)->Option.isNone {
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
         throw(JsError.throwWithMessage("tiers.json: reasoningPolicy.adaptive must be an object"))
       }
       switch JSON.Decode.object(json) {
@@ -408,7 +403,7 @@ and validateReasoningPolicyMode = (policy: dict<JSON.t>): unit => {
 and validateReasoningPolicy = (obj: dict<JSON.t>): unit => {
   switch Dict.get(obj, "reasoningPolicy") {
   | Some(json) => {
-      if JSON.Decode.object(json)->Option.isNone {
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
         throw(JsError.throwWithMessage("tiers.json: 'reasoningPolicy' must be an object"))
       }
       switch JSON.Decode.object(json) {

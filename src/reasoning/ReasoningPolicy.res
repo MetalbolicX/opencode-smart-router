@@ -55,7 +55,7 @@ type adaptiveSignals = {
 
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<JSON.t>,
+  options?: dict<unknown>,
 }
 
 // Mutually recursive types — reasoningPolicyConfig references adaptivePolicyConfig
@@ -113,11 +113,11 @@ let _getDefaultLevel = (policy: option<reasoningPolicyConfig>): option<string> =
   }
 }
 
-// Returns JS null (not undefined) to match the original contract — callers
-// expect null when reasoning is not applicable. Nullable.null maps to JS null,
-// while None would map to undefined. Use Nullable.t<resolvedReasoning> + convert
-// at boundaries to preserve the original API behavior.
-let _nullResult = (): Nullable.t<resolvedReasoning> => Nullable.null
+// %raw helper: return explicit JS null instead of undefined (which is what None compiles to)
+@setRuntimeSideEffects
+let _nullResult = (): resolvedReasoning => {
+  %raw("null")
+}
 
 // ---------------------------------------------------------------------------
 // resolveReasoningOverride — main export
@@ -128,14 +128,14 @@ let resolveReasoningOverride = (
   policy: option<reasoningPolicyConfig>,
   sessionOverride: option<reasoningLevel>,
   _signals: adaptiveSignals,
-): Nullable.t<resolvedReasoning> => {
+): option<resolvedReasoning> => {
   let mode = _getMode(policy)
 
   // Primary regression guard: static mode hard no-op.
   // policy absent OR mode === "static" → null (not undefined)
   switch mode {
-  | Some("static") => _nullResult()
-  | None => _nullResult()
+  | Some("static") => _nullResult()->Some
+  | None => _nullResult()->Some
   | _ => // Manual mode: sessionOverride ?? defaultLevel, then translate
     switch mode {
     | Some("manual") => {
@@ -159,20 +159,20 @@ let resolveReasoningOverride = (
               ) :> ReasoningTranslate.reasoningCapability)
             }
             switch ReasoningTranslate.translateLevel(cap, l) {
-            | Some(r) => Nullable.make((r :> resolvedReasoning))
-            | None => _nullResult()
+            | Some(r) => Some((r :> resolvedReasoning))
+            | None => _nullResult()->Some
             }
           }
-        | None => _nullResult()
+        | None => _nullResult()->Some
         }
       }
 
     // Adaptive mode: Phase 2 will replace with call to selectAdaptiveLevel.
     // For Phase 1, stub to null (adaptive.ts not yet ported).
-    | Some("adaptive") => _nullResult()
+    | Some("adaptive") => _nullResult()->Some
 
     // Unknown mode (not static, not manual, not adaptive): fail soft to null
-    | _ => _nullResult()
+    | _ => _nullResult()->Some
     }
   }
 }

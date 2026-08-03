@@ -39,7 +39,7 @@ type reasoningCapability = {
 // null = no-op / capability can't satisfy this level.
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<JSON.t>,
+  options?: dict<unknown>,
 }
 
 // translateLevel: pure function — no side effects, no IO.

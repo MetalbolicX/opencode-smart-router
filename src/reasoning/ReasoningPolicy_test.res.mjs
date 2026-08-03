@@ -2,13 +2,14 @@
 
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as ReasoningPolicy from "./ReasoningPolicy.res.mjs";
+import * as Stdlib_Nullable from "@rescript/runtime/lib/es6/Stdlib_Nullable.js";
 
 function assertionNull(operator, actual) {
-  Test.assertion(undefined, operator, (a, _b) => a === null, actual, null);
+  Test.assertion(undefined, operator, (a, _b) => a === null, Stdlib_Nullable.fromOption(actual), null);
 }
 
 function assertionNotNull(operator, actual) {
-  Test.assertion(undefined, operator, (a, _b) => a !== null, actual, null);
+  Test.assertion(undefined, operator, (a, _b) => a !== null, Stdlib_Nullable.fromOption(actual), null);
 }
 
 let baseTier_whenToUse = [];

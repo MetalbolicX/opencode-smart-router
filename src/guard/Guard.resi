@@ -188,7 +188,7 @@ let evaluateGuards: (guardState, guardCall, guardPolicy) => guardDecision
 let forcingMessage: (guardState, guardPolicy) => string
 
 // trajectoryMetrics: returns snake_case metrics dict
-let trajectoryMetrics: guardState => dict<JSON.t>
+let trajectoryMetrics: guardState => dict<unknown>
 
 // observationOk: heuristic — did the tool output indicate success?
 let observationOk: JSON.t => bool

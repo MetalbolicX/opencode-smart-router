@@ -30,16 +30,20 @@ function _getDefaultLevel(policy) {
   }
 }
 
+function _nullResult() {
+  return null;
+}
+
 function resolveReasoningOverride(tier, policy, sessionOverride, _signals) {
   let mode = _getMode(policy);
   if (mode === undefined) {
-    return null;
+    return _nullResult();
   }
   if (mode === "static") {
-    return null;
+    return _nullResult();
   }
   if (mode === undefined) {
-    return null;
+    return _nullResult();
   }
   switch (mode) {
     case "manual" :
@@ -51,7 +55,7 @@ function resolveReasoningOverride(tier, policy, sessionOverride, _signals) {
         level = dl !== undefined ? _levelFromString(dl) : undefined;
       }
       if (level === undefined) {
-        return null;
+        return _nullResult();
       }
       let c = tier.capability;
       let cap = c !== undefined ? c : ReasoningCapability.inferCapability(tier);
@@ -59,10 +63,10 @@ function resolveReasoningOverride(tier, policy, sessionOverride, _signals) {
       if (r !== undefined) {
         return r;
       } else {
-        return null;
+        return _nullResult();
       }
     default:
-      return null;
+      return _nullResult();
   }
 }
 

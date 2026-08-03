@@ -2,11 +2,10 @@
 
 import * as Stdlib_JSON from "@rescript/runtime/lib/es6/Stdlib_JSON.js";
 import * as Stdlib_List from "@rescript/runtime/lib/es6/Stdlib_List.js";
-import * as Stdlib_Option from "@rescript/runtime/lib/es6/Stdlib_Option.js";
 import * as Stdlib_JsError from "@rescript/runtime/lib/es6/Stdlib_JsError.js";
 
-function ensureIsObject(val, path) {
-  if (!Stdlib_Option.isNone(Stdlib_JSON.Decode.object(val))) {
+function ensureIsObject(_val, path) {
+  if (!(!(val && typeof val === 'object' && !Array.isArray(val)))) {
     return;
   }
   throw Stdlib_JsError.throwWithMessage(`tiers.json: ` + path + ` must be an object`);
@@ -31,9 +30,9 @@ function validateTierCaps(obj) {
       let k = keys$1.hd;
       let capJson = caps[k];
       if (capJson !== undefined) {
-        let cap = Stdlib_JSON.Decode.float(capJson);
-        if (cap !== undefined) {
-          if (!isFinite(cap) || cap < 1.0) {
+        let _cap = Stdlib_JSON.Decode.float(capJson);
+        if (_cap !== undefined) {
+          if ((!(Number.isFinite(cap) && cap >= 1))) {
             throw Stdlib_JsError.throwWithMessage(`tiers.json: tierCaps.'` + k + `' must be a positive integer`);
           }
           _keys = rest;

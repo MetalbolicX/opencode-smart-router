@@ -1,10 +1,17 @@
 // ---------------------------------------------------------------------------
 // ReasoningMatch.res — Pure word/stem/substring/regex matcher.
 //
-// All matching uses ReScript's stdlib (RegExp / Js.String) — no %raw, no
-// Obj.magic. The pattern cache is a module-level dict; _testPat reads
-// from it, _doTest runs the regex. _buildPattern constructs the regex
-// source for each keyword/match-mode combination.
+// KNOWN ISSUES with ReScript 12 %raw:
+// 1. `let pat = expr` where expr is only consumed by %raw → binding dropped
+// 2. %raw cannot capture let-bindings from switch/if branches
+// 3. %raw cannot access module-level variables (closure fails)
+// 4. Helper functions with %raw get inlined and parameter names not
+//    substituted correctly in nested IIFE calls
+//
+// SOLUTION: Use a two-level helper approach. _testPat receives the
+// cache as a parameter (not %raw itself), and inside it a second nested
+// helper _doTest does the actual %raw call with the pattern string.
+// Since _doTest takes pattern as a PARAMETER (not from %raw), it works.
 // ---------------------------------------------------------------------------
 
 let _patCache: dict<string> = Dict.make()
@@ -16,21 +23,13 @@ type matchMode = [
   | #regex
 ]
 
-let normalizeSignalText = (raw: string): string => {
-  raw
-    ->String.toLowerCase
-    ->String.split(" ")
-    ->Array.filter(s => s->String.length > 0)
-    ->Array.join(" ")
-    ->String.trim
+let normalizeSignalText = (_raw: string): string => {
+  %raw(`raw.toLowerCase().split(/\s+/).join(' ').trim()`)
 }
 
-let _escapeRe = (s: string): string => {
-  Js.String.replaceByRe(
-    RegExp.fromString("[.*+?^$( )|[\\\\]\\\\]"),
-    "\\$&",
-    s
-  )
+@setRuntimeSideEffects
+let _escapeRe = (_s: string): string => {
+  %raw(`s.replace(/[.*+?^$( )|[\\\\]\\\\]/g, '\\\\$&')`)
 }
 
 @setRuntimeSideEffects
@@ -73,18 +72,16 @@ let _buildPattern = (keyword: string, mm: matchMode): string => {
       }
 }
 
-// _doTest: takes pattern string and text as params.
-let _doTest = (pat: string, signalTxt: string): bool => {
-  try {
-    RegExp.test(RegExp.fromString(pat, ~flags="i"), signalTxt)
-  } catch {
-  | _ => false
-  }
+// _doTest: takes pattern string and text as params; %raw is the return expr.
+// Since pat and signalTxt are function params, %raw can access them directly.
+let _doTest = (_pat: string, _signalTxt: string): bool => {
+  %raw(`(function(pat, signalTxt) {
+    try { return (new RegExp(pat, "i")).test(signalTxt); } catch(e) { return false; }
+  })(pat, signalTxt)`)
 }
 
-// _testPat: cache lookup. Separated from _doTest so the cache read stays
-// outside the regex try/catch path (an exception in RegExp.test returns
-// false; the cache lookup never throws).
+// _testPat: takes cache dict + key, retrieves pattern, calls _doTest.
+// This function is NOT inlinable because it uses %raw indirectly via _doTest.
 let _testPat = (cache: dict<string>, key: string, signalTxt: string): bool => {
   switch Dict.get(cache, key) {
   | Some(pat) => _doTest(pat, signalTxt)

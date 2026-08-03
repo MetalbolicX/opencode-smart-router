@@ -37,27 +37,29 @@ type reasoningCapability = {
 
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<JSON.t>,
+  options?: dict<unknown>,
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — build JS-shaped option dicts for provider payloads
+// %raw helpers — build JS objects for options without ReScript type friction
 // ---------------------------------------------------------------------------
 
-let _effortOpts = (picked: string): dict<JSON.t> => {
-  let d = Dict.make()
-  Dict.set(d, "reasoning_effort", JSON.Encode.string(picked))
-  d
-}
-let _budgetOpts = (tokens: float): dict<JSON.t> => {
-  let d = Dict.make()
-  Dict.set(d, "budget_tokens", JSON.Encode.float(tokens))
-  d
+// Build { reasoning_effort: picked }
+@setRuntimeSideEffects
+let _effortOpts = (_picked: string): dict<unknown> => {
+  %raw(`(function(p) { return { "reasoning_effort": p }; })(arguments[0])`)
 }
 
-// Compute Math.round((rank / 3) * (len - 1))
-let _clampIdx = (rank: int, len: int): int => {
-  Math.round(Float.fromInt(rank) /. 3.0 *. (Float.fromInt(len) -. 1.0))->Float.toInt
+// Build { budget_tokens: tokens }
+@setRuntimeSideEffects
+let _budgetOpts = (_tokens: float): dict<unknown> => {
+  %raw(`(function(t) { return { "budget_tokens": t }; })(arguments[0])`)
+}
+
+// Compute Math.round((rank / 3) * (len - 1)) — %raw cannot capture let bindings
+@setRuntimeSideEffects
+let _clampIdx = (_rank: int, _len: int): int => {
+  %raw(`(function(rank, len) { return Math.round((rank / 3) * (len - 1)); })(arguments[0], arguments[1])`)
 }
 
 // ---------------------------------------------------------------------------

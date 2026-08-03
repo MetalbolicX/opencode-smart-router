@@ -33,30 +33,11 @@ let getStringField = (dict: dict<JSON.t>, key: string): string => {
 // description (string), whenToUse (array).
 // ---------------------------------------------------------------------------
 
-// Runtime check: is the value a plain JS object (not null, array, or primitive)?
-// Uses safe ReScript APIs only — no %raw, no Obj.magic.
-// Array.isArray distinguishes arrays from objects; the try/catch on Dict.keysToArray
-// catches null/undefined (Dict.keysToArray throws on those). Strings and other
-// primitives have no enumerable own keys, so they fail the keysToArray check.
-let _isPlainObject = (d: dict<JSON.t>): bool => {
-  try {
-    let keys = Dict.keysToArray(d)
-    !Array.isArray(d) && (
-      Belt.Array.length(keys) == 0 ||
-      Belt.Array.some(keys, key =>
-        switch Int.fromString(key) {
-        | Some(n) => n < 0 || Belt.Int.toString(n) != key
-        | None => true
-        })
-    )
-  } catch {
-  | _ => false
-  }
-}
-
-// Guard: throws if value is not a plain object (not null, string, number, array, etc.)
-let ensureIsObject = (tier: dict<JSON.t>, presetName: string, tierName: string): unit => {
-  if !_isPlainObject(tier) {
+// Guard: throws if tier is not a plain object (not null, string, number, etc.)
+// Js.Dict.get uses the 'in' operator internally which throws for non-objects,
+// so we must check upfront.
+let ensureIsObject = (_tier: dict<JSON.t>, presetName: string, tierName: string): unit => {
+  if %raw(`!(tier && typeof tier === 'object' && !Array.isArray(tier))`) {
     throw(
       JsError.throwWithMessage(`tiers.json: tier '${presetName}.${tierName}' must be an object`),
     )
@@ -124,8 +105,9 @@ let validateTier = (presetName: string, tierName: string, tier: dict<JSON.t>): u
 // Validates that a preset is a non-null object and checks each tier.
 // ---------------------------------------------------------------------------
 
-let ensurePresetIsObject = (preset: dict<JSON.t>, presetName: string): unit => {
-  if !_isPlainObject(preset) {
+// Guard: throws if preset is not a plain object
+let ensurePresetIsObject = (_preset: dict<JSON.t>, presetName: string): unit => {
+  if %raw(`!(preset && typeof preset === 'object' && !Array.isArray(preset))`) {
     throw(JsError.throwWithMessage(`tiers.json: preset '${presetName}' must be an object`))
   }
 }
@@ -160,8 +142,9 @@ let validatePreset = (presetName: string, preset: dict<JSON.t>): unit => {
 // then validates each preset.
 // ---------------------------------------------------------------------------
 
-let ensureIsConfigObject = (obj: dict<JSON.t>): unit => {
-  if !_isPlainObject(obj) {
+// Guard: throws if obj is not a plain object
+let ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
+  if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
     throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
   }
 }
