@@ -1035,6 +1035,21 @@ declare module "*VerifyDispatchCore.res.mjs" {
 }
 
 // ---------------------------------------------------------------------------
+// ConfigMerge (src/config/ConfigMerge.res)
+// Pure deep-merge for JSON configuration objects.
+// Semantic: base undefined → override; override undefined → base;
+// both plain objects → recursive merge (override wins per key);
+// array or scalar → override (replacement, not concat).
+// ---------------------------------------------------------------------------
+declare module "*ConfigMerge.res.mjs" {
+  // deepMerge: (base: JSON.t, override: JSON.t) => JSON.t
+  // JSON.t = null | undefined | JSONValue at the ReScript level.
+  // At the TS boundary, Js.Json.t maps to unknown (since JSONValue is not a TS type).
+  // The actual runtime values are plain JSON: object, array, string, number, boolean, null.
+  export const deepMerge: (base: unknown, override: unknown) => unknown;
+}
+
+// ---------------------------------------------------------------------------
 // Verify (src/verify/Verify.res)
 // Public facade re-exporting from VerifyDoD and VerifyDispatchCore.
 // ---------------------------------------------------------------------------
