@@ -3,7 +3,7 @@
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Config from "./Config.res.mjs";
 import * as Belt_Array from "@rescript/runtime/lib/es6/Belt_Array.js";
-import * as Stdlib_Exn from "@rescript/runtime/lib/es6/Stdlib_Exn.js";
+import * as Pervasives from "@rescript/runtime/lib/es6/Pervasives.js";
 import * as TierLadder from "./TierLadder.res.mjs";
 
 function arrayEqual(a, b) {
@@ -39,7 +39,7 @@ function makeCfg(tiers, explicitLadder) {
   if (cfg !== undefined) {
     return cfg;
   } else {
-    return Stdlib_Exn.raiseError("makeCfg: failed to parse constructed JSON");
+    return Pervasives.failwith("makeCfg: failed to parse constructed JSON");
   }
 }
 
