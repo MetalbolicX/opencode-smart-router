@@ -14,18 +14,37 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Runtime check: is the value a plain JS object (not null, array, or primitive)?
+// Uses safe ReScript APIs only — no %raw, no Obj.magic.
+// Array.isArray distinguishes arrays from objects; the try/catch on Dict.keysToArray
+// catches null/undefined. Strings/primitives have no own enumerable keys, so they
+// fail the "some key is non-numeric" check.
+let _isPlainObject = (d: dict<JSON.t>): bool => {
+  try {
+    let keys = Dict.keysToArray(d)
+    !Array.isArray(d) && (
+      Belt.Array.length(keys) == 0 ||
+      Belt.Array.some(keys, key =>
+        switch Int.fromString(key) {
+        | Some(n) => n < 0 || Belt.Int.toString(n) != key
+        | None => true
+        })
+    )
+  } catch {
+  | _ => false
+  }
+}
+
 // Guard: throws if obj is not a plain object (not null, string, number, etc.)
-// Js.Dict.get uses the 'in' operator internally which throws for non-objects,
-// so we must check upfront.
-let _ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
-  if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
+let _ensureIsConfigObject = (obj: dict<JSON.t>): unit => {
+  if !_isPlainObject(obj) {
     throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
   }
 }
 
 // Guard: throws if val is not a plain object (used for sub-object checks)
-let ensureIsObject = (_val: JSON.t, path: string): unit => {
-  if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
+let ensureIsObject = (val: JSON.t, path: string): unit => {
+  if JSON.Decode.object(val)->Option.isNone {
     throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
   }
 }
@@ -50,9 +69,9 @@ let validateTierCaps = (obj: dict<JSON.t>): unit => {
               switch Dict.get(caps, k) {
               | Some(capJson) =>
                 switch JSON.Decode.float(capJson) {
-                | Some(_cap) =>
+                | Some(cap) =>
                   // Must be finite and >= 1
-                  if %raw(`!(Number.isFinite(cap) && cap >= 1)`) {
+                  if !Float.isFinite(cap) || cap < 1.0 {
                     throw(
                       JsError.throwWithMessage(
                         `tiers.json: tierCaps.'${k}' must be a positive integer`,

@@ -791,15 +791,15 @@ test("trajectoryMetrics: returns correct snake_case keys", () => {
   s.ttfa = Nullable.make(3)
   s.toolCallCount = 6
   let m = Guard.trajectoryMetrics(s)
-  // Access fields from Js.Dict.t<unknown> - use Obj.magic to bypass type checking
-  let ttfaVal = (Obj.magic(m)["ttfa"] :> int)
-  let readExecRatioVal = (Obj.magic(m)["read_exec_ratio"] :> float)
-  let toolCallCountVal = (Obj.magic(m)["tool_call_count"] :> int)
-  let deliverableExecutedVal = (Obj.magic(m)["deliverable_executed"] :> bool)
-  let blockedCountVal = (Obj.magic(m)["blocked_count"] :> int)
-  let redundantCountVal = (Obj.magic(m)["redundant_count"] :> int)
-  let consecutiveNonProducingVal = (Obj.magic(m)["consecutive_non_producing"] :> int)
-  let selfScriptCountVal = (Obj.magic(m)["self_script_count"] :> int)
+  // Access fields from dict<JSON.t> using safe JSON decoders
+  let ttfaVal = Dict.getUnsafe(m, "ttfa")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
+  let readExecRatioVal = Dict.getUnsafe(m, "read_exec_ratio")->JSON.Decode.float->Option.getOr(0.0)
+  let toolCallCountVal = Dict.getUnsafe(m, "tool_call_count")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
+  let deliverableExecutedVal = Dict.getUnsafe(m, "deliverable_executed")->JSON.Decode.bool->Option.getOr(false)
+  let blockedCountVal = Dict.getUnsafe(m, "blocked_count")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
+  let redundantCountVal = Dict.getUnsafe(m, "redundant_count")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
+  let consecutiveNonProducingVal = Dict.getUnsafe(m, "consecutive_non_producing")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
+  let selfScriptCountVal = Dict.getUnsafe(m, "self_script_count")->JSON.Decode.float->Option.mapOr(0, Float.toInt)
   assertionEqual(~operator="ttfa", 3, ttfaVal)
   assertionEqual(~operator="read_exec_ratio", 2.0, readExecRatioVal)
   assertionEqual(~operator="tool_call_count", 6, toolCallCountVal)
@@ -816,7 +816,7 @@ test("trajectoryMetrics: read_exec_ratio when execCount=0 => readCount", () => {
   s.readCount = 5
   s.execCount = 0
   let m = Guard.trajectoryMetrics(s)
-  let ratioVal = (Obj.magic(m)["read_exec_ratio"] :> float)
+  let ratioVal = Dict.getUnsafe(m, "read_exec_ratio")->JSON.Decode.float->Option.getOr(0.0)
   assertionEqual(~operator="ratio with 0 exec", 5.0, ratioVal)
 })
 

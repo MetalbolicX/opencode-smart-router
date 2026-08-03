@@ -3,6 +3,8 @@
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Guard from "./Guard.res.mjs";
 import * as Js_string from "@rescript/runtime/lib/es6/Js_string.js";
+import * as Stdlib_JSON from "@rescript/runtime/lib/es6/Stdlib_JSON.js";
+import * as Stdlib_Option from "@rescript/runtime/lib/es6/Stdlib_Option.js";
 import * as Primitive_option from "@rescript/runtime/lib/es6/Primitive_option.js";
 
 function assertionEqual(operator, expected, actual) {
@@ -786,14 +788,14 @@ Test.test("trajectoryMetrics: returns correct snake_case keys", () => {
   s.ttfa = 3;
   s.toolCallCount = 6;
   let m = Guard.trajectoryMetrics(s);
-  let ttfaVal = m.ttfa;
-  let readExecRatioVal = m.read_exec_ratio;
-  let toolCallCountVal = m.tool_call_count;
-  let deliverableExecutedVal = m.deliverable_executed;
-  let blockedCountVal = m.blocked_count;
-  let redundantCountVal = m.redundant_count;
-  let consecutiveNonProducingVal = m.consecutive_non_producing;
-  let selfScriptCountVal = m.self_script_count;
+  let ttfaVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["ttfa"]), 0, prim => prim | 0);
+  let readExecRatioVal = Stdlib_Option.getOr(Stdlib_JSON.Decode.float(m["read_exec_ratio"]), 0.0);
+  let toolCallCountVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["tool_call_count"]), 0, prim => prim | 0);
+  let deliverableExecutedVal = Stdlib_Option.getOr(Stdlib_JSON.Decode.bool(m["deliverable_executed"]), false);
+  let blockedCountVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["blocked_count"]), 0, prim => prim | 0);
+  let redundantCountVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["redundant_count"]), 0, prim => prim | 0);
+  let consecutiveNonProducingVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["consecutive_non_producing"]), 0, prim => prim | 0);
+  let selfScriptCountVal = Stdlib_Option.mapOr(Stdlib_JSON.Decode.float(m["self_script_count"]), 0, prim => prim | 0);
   assertionEqual("ttfa", 3, ttfaVal);
   assertionEqual("read_exec_ratio", 2.0, readExecRatioVal);
   assertionEqual("tool_call_count", 6, toolCallCountVal);
@@ -810,7 +812,7 @@ Test.test("trajectoryMetrics: read_exec_ratio when execCount=0 => readCount", ()
   s.readCount = 5;
   s.execCount = 0;
   let m = Guard.trajectoryMetrics(s);
-  let ratioVal = m.read_exec_ratio;
+  let ratioVal = Stdlib_Option.getOr(Stdlib_JSON.Decode.float(m["read_exec_ratio"]), 0.0);
   assertionEqual("ratio with 0 exec", 5.0, ratioVal);
 });
 

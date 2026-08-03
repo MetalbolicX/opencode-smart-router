@@ -3,26 +3,6 @@
 import * as ReasoningMatch from "./ReasoningMatch.res.mjs";
 import * as Primitive_option from "@rescript/runtime/lib/es6/Primitive_option.js";
 
-function _nullLevel() {
-  return null;
-}
-
-function _getTrivialLevel(_ac) {
-  return ((function(ac) { return ac.trivialLevel == null ? undefined : ac.trivialLevel; })(arguments[0]));
-}
-
-function _getTierDefaults(_ac) {
-  return ((function(ac) { return ac.tierDefaults == null ? undefined : ac.tierDefaults; })(arguments[0]));
-}
-
-function _getKeywordRules(_ac) {
-  return ((function(ac) { return ac.keywordRules == null ? undefined : ac.keywordRules; })(arguments[0]));
-}
-
-function _getDefaultLevel(_ac) {
-  return ((function(ac) { return ac.defaultLevel == null ? undefined : ac.defaultLevel; })(arguments[0]));
-}
-
 function _levelFromString(s) {
   switch (s) {
     case "elevated" :
@@ -34,7 +14,7 @@ function _levelFromString(s) {
     case "normal" :
       return "normal";
     default:
-      return _nullLevel();
+      return null;
   }
 }
 
@@ -122,28 +102,24 @@ function _scanRules(rules, _idx, prompt, description) {
   };
 }
 
-function selectAdaptiveLevel(signals, _policy) {
-  let p = (policy == null ? undefined : policy);
-  let effectivePolicy = p !== undefined ? Primitive_option.valFromOption(p) : undefined;
-  let adaptive = effectivePolicy !== undefined ? effectivePolicy.adaptive : undefined;
+function selectAdaptiveLevel(signals, policy) {
+  let adaptive = policy !== undefined ? policy.adaptive : undefined;
   if (adaptive === undefined) {
     return {
-      level: _nullLevel(),
+      level: null,
       reason: "no adaptive config"
     };
   }
-  let acTrivialLevel = _getTrivialLevel(adaptive);
-  let acTierDefaults = _getTierDefaults(adaptive);
-  let acKeywordRules = _getKeywordRules(adaptive);
-  let acDefaultLevel = _getDefaultLevel(adaptive);
   if (signals.isTrivial) {
-    let lvl = acTrivialLevel !== undefined ? _levelFromString(acTrivialLevel) : _nullLevel();
+    let s = adaptive.trivialLevel;
+    let lvl = s !== undefined ? _levelFromString(s) : null;
     return {
       level: lvl,
       reason: "trivial"
     };
   }
-  let tierDefaults = acTierDefaults !== undefined ? acTierDefaults : ({});
+  let td = adaptive.tierDefaults;
+  let tierDefaults = td !== undefined ? td : ({});
   let tierLevel = tierDefaults[signals.tierName];
   if (tierLevel !== undefined) {
     let lvl$1 = _levelFromString(tierLevel);
@@ -152,12 +128,14 @@ function selectAdaptiveLevel(signals, _policy) {
       reason: `tier default: ` + signals.tierName
     };
   }
-  let keywordRules = acKeywordRules !== undefined ? acKeywordRules : [];
+  let rules = adaptive.keywordRules;
+  let keywordRules = rules !== undefined ? rules : [];
   let d = _scanRules(keywordRules, 0, signals.prompt, signals.description);
   if (d !== undefined) {
     return d;
   }
-  let lvl$2 = acDefaultLevel !== undefined ? _levelFromString(acDefaultLevel) : _nullLevel();
+  let s$1 = adaptive.defaultLevel;
+  let lvl$2 = s$1 !== undefined ? _levelFromString(s$1) : null;
   return {
     level: lvl$2,
     reason: "default level"

@@ -51,28 +51,6 @@ let _WRITE_TOOLS: dict<bool> = Dict.fromArray([
 ])
 
 // ---------------------------------------------------------------------------
-// Regex constants for self-script detection
-// ---------------------------------------------------------------------------
-
-// SCRIPT_EXT_RE: /\.(mjs|sh|py|js|ts|cjs|bash)\b/i
-let _SCRIPT_EXT_RE = %raw(`/\\.(mjs|sh|py|js|ts|cjs|bash)\\b/i`)
-
-// HEREDOC_RE: /<<-?\s*['"]?[A-Za-z_]/
-let _HEREDOC_RE = %raw(`/<<-?\\s*['"]?[A-Za-z_]/`)
-
-// REDIRECT_SCRIPT_RE: />\s*\S+\.(mjs|sh|py|js|ts|cjs|bash)\b/i
-let _REDIRECT_SCRIPT_RE = %raw(`/\\>\\s*\\S+\\.(mjs|sh|py|js|ts|cjs|bash)\\b/i`)
-
-// INLINE_SCRIPT_RE: /\b(node|python3?|deno|bun)\s+-(e|c)\b/i
-let _INLINE_SCRIPT_RE = %raw(`/\\b(node|python3?|deno|bun)\\s+-(e|c)\\b/i`)
-
-// CAT_WRITE_RE: /\bcat\s+>\s*\S/
-let _CAT_WRITE_RE = %raw(`/\\bcat\\s+>\\s*\\S/`)
-
-// BASH_C_RE: /\bbash\s+-c\b/i
-let _BASH_C_RE = %raw(`/\\bbash\\s+-c\\b/i`)
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -332,49 +310,42 @@ type resolveEnforcementModeParams = {
 // _hasToolSet: checks if a tool is in the given set (plain object in ReScript 12.x)
 @setRuntimeSideEffects
 let _hasToolSet = (_tool: string, _set: dict<bool>): bool => {
-  %raw(`tool in set`)
+  %raw(`_tool in _set`)
 }
 
 // _hasScriptExt: checks if target has a script extension
-@setRuntimeSideEffects
 let _hasScriptExt = (_target: string): bool => {
-  %raw(`/\.(mjs|sh|py|js|ts|cjs|bash)\b/i.test(target)`)
+  RegExp.test(RegExp.fromString("\\.(mjs|sh|py|js|ts|cjs|bash)\\b"), _target)
 }
 
 // _hasHeredoc: checks for heredoc pattern
-@setRuntimeSideEffects
 let _hasHeredoc = (_cmd: string): bool => {
-  %raw(`/<<-?\\s*['"]?[A-Za-z_]/.test(cmd)`)
+  RegExp.test(RegExp.fromString("<<-?\\s*['\"]?[A-Za-z_]"), _cmd)
 }
 
 // _hasRedirectScript: checks for redirect-to-script pattern
-@setRuntimeSideEffects
 let _hasRedirectScript = (_cmd: string): bool => {
-  %raw(`/>\\s*\\S+\\.(mjs|sh|py|js|ts|cjs|bash)\\b/i.test(cmd)`)
+  RegExp.test(RegExp.fromString(">\\s*\\S+\\.(mjs|sh|py|js|ts|cjs|bash)\\b"), _cmd)
 }
 
 // _hasInlineScript: checks for inline script execution
-@setRuntimeSideEffects
 let _hasInlineScript = (_cmd: string): bool => {
-  %raw(`/\b(node|python3?|deno|bun)\s+-(e|c)\b/i.test(cmd)`)
+  RegExp.test(RegExp.fromString("\\b(node|python3?|deno|bun)\\s+-(e|c)\\b"), _cmd)
 }
 
 // _hasCatWrite: checks for cat-write pattern
-@setRuntimeSideEffects
 let _hasCatWrite = (_cmd: string): bool => {
-  %raw(`/\bcat\s+>\s*\S/.test(cmd)`)
+  RegExp.test(RegExp.fromString("\\bcat\\s+>\\s*\\S"), _cmd)
 }
 
 // _hasBashC: checks for bash -c pattern
-@setRuntimeSideEffects
 let _hasBashC = (_cmd: string): bool => {
-  %raw(`/\bbash\s+-c\b/i.test(cmd)`)
+  RegExp.test(RegExp.fromString("\\bbash\\s+-c\\b"), _cmd)
 }
 
 // _stringifyArgs: converts args to a JSON string for fingerprinting
-@setRuntimeSideEffects
 let _stringifyArgs = (_args: dict<JSON.t>): string => {
-  %raw(`JSON.stringify(args).slice(0, 120)`)
+  JSON.stringify(JSON.Encode.object(_args))->String.slice(~start=0, ~end=120)
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +385,7 @@ let _fingerprintToolCall = (_tool: string, _args: dict<JSON.t>): string => {
         case 'ls': return 'ls:' + (a.path || '');
         default: return tool + ':' + JSON.stringify(a).slice(0, 120);
       }
-    })(tool, args)
+    })(_tool, _args)
   `)
 }
 
@@ -453,16 +424,10 @@ let isSelfScript = (call: guardCall, policy: guardPolicy): bool => {
       } // Check for bash/shell ad-hoc execution
       else if call.tool === "bash" || call.tool === "shell" {
         let cmd = switch args->Dict.get("command") {
-        | Some(v) => {
-            let s: string = Obj.magic(v)
-            s
-          }
+        | Some(v) => JSON.Decode.string(v)->Option.getOr("")
         | None =>
           switch args->Dict.get("cmd") {
-          | Some(v) => {
-              let s: string = Obj.magic(v)
-              s
-            }
+          | Some(v) => JSON.Decode.string(v)->Option.getOr("")
           | None => ""
           }
         }
@@ -489,16 +454,10 @@ let isSelfScript = (call: guardCall, policy: guardPolicy): bool => {
       // No deliverablePath exemption — check for bash/shell ad-hoc
       if call.tool === "bash" || call.tool === "shell" {
         let cmd = switch args->Dict.get("command") {
-        | Some(v) => {
-            let s: string = Obj.magic(v)
-            s
-          }
+        | Some(v) => JSON.Decode.string(v)->Option.getOr("")
         | None =>
           switch args->Dict.get("cmd") {
-          | Some(v) => {
-              let s: string = Obj.magic(v)
-              s
-            }
+          | Some(v) => JSON.Decode.string(v)->Option.getOr("")
           | None => ""
           }
         }
@@ -778,7 +737,7 @@ let forcingMessage = (state: guardState, policy: guardPolicy): string => {
 // trajectoryMetrics
 // ---------------------------------------------------------------------------
 
-let trajectoryMetrics = (state: guardState): dict<unknown> => {
+let trajectoryMetrics = (state: guardState): dict<JSON.t> => {
   let ratio = if state.execCount === 0 {
     Belt.Float.fromInt(state.readCount)
   } else {
@@ -788,17 +747,16 @@ let trajectoryMetrics = (state: guardState): dict<unknown> => {
   | Some(v) => v
   | None => 0
   }
-  // Pass local values explicitly to IIFE since %raw cannot capture let bindings
-  %raw(`(function() { return arguments[0]; })`)({
-    "ttfa": ttfaVal,
-    "read_exec_ratio": ratio,
-    "self_script_count": state.selfScriptCount,
-    "tool_call_count": state.toolCallCount,
-    "deliverable_executed": state.deliverableExecuted,
-    "blocked_count": state.blockedCount,
-    "redundant_count": state.redundantCount,
-    "consecutive_non_producing": state.consecutiveNonProducing,
-  })
+  Dict.fromArray([
+    ("ttfa", ttfaVal->JSON.Encode.int),
+    ("read_exec_ratio", ratio->JSON.Encode.float),
+    ("self_script_count", state.selfScriptCount->JSON.Encode.int),
+    ("tool_call_count", state.toolCallCount->JSON.Encode.int),
+    ("deliverable_executed", state.deliverableExecuted->JSON.Encode.bool),
+    ("blocked_count", state.blockedCount->JSON.Encode.int),
+    ("redundant_count", state.redundantCount->JSON.Encode.int),
+    ("consecutive_non_producing", state.consecutiveNonProducing->JSON.Encode.int),
+  ])
 }
 
 // ---------------------------------------------------------------------------
@@ -819,19 +777,16 @@ let _ERROR_PREFIXES: array<string> = [
 ]
 
 @setRuntimeSideEffects
-let observationOk = (_output: JSON.t): bool => {
-  // Inline ERROR_PREFIXES array since %raw cannot capture module-level let bindings
-  %raw(`
-    (function(output) {
-      var s = typeof output === 'string' ? output.trimStart() : '';
-      if (s.length === 0) return true;
-      var prefixes = ["DENIED", "BLOCKED", "Error", "error:", "ERROR", "Exception", "Traceback", "FAIL", "failed:"];
-      for (var i = 0; i < prefixes.length; i++) {
-        if (s.startsWith(prefixes[i])) return false;
-      }
-      return true;
-    })(output)
-  `)
+let observationOk = (output: JSON.t): bool => {
+  let s = switch JSON.Decode.string(output) {
+  | Some(s) => s->String.trimStart
+  | None => ""
+  }
+  if s === "" {
+    true
+  } else {
+    !Belt.Array.some(_ERROR_PREFIXES, p => s->String.startsWith(p))
+  }
 }
 
 // ---------------------------------------------------------------------------

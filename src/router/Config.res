@@ -122,9 +122,9 @@ let decodeLevel = (s: string): option<string> =>
   Js.Array.includes(s, reasoningLevels) ? Some(s) : None
 
 // Try to compile a string as a RegExp. Returns true if valid, false otherwise.
-let isValidRegex = (_s: string): bool =>
+let isValidRegex = (s: string): bool =>
   try {
-    let _ = %raw(`new RegExp(s)`)
+    let _ = RegExp.fromString(s)
     true
   } catch {
   | _ => false

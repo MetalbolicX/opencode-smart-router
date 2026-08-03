@@ -19,13 +19,13 @@ open Test
 
 // assertionNull: check that actual is null.
 // Handles both None (undefined) and Some(null) — loose equality makes both pass.
-let assertionNull = (~operator: string, actual: option<'a>): unit =>
-  assertion(~operator, (a, _b) => a == null, Nullable.fromOption(actual), Nullable.null)
+let assertionNull = (~operator: string, actual: Nullable.t<'a>): unit =>
+  assertion(~operator, (a, _b) => a == null, actual, Nullable.null)
 
 // assertionNotNull: check that actual is not null (not undefined).
 // Returns true when actual is not null.
-let assertionNotNull = (~operator: string, actual: option<'a>): unit =>
-  assertion(~operator, (a, _b) => a != null, Nullable.fromOption(actual), Nullable.null)
+let assertionNotNull = (~operator: string, actual: Nullable.t<'a>): unit =>
+  assertion(~operator, (a, _b) => a != null, actual, Nullable.null)
 
 // ---------------------------------------------------------------------------
 // Test data helpers

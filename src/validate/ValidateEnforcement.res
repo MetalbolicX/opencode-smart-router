@@ -25,8 +25,8 @@ let verifyRequireModes: array<string> = ["never", "whenDoDPresent", "always"]
 // ---------------------------------------------------------------------------
 
 // Guard: throws if val is not a plain object (for sub-object checks in enforcement)
-let ensureIsObjectVal = (_val: JSON.t, path: string): unit => {
-  if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
+let ensureIsObjectVal = (val: JSON.t, path: string): unit => {
+  if JSON.Decode.object(val)->Option.isNone {
     throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
   }
 }
@@ -105,7 +105,7 @@ and validateEnforcementMode = (enf: dict<JSON.t>): unit => {
 and validateEnforcementVerify = (enf: dict<JSON.t>): unit => {
   switch Dict.get(enf, "verify") {
   | Some(json) => // Permissive skip: non-object verify is ignored so older configs survive.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+    if JSON.Decode.object(json)->Option.isNone {
       ()
     } else {
       switch JSON.Decode.object(json) {
@@ -167,7 +167,7 @@ and validateEnforcementVerify = (enf: dict<JSON.t>): unit => {
 and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
   switch Dict.get(enf, "escalate") {
   | Some(json) => // Permissive skip: non-object escalate is ignored so older configs survive.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+    if JSON.Decode.object(json)->Option.isNone {
       ()
     } else {
       switch JSON.Decode.object(json) {
@@ -209,8 +209,8 @@ and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
           switch Dict.get(escalate, "maxAttemptsPerTier") {
           | Some(matJson) =>
             switch JSON.Decode.float(matJson) {
-            | Some(_mat) =>
-              if %raw(`!(Number.isInteger(mat) && mat >= 0)`) {
+            | Some(mat) =>
+              if !(Float.isFinite(mat) && Float.toInt(mat)->Float.fromInt === mat && mat >= 0.0) {
                 throw(
                   JsError.throwWithMessage(
                     "tiers.json: enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
@@ -225,8 +225,8 @@ and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
           switch Dict.get(escalate, "maxTotalAttempts") {
           | Some(mtaJson) =>
             switch JSON.Decode.float(mtaJson) {
-            | Some(_mta) =>
-              if %raw(`!(Number.isInteger(mta) && mta >= 1)`) {
+            | Some(mta) =>
+              if !(Float.isFinite(mta) && Float.toInt(mta)->Float.fromInt === mta && mta >= 1.0) {
                 throw(
                   JsError.throwWithMessage(
                     "tiers.json: enforcement.escalate.maxTotalAttempts must be an integer >= 1",
@@ -240,10 +240,9 @@ and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
           // Validate floorTier (string | null)
           switch Dict.get(escalate, "floorTier") {
           | Some(ftJson) =>
-            // null is allowed; other non-strings are not
-            if %raw(`ftJson === null`) {
-              () // null is allowed
-            } else {
+            switch JSON.Decode.null(ftJson) {
+            | Some(_) => () // null is allowed
+            | None =>
               switch JSON.Decode.string(ftJson) {
               | Some(_) => ()
               | None =>
@@ -274,7 +273,7 @@ and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
 and validateEnforcementPerTier = (enf: dict<JSON.t>): unit => {
   switch Dict.get(enf, "perTier") {
   | Some(json) => // Permissive skip: non-object perTier is ignored.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+    if JSON.Decode.object(json)->Option.isNone {
       ()
     } else {
       switch JSON.Decode.object(json) {
@@ -327,7 +326,7 @@ and validateEnforcementPerTier = (enf: dict<JSON.t>): unit => {
 and validateEnforcementGuard = (enf: dict<JSON.t>): unit => {
   switch Dict.get(enf, "guard") {
   | Some(json) => // Permissive skip: non-object guard is ignored.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+    if JSON.Decode.object(json)->Option.isNone {
       ()
     } else {
       switch JSON.Decode.object(json) {
@@ -336,8 +335,8 @@ and validateEnforcementGuard = (enf: dict<JSON.t>): unit => {
           switch Dict.get(guard, "budget") {
           | Some(budgetJson) =>
             switch JSON.Decode.float(budgetJson) {
-            | Some(_budget) =>
-              if %raw(`!(Number.isFinite(budget) && budget >= 1)`) {
+            | Some(budget) =>
+              if !Float.isFinite(budget) || budget < 1.0 {
                 throw(JsError.throwWithMessage("enforcement.guard.budget must be a number >= 1"))
               }
             | None =>
@@ -372,7 +371,7 @@ and validateEnforcementGuard = (enf: dict<JSON.t>): unit => {
 and validateEscalateCostCeiling = (escalate: dict<JSON.t>): unit => {
   switch Dict.get(escalate, "costCeiling") {
   | Some(ccJson) => // Permissive skip: non-object costCeiling is ignored.
-    if %raw(`!(ccJson && typeof ccJson === 'object' && !Array.isArray(ccJson))`) {
+    if JSON.Decode.object(ccJson)->Option.isNone {
       ()
     } else {
       switch JSON.Decode.object(ccJson) {

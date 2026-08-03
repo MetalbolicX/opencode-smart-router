@@ -78,7 +78,7 @@ and keywordRule = {
 // Resolved reasoning patch (matches ReasoningTranslate.resolvedReasoning)
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<unknown>,
+  options?: dict<JSON.t>,
 }
 
 // Main export: resolve the effective reasoning patch for a tier.
@@ -87,4 +87,4 @@ let resolveReasoningOverride: (
   option<reasoningPolicyConfig>,
   option<reasoningLevel>,
   adaptiveSignals,
-) => option<resolvedReasoning>
+) => Nullable.t<resolvedReasoning>

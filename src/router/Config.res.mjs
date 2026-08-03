@@ -21,9 +21,9 @@ function decodeLevel(s) {
   }
 }
 
-function isValidRegex(_s) {
+function isValidRegex(s) {
   try {
-    ((new RegExp(s)));
+    new RegExp(s);
     return true;
   } catch (exn) {
     return false;

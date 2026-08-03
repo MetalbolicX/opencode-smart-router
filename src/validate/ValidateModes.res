@@ -13,18 +13,37 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Runtime check: is the value a plain JS object (not null, array, or primitive)?
+// Uses safe ReScript APIs only — no %raw, no Obj.magic.
+// Array.isArray distinguishes arrays from objects; the try/catch on Dict.keysToArray
+// catches null/undefined. Strings/primitives have no own enumerable keys, so they
+// fail the "some key is non-numeric" check.
+let _isPlainObject = (d: dict<JSON.t>): bool => {
+  try {
+    let keys = Dict.keysToArray(d)
+    !Array.isArray(d) && (
+      Belt.Array.length(keys) == 0 ||
+      Belt.Array.some(keys, key =>
+        switch Int.fromString(key) {
+        | Some(n) => n < 0 || Belt.Int.toString(n) != key
+        | None => true
+        })
+    )
+  } catch {
+  | _ => false
+  }
+}
+
 // Guard: throws if obj is not a plain object (not null, string, number, etc.)
-// Js.Dict.get uses the 'in' operator internally which throws for non-objects,
-// so we must check upfront.
-let _ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
-  if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
+let _ensureIsConfigObject = (obj: dict<JSON.t>): unit => {
+  if !_isPlainObject(obj) {
     throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
   }
 }
 
 // Guard: throws if val is not a plain object
-let ensureIsObject = (_val: JSON.t, path: string): unit => {
-  if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
+let ensureIsObject = (val: JSON.t, path: string): unit => {
+  if JSON.Decode.object(val)->Option.isNone {
     throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
   }
 }
@@ -36,9 +55,7 @@ let ensureIsObject = (_val: JSON.t, path: string): unit => {
 
 let validateMode = (modeName: string, mode: dict<JSON.t>): unit => {
   // Guard: mode must be a non-null object (not null, number, string, etc.)
-  // Js.Dict.get uses the 'in' operator internally which throws for non-objects,
-  // so we must check upfront.
-  if %raw(`!(mode && typeof mode === 'object' && !Array.isArray(mode))`) {
+  if !_isPlainObject(mode) {
     throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}' must be an object`))
   }
 

@@ -78,31 +78,6 @@ type adaptiveDecision = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// %raw helper: return explicit JS null for nullable level fields
-@setRuntimeSideEffects
-let _nullLevel = (): Nullable.t<reasoningLevel> => {
-  %raw("null")
-}
-
-// IIFE helpers to safely extract nullable record fields from JS boundary.
-// %raw at module scope (not inside switch/if) CAN capture function params via IIFE.
-@setRuntimeSideEffects
-let _getTrivialLevel = (_ac): option<string> => {
-  %raw(`(function(ac) { return ac.trivialLevel == null ? undefined : ac.trivialLevel; })(arguments[0])`)
-}
-@setRuntimeSideEffects
-let _getTierDefaults = (_ac): option<dict<string>> => {
-  %raw(`(function(ac) { return ac.tierDefaults == null ? undefined : ac.tierDefaults; })(arguments[0])`)
-}
-@setRuntimeSideEffects
-let _getKeywordRules = (_ac): option<array<keywordRule>> => {
-  %raw(`(function(ac) { return ac.keywordRules == null ? undefined : ac.keywordRules; })(arguments[0])`)
-}
-@setRuntimeSideEffects
-let _getDefaultLevel = (_ac): option<string> => {
-  %raw(`(function(ac) { return ac.defaultLevel == null ? undefined : ac.defaultLevel; })(arguments[0])`)
-}
-
 // Convert string level to reasoningLevel variant, or return null
 let _levelFromString = (s: string): Nullable.t<reasoningLevel> => {
   switch s {
@@ -110,7 +85,7 @@ let _levelFromString = (s: string): Nullable.t<reasoningLevel> => {
   | "normal" => Nullable.make(#normal)
   | "elevated" => Nullable.make(#elevated)
   | "max" => Nullable.make(#max)
-  | _ => _nullLevel()
+  | _ => Nullable.null
   }
 }
 
@@ -222,38 +197,24 @@ and _scanRules = (rules: array<keywordRule>, idx: int, prompt: string, descripti
 
 let selectAdaptiveLevel = (
   signals: adaptiveSignals,
-  _policy: option<reasoningPolicyConfig>,
+  policy: option<reasoningPolicyConfig>,
 ): adaptiveDecision => {
-  // Step 0: handle JS null policy (the option type only covers undefined, not null)
-  // %raw here CAN capture `policy` because it's at function scope
-  let p = %raw(`policy == null ? undefined : policy`)
-  let effectivePolicy: option<reasoningPolicyConfig> = switch p {
-  | Some(pp) => Some(pp)
+  let adaptive: option<adaptivePolicyConfig> = switch policy {
   | None => None
-  }
-  let adaptive: option<adaptivePolicyConfig> = switch effectivePolicy {
-  | Some(pp) => pp.adaptive
-  | None => None
+  | Some(p) => p.adaptive
   }
   switch adaptive {
-  | None => {level: _nullLevel(), reason: "no adaptive config"}
+  | None => {level: Nullable.null, reason: "no adaptive config"}
 
   | Some(ac) => {
-      // Use IIFE helpers to safely extract nullable fields from `ac`
-      // (ac is from switch pattern; %raw can't capture it directly)
-      let acTrivialLevel = _getTrivialLevel(ac)
-      let acTierDefaults = _getTierDefaults(ac)
-      let acKeywordRules = _getKeywordRules(ac)
-      let acDefaultLevel = _getDefaultLevel(ac)
-
       if signals.isTrivial {
-        let lvl = switch acTrivialLevel {
+        let lvl = switch ac.trivialLevel {
         | Some(s) => _levelFromString(s)
-        | None => _nullLevel()
+        | None => Nullable.null
         }
         {level: lvl, reason: "trivial"}
       } else {
-        let tierDefaults: dict<string> = switch acTierDefaults {
+        let tierDefaults: dict<string> = switch ac.tierDefaults {
         | Some(td) => td
         | None => Dict.make()
         }
@@ -263,16 +224,16 @@ let selectAdaptiveLevel = (
             {level: lvl, reason: `tier default: ${signals.tierName}`}
           }
         | None => {
-            let keywordRules: array<keywordRule> = switch acKeywordRules {
+            let keywordRules: array<keywordRule> = switch ac.keywordRules {
             | Some(rules) => rules
             | None => []
             }
             switch _scanRules(keywordRules, 0, signals.prompt, signals.description) {
             | Some(d) => d
             | None => {
-                let lvl = switch acDefaultLevel {
+                let lvl = switch ac.defaultLevel {
                 | Some(s) => _levelFromString(s)
-                | None => _nullLevel()
+                | None => Nullable.null
                 }
                 {level: lvl, reason: "default level"}
               }
