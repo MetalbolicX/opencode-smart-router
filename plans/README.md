@@ -36,12 +36,12 @@ your row when done.
 | 013  | Add an automated CI gate for typecheck, lint, tests, and build | P1 | S | LOW | 011 | DONE |
 | 014  | Make reasoning control production-ready with runtime mode switching | P1 | M | MED | — | DONE (PR 1 + PR 2 + PR 3 + PR 4 on stacked branch `feature/reasoning-mode-switch`) |
 | 015  | Ship an adaptive reasoning engine as a deterministic, config-driven selector | P1 | L | MED | 010, 014 | TODO |
-| 023  | Restore Guard self-script hard-block (regression from %raw / compiler-warning cleanup) | P1 | S | LOW | — | BLOCKED — cleanup reverted (`eac39cf` / `f86da65`); defects no longer exist |
-| 024  | Restore ConfigMerge scalar-override (regression from JSON migration cleanup) | P1 | S | LOW | — | BLOCKED — cleanup reverted (`eac39cf` / `f86da65`); defects no longer exist |
+| 023  | Restore Guard self-script hard-block (regression from %raw / compiler-warning cleanup) | P1 | S | LOW | — | CLOSED — defects removed by revert `eac39cf` + `f86da65`; no work remains |
+| 024  | Restore ConfigMerge scalar-override (regression from JSON migration cleanup) | P1 | S | LOW | — | CLOSED — defects removed by revert `eac39cf` + `f86da65`; no work remains |
 | 025  | Add VerifyDoD_test.res + VerifyDispatch_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | TODO |
-| 026  | Unify Protocol ABI naming — alias `tierConfig` to `RouterConfig` | P3 | S | LOW | — | TODO |
-| 027  | Document test commands in README | P3 | S | LOW | — | TODO |
-| 028  | Eliminate all 162 ReScript compiler warnings via mechanical migration to @rescript/core | P2 | M | LOW | — | TODO |
+| 026  | Unify Protocol ABI naming — alias `tierConfig` to `RouterConfig` | P3 | S | LOW | — | DONE |
+| 027  | Document test commands in README | P3 | S | LOW | — | DONE |
+| 028  | Eliminate all 162 ReScript compiler warnings via mechanical migration to @rescript/core | P2 | M | LOW | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
