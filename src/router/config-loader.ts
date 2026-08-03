@@ -34,6 +34,9 @@ export const isPlainObject = (v: unknown): v is Record<string, unknown> => {
 import { globalConfigPath, resolveConfigPaths } from "./config-paths";
 import { resolvePresetName } from "./config-resolve";
 import { readState } from "./config-state";
+import { deepMerge as deepMergeConfig } from "../config/ConfigMerge.res.mjs";
+// Re-export for backward compat — deepMergeConfig is now the ReScript port.
+export { deepMergeConfig };
 import { validateConfig } from "../validate/Validate.res.mjs";
 import { isValidEnforcementMode } from "./enforcement";
 
@@ -205,20 +208,9 @@ const warnAndSkip = (layer: ConfigLayer, _kind: "missing"): void => {
  * - Arrays and scalars (including `null`) ⇒ override replaces base.
  * - `null` is NOT a plain object; it is treated as a scalar replacement.
  *
+ * deepMergeConfig is now imported from ConfigMerge.res.mjs (ReScript port).
  * Exported for `src/router/config-store.ts`; pure.
  */
-export const deepMergeConfig = (base: unknown, override: unknown): unknown => {
-  if (base === undefined) return override;
-  if (override === undefined) return base;
-  if (isPlainObject(base) && isPlainObject(override)) {
-    const result: Record<string, unknown> = { ...base };
-    for (const key of Object.keys(override)) {
-      result[key] = deepMergeConfig(base[key], override[key]);
-    }
-    return result;
-  }
-  return override;
-};
 
 // ---------------------------------------------------------------------------
 // State overlay
