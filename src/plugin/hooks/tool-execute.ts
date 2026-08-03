@@ -25,7 +25,7 @@ import { guardAfterCall } from "../../guard/Guard.res.mjs";
 import { restoreAgentBaseline } from "../../router/agents";
 import { READ_ONLY_TOOLS } from "../../router/tools";
 import { log } from "../../utils/observability";
-import { verifyTaskAfterHook } from "../../verify/dispatch";
+import { verifyTaskAfterHook } from "../../verify/dispatch-io";
 import type { PluginContext } from "../context";
 import { asToolCallInput, type HookPayload } from "../types";
 import {
