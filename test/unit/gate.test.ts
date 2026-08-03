@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CheckerDeps } from "../../src/verify/checker";
 import { createMutexRegistry } from "../../src/verify/deterministic";
-import { normalizeDoD } from "../../src/verify/dod";
+import { normalizeDoD } from "../../src/verify/Verify.res.mjs";
 import type { Artefact, Delegation, GateDeps } from "../../src/verify/gate";
 import { accept } from "../../src/verify/gate";
 import type { DeterministicDeps } from "../../src/verify/types";

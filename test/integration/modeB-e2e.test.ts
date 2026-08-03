@@ -14,7 +14,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ModelRouterPlugin from "../../src/index";
-import { parseDoDFromAnnotation, parseDoDFromDispatch } from "../../src/verify/dod";
+import { parseDoDFromAnnotation, parseDoDFromDispatch } from "../../src/verify/Verify.res.mjs";
 
 // ---------------------------------------------------------------------------
 // Globally unique session counter (prevents duplicate IDs across all tests).

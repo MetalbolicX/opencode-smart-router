@@ -10,7 +10,7 @@ import {
   runDeterministic,
   shapeMismatch,
 } from "../../src/verify/deterministic";
-import type { Check, DoD } from "../../src/verify/dod";
+import type { check as Check, dod as DoD } from "../../src/verify/Verify.res.mjs";
 import type { DeterministicDeps, ExecResult } from "../../src/verify/types";
 
 // ---------------------------------------------------------------------------

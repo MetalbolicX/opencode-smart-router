@@ -20,8 +20,8 @@
 import type { ArtefactView, CheckerDeps } from "./checker";
 import { runChecker } from "./checker";
 import { runDeterministic } from "./deterministic";
-import type { DoD } from "./dod";
-import { isCheckable } from "./dod";
+import type { dod as DoD } from "./Verify.res.mjs";
+import { isCheckable } from "./Verify.res.mjs";
 import type { DeterministicDeps, Verdict } from "./types";
 
 /** The concrete, inspectable result of a delegation (artefact contract §3.3). */
