@@ -41,6 +41,7 @@ your row when done.
 | 025  | Add VerifyDoD_test.res + VerifyDispatch_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | TODO |
 | 026  | Unify Protocol ABI naming — alias `tierConfig` to `RouterConfig` | P3 | S | LOW | — | TODO |
 | 027  | Document test commands in README | P3 | S | LOW | — | TODO |
+| 028  | Eliminate all 162 ReScript compiler warnings via mechanical migration to @rescript/core | P2 | M | LOW | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
@@ -109,6 +110,14 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   `pnpm run test:res` (and the `NOT pnpm res:test` gotcha that cost the
   migration cycle real time). P3 priority, LOW risk. **Still TODO.**
 - **No inter-dependencies among 025 / 026 / 027** — any order, any branches.
+- **028 is the narrow warnings cleanup** (post-revert). After the cleanup
+  commits were reverted (`eac39cf` + `f86da65`), the 160 deprecation
+  warnings + 2 unused-code warnings returned. Plan 028 migrates ONLY the
+  deprecated `Js.*` APIs to their `@rescript/core` equivalents (type
+  aliases + function renames, zero runtime change) in 4 files
+  (`Ladder.res`, `Ladder.resi`, `Ladder_test.res`, `TierLadder_test.res`).
+  It does NOT touch `%raw`, `Obj.magic`, or `Js.typeof` — those are
+  separate semantic concerns.
 - **S3 (investigate the 13 pre-existing vitest failures) is REJECTED** —
   see "Findings considered and rejected → Audit cycle 3" below.
 
