@@ -36,9 +36,9 @@ your row when done.
 | 013  | Add an automated CI gate for typecheck, lint, tests, and build | P1 | S | LOW | 011 | DONE |
 | 014  | Make reasoning control production-ready with runtime mode switching | P1 | M | MED | — | DONE (PR 1 + PR 2 + PR 3 + PR 4 on stacked branch `feature/reasoning-mode-switch`) |
 | 015  | Ship an adaptive reasoning engine as a deterministic, config-driven selector | P1 | L | MED | 010, 014 | TODO |
-| 023  | Restore Guard self-script hard-block (regression from %raw / compiler-warning cleanup) | P1 | S | LOW | — | TODO |
-| 024  | Restore ConfigMerge scalar-override (regression from JSON migration cleanup) | P1 | S | LOW | — | TODO |
-| 025  | Add VerifyDoD_test.res + VerifyDispatchCore_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | TODO |
+| 023  | Restore Guard self-script hard-block (regression from %raw / compiler-warning cleanup) | P1 | S | LOW | — | BLOCKED — cleanup reverted (`eac39cf` / `f86da65`); defects no longer exist |
+| 024  | Restore ConfigMerge scalar-override (regression from JSON migration cleanup) | P1 | S | LOW | — | BLOCKED — cleanup reverted (`eac39cf` / `f86da65`); defects no longer exist |
+| 025  | Add VerifyDoD_test.res + VerifyDispatch_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | TODO |
 | 026  | Unify Protocol ABI naming — alias `tierConfig` to `RouterConfig` | P3 | S | LOW | — | TODO |
 | 027  | Document test commands in README | P3 | S | LOW | — | TODO |
 
@@ -64,41 +64,50 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ### Audit cycle 3 — new plans (2026-08-03, commit `9c744be`)
 
-- **023 is the urgent Eisenhower-1 item.** Two cleanup commits
-  (`2a4a4b2 fix(rescript): eliminate all compiler warnings` and
-  `9c744be refactor(rescript): eliminate %raw and Obj.magic from core`) —
-  committed after the SDD migration archived at engram #3980 — silently
-  broke Guard self-script detection (the security boundary). Six
-  integration-test regressions traced back to two sites in
+- **RESOLUTION: plans 023 and 024 are BLOCKED.** The two cleanup commits
+  that introduced the regressions (`2a4a4b2` + `9c744be`) were reverted on
+  2026-08-03 in commits `f86da65` (revert of `9c744be`) and `eac39cf`
+  (revert of `2a4a4b2`). The 14-failure accepted baseline is restored;
+  416/416 rescript-test preserved; build + typecheck green. The revert was
+  needed because the cleanup was 86 files / 9796 lines changed — far wider
+  than the percentage of code that needed refactoring — and the 6 regressions
+  traced back to the broad blast radius, not to two narrow sites. The right
+  path forward is a SMALLER, scoped cleanup (mechanical `Js.Nullable.t` →
+  `Nullable.t` migration without touching logic) that addresses the 33
+  deprecation warnings without re-implementing the modules.
+- **023** was the urgent Eisenhower-1 item. Two cleanup commits had
+  silently broken Guard self-script detection (the security boundary).
+  Six integration-test regressions traced back to two sites in
   `src/guard/Guard.res`:
   1. The `i` (case-insensitive) flag was dropped from 4 of 6 detection
      regexes during the `%raw(/.../i)` → `RegExp.fromString(...)` swap.
   2. The `Obj.magic(v)` → `JSON.Decode.string(v)->Option.getOr("")` command
      extraction rejects valid JS strings at the integration-test ABI
      boundary, so `isSelfScript` short-circuits with `cmd === ""`.
-- **024 is the second regression**, introduced by the same two commits but
+- **024** was the second regression, introduced by the same two commits but
   in a file-disjoint module. `Js.typeof(override) == "undefined"` was
   replaced with `overrideObj == None`, conflating the scalar-override
   case with the undefined-override case in the `!overrideIsObj` branch.
-  `deepMergeConfig(base, 42)` now returns `base` instead of `42`.
-- **023 and 024 are file-disjoint (`Guard.res` vs `ConfigMerge.res`) and
-  CAN be executed in parallel on separate branches.** Together they
-  restore the current 20-failure baseline to the 14-failure accepted
-  baseline established by the migration verify-report (engram #3978).
+  `deepMergeConfig({key:'value'}, 42)` now returns `base` instead of `42`.
+- **Both fixes were correct in isolation** — verified by direct runtime
+  probes during dispatch — but the broader cleanup had changed the dispatch
+  chain upstream so the planned `_stringOrEmpty` fix for `isSelfScript` was
+  never reached in the integration test path. The executor's commit
+  `4bc4a95` on `advisor/023` was reverted; the worktree was discarded.
 - **025 is the strict REQ-CORE-104 follow-up** (archive report S1 / W1).
   Adds `VerifyDoD_test.res` + `VerifyDispatchCore_test.res` pure-logic
   parity fixtures (~25 tests each) so `rescript-test` — not just the TS
   adapter vitest — is the parity suite for the Verify helpers. No code
-  change to the modules under test; P2 priority, LOW risk.
+  change to the modules under test; P2 priority, LOW risk. **Still TODO.**
 - **026 is the Protocol ABI naming reconciliation** (archive report S4).
   Adds a single line `export type RouterConfig = tierConfig;` to the
   `*Protocol.res.mjs` block in `src/types/rescript-modules.d.ts`. Zero
   runtime / compiled-output impact; backward-compatible alias only. P3
-  priority, LOW risk.
+  priority, LOW risk. **Still TODO.**
 - **027 is the README test docs follow-up** (archive report S5).
   Inserts a `## Testing` section in `README.md` documenting
   `pnpm run test:res` (and the `NOT pnpm res:test` gotcha that cost the
-  migration cycle real time). P3 priority, LOW risk.
+  migration cycle real time). P3 priority, LOW risk. **Still TODO.**
 - **No inter-dependencies among 025 / 026 / 027** — any order, any branches.
 - **S3 (investigate the 13 pre-existing vitest failures) is REJECTED** —
   see "Findings considered and rejected → Audit cycle 3" below.
@@ -162,10 +171,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **README test-command absence** (archive report S5): planned as
   **Plan 027**.
 - **`Js.Nullable.t<T>` → `Nullable.t<T>` migration across all 33 sites**
-  (archive report W2 / S2): REJECTED for repeated planning because the
-  user has already executed this migration (commits `2a4a4b2` +
-  `9c744be`). The 33 compiler deprecation warnings are cleared. The
-  regressions introduced by the migration are captured by Plans 023 +
-  024; the migration itself is functionally complete and out of scope
-  for further plans. Any residual structuring belongs in a separate
-  hygiene audit, not a re-plan.
+  (archive report W2 / S2): REJECTED for repeated planning. The cleanup
+  commits that performed this migration (`2a4a4b2` + `9c744be`) were
+  REVERTED on 2026-08-03 (`eac39cf` + `f86da65`) because the cleanup
+  touched 86 files / 9796 lines and introduced 6 regressions. A future
+  scoped cleanup that ONLY clears the 33 deprecation warnings
+  (mechanical `Js.Nullable.t` → `Nullable.t` rename without touching
+  logic) is a candidate for a SEPARATE hygiene change, not a re-plan of
+  these existing ones.
