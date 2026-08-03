@@ -874,6 +874,7 @@ declare module "*Protocol.res.mjs" {
     modes: Record<string, modeConfig> | null;
     enforcement: enforcementConfig | null;
   };
+  export type RouterConfig = tierConfig; // Canonical TS name; `tierConfig` kept as an alias for backward compat.
 
   // Tier / mode helpers
   export const tierConfigFromDict: (raw: Record<string, any>) => tierConfig;
