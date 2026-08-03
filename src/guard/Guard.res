@@ -19,14 +19,14 @@
 // ---------------------------------------------------------------------------
 
 // FINISH_TOOLS: tools that mark delegation as terminally complete
-let _FINISH_TOOLS: dict<bool> = Dict.fromArray([
+let _FINISH_TOOLS: Js.Dict.t<bool> = Js.Dict.fromArray([
   ("finish", true),
   ("return", true),
   ("task_complete", true),
 ])
 
 // READ_ONLY_TOOLS: tools that never mutate the workspace
-let _READ_ONLY_TOOLS: dict<bool> = Dict.fromArray([
+let _READ_ONLY_TOOLS: Js.Dict.t<bool> = Js.Dict.fromArray([
   ("grep", true),
   ("read", true),
   ("glob", true),
@@ -34,7 +34,7 @@ let _READ_ONLY_TOOLS: dict<bool> = Dict.fromArray([
 ])
 
 // MUTATION_TOOLS: broader mutation set used by classify
-let _MUTATION_TOOLS: dict<bool> = Dict.fromArray([
+let _MUTATION_TOOLS: Js.Dict.t<bool> = Js.Dict.fromArray([
   ("write", true),
   ("edit", true),
   ("patch", true),
@@ -43,7 +43,7 @@ let _MUTATION_TOOLS: dict<bool> = Dict.fromArray([
 ])
 
 // WRITE_TOOLS: tools that produce a changed-file record
-let _WRITE_TOOLS: dict<bool> = Dict.fromArray([
+let _WRITE_TOOLS: Js.Dict.t<bool> = Js.Dict.fromArray([
   ("write", true),
   ("edit", true),
   ("patch", true),
@@ -99,23 +99,23 @@ type guardPolicy = {
   sameOpRetryCap: int,
   blockSelfScript: bool,
   deliverableFirst: bool,
-  deliverableSignal: Nullable.t<string>,
-  deliverablePath: Nullable.t<string>,
-  deliverableIsScript: Nullable.t<bool>,
-  blockScriptWrites: Nullable.t<bool>,
+  deliverableSignal: Js.Nullable.t<string>,
+  deliverablePath: Js.Nullable.t<string>,
+  deliverableIsScript: Js.Nullable.t<bool>,
+  blockScriptWrites: Js.Nullable.t<bool>,
 }
 
 // guardCall: a tool call to be evaluated
 type guardCall = {
   tool: string,
-  args?: Nullable.t<dict<JSON.t>>,
+  args?: Js.Nullable.t<Js.Dict.t<Js.Json.t>>,
 }
 
 // guardDecision: result of evaluateGuards
 type guardDecision = {
   allow: bool,
-  guard: Nullable.t<string>,
-  observation: Nullable.t<string>,
+  guard: Js.Nullable.t<string>,
+  observation: Js.Nullable.t<string>,
 }
 
 // guardState: mutable state tracked across a delegation session
@@ -129,9 +129,9 @@ type guardState = {
   mutable blockedCount: int,
   mutable consecutiveNonProducing: int,
   mutable deliverableExecuted: bool,
-  mutable ttfa: Nullable.t<int>,
-  mutable seen: dict<int>,
-  mutable lastBlock: Nullable.t<string>,
+  mutable ttfa: Js.Nullable.t<int>,
+  mutable seen: Js.Dict.t<int>,
+  mutable lastBlock: Js.Nullable.t<string>,
 }
 
 // ---------------------------------------------------------------------------
@@ -149,18 +149,18 @@ let newGuardState = (policy: guardPolicy): guardState => {
     blockedCount: 0,
     consecutiveNonProducing: 0,
     deliverableExecuted: false,
-    ttfa: Nullable.null,
-    seen: Dict.make(),
-    lastBlock: Nullable.null,
+    ttfa: Js.Nullable.null,
+    seen: Js.Dict.empty(),
+    lastBlock: Js.Nullable.null,
   }
 }
 
 // guardStoreLike: interface for guard state persistence
 type guardStoreLike = {
   ensure: (string, guardPolicy) => guardState,
-  get: string => Nullable.t<guardState>,
+  get: (string) => Js.Nullable.t<guardState>,
   setPendingNote: (string, string) => unit,
-  takePendingNote: string => Nullable.t<string>,
+  takePendingNote: (string) => Js.Nullable.t<string>,
 }
 
 // makePolicyWithDefaults partial type
@@ -170,8 +170,8 @@ type makePolicyPartial = {
   sameOpRetryCap?: int,
   blockSelfScript?: bool,
   deliverableFirst?: bool,
-  deliverableSignal?: Nullable.t<string>,
-  blockScriptWrites?: Nullable.t<bool>,
+  deliverableSignal?: Js.Nullable.t<string>,
+  blockScriptWrites?: Js.Nullable.t<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -185,10 +185,10 @@ let makePolicyDefault = (): guardPolicy => {
     sameOpRetryCap: 1,
     blockSelfScript: true,
     deliverableFirst: true,
-    deliverableSignal: Nullable.null,
-    deliverablePath: Nullable.null,
-    deliverableIsScript: Nullable.null,
-    blockScriptWrites: Nullable.null,
+    deliverableSignal: Js.Nullable.null,
+    deliverablePath: Js.Nullable.null,
+    deliverableIsScript: Js.Nullable.null,
+    blockScriptWrites: Js.Nullable.null,
   }
 }
 
@@ -196,46 +196,46 @@ let makePolicyWithDefaults = (partial: makePolicyPartial): guardPolicy => {
   let defaults = makePolicyDefault()
   {
     budget: switch partial.budget {
-    | Some(v) => v
-    | None => defaults.budget
-    },
+      | Some(v) => v
+      | None => defaults.budget
+      },
     readDraftCap: switch partial.readDraftCap {
-    | Some(v) => v
-    | None => defaults.readDraftCap
-    },
+      | Some(v) => v
+      | None => defaults.readDraftCap
+      },
     sameOpRetryCap: switch partial.sameOpRetryCap {
-    | Some(v) => v
-    | None => defaults.sameOpRetryCap
-    },
+      | Some(v) => v
+      | None => defaults.sameOpRetryCap
+      },
     blockSelfScript: switch partial.blockSelfScript {
-    | Some(v) => v
-    | None => defaults.blockSelfScript
-    },
+      | Some(v) => v
+      | None => defaults.blockSelfScript
+      },
     deliverableFirst: switch partial.deliverableFirst {
-    | Some(v) => v
-    | None => defaults.deliverableFirst
-    },
+      | Some(v) => v
+      | None => defaults.deliverableFirst
+      },
     deliverableSignal: switch partial.deliverableSignal {
-    | Some(v) => v
-    | None => defaults.deliverableSignal
-    },
+      | Some(v) => v
+      | None => defaults.deliverableSignal
+      },
     deliverablePath: defaults.deliverablePath,
     deliverableIsScript: defaults.deliverableIsScript,
     blockScriptWrites: switch partial.blockScriptWrites {
-    | Some(v) => v
-    | None => defaults.blockScriptWrites
-    },
+      | Some(v) => v
+      | None => defaults.blockScriptWrites
+      },
   }
 }
 
 let makePolicyWithBlockScriptWrites = (enabled: bool): guardPolicy => {
   let defaults = makePolicyDefault()
-  {...defaults, blockScriptWrites: Nullable.make(enabled)}
+  { ...defaults, blockScriptWrites: Js.Nullable.return(enabled) }
 }
 
 let makePolicyWithDeliverablePath = (path: string): guardPolicy => {
   let defaults = makePolicyDefault()
-  {...defaults, deliverablePath: Nullable.make(path)}
+  { ...defaults, deliverablePath: Js.Nullable.return(path) }
 }
 
 let makePolicyWithDeliverablePathAndBlockScript = (path: string, enabled: bool): guardPolicy => {
@@ -247,23 +247,23 @@ let makePolicyWithDeliverablePathAndBlockScript = (path: string, enabled: bool):
     blockSelfScript: defaults.blockSelfScript,
     deliverableFirst: defaults.deliverableFirst,
     deliverableSignal: defaults.deliverableSignal,
-    deliverablePath: Nullable.make(path),
+    deliverablePath: Js.Nullable.return(path),
     deliverableIsScript: defaults.deliverableIsScript,
-    blockScriptWrites: Nullable.make(enabled),
+    blockScriptWrites: Js.Nullable.return(enabled),
   }
 }
 
 let makePolicyWithDeliverableIsScript = (enabled: bool): guardPolicy => {
   let defaults = makePolicyDefault()
-  {...defaults, deliverableIsScript: Nullable.make(enabled)}
+  { ...defaults, deliverableIsScript: Js.Nullable.return(enabled) }
 }
 
 // beforeResult: result of guardBeforeCall
 type beforeResult = {
   block: bool,
-  message: Nullable.t<string>,
+  message: Js.Nullable.t<string>,
   mode: string,
-  guard: Nullable.t<string>,
+  guard: Js.Nullable.t<string>,
 }
 
 // updateState opts
@@ -271,47 +271,41 @@ type updateStateOpts = {ok: bool}
 
 // minimal RouterConfig shape for guard policy building
 type routerConfigMinimal = {
-  enforcement: option<
-    {
-      guard: option<
-        {
-          budget: option<int>,
-          readDraftCap: option<int>,
-          sameOpRetryCap: option<int>,
-          blockSelfScript: option<bool>,
-          deliverableFirst: option<bool>,
-          blockScriptWrites: option<bool>,
-        },
-      >,
-      proportional: option<
-        {
-          trivialBypass: option<bool>,
-        },
-      >,
-    },
-  >,
+  enforcement: option<{
+    guard: option<{
+      budget: option<int>,
+      readDraftCap: option<int>,
+      sameOpRetryCap: option<int>,
+      blockSelfScript: option<bool>,
+      deliverableFirst: option<bool>,
+      blockScriptWrites: option<bool>,
+    }>,
+    proportional: option<{
+      trivialBypass: option<bool>,
+    }>,
+  }>,
 }
 
 // guardBeforeCall params
 type guardBeforeCallParams = {
   cfg: routerConfigMinimal,
-  tier: Nullable.t<string>,
+  tier: Js.Nullable.t<string>,
   sessionID: string,
   tool: string,
-  toolArgs: Nullable.t<dict<JSON.t>>,
+  toolArgs: Js.Nullable.t<Js.Dict.t<Js.Json.t>>,
   store: guardStoreLike,
-  env: dict<Nullable.t<string>>,
-  trivial: Nullable.t<bool>,
+  env: Js.Dict.t<Js.Nullable.t<string>>,
+  trivial: Js.Nullable.t<bool>,
 }
 
 // guardAfterCall params
 type guardAfterCallParams = {
   cfg: routerConfigMinimal,
-  tier: Nullable.t<string>,
+  tier: Js.Nullable.t<string>,
   sessionID: string,
   tool: string,
-  toolArgs: Nullable.t<dict<JSON.t>>,
-  output_: {mutable output: Nullable.t<JSON.t>},
+  toolArgs: Js.Nullable.t<Js.Dict.t<Js.Json.t>>,
+  output: {mutable output: Js.Nullable.t<Js.Json.t>},
   store: guardStoreLike,
 }
 
@@ -322,7 +316,7 @@ type resolveEnforcementModeResult = {mode: string}
 type resolveEnforcementModeParams = {
   config: option<routerConfigMinimal>,
   tier: option<string>,
-  env: dict<Nullable.t<string>>,
+  env: Js.Dict.t<Js.Nullable.t<string>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -331,49 +325,49 @@ type resolveEnforcementModeParams = {
 
 // _hasToolSet: checks if a tool is in the given set (plain object in ReScript 12.x)
 @setRuntimeSideEffects
-let _hasToolSet = (_tool: string, _set: dict<bool>): bool => {
+let _hasToolSet = (tool: string, set: Js.Dict.t<bool>): bool => {
   %raw(`tool in set`)
 }
 
 // _hasScriptExt: checks if target has a script extension
 @setRuntimeSideEffects
-let _hasScriptExt = (_target: string): bool => {
+let _hasScriptExt = (target: string): bool => {
   %raw(`/\.(mjs|sh|py|js|ts|cjs|bash)\b/i.test(target)`)
 }
 
 // _hasHeredoc: checks for heredoc pattern
 @setRuntimeSideEffects
-let _hasHeredoc = (_cmd: string): bool => {
+let _hasHeredoc = (cmd: string): bool => {
   %raw(`/<<-?\\s*['"]?[A-Za-z_]/.test(cmd)`)
 }
 
 // _hasRedirectScript: checks for redirect-to-script pattern
 @setRuntimeSideEffects
-let _hasRedirectScript = (_cmd: string): bool => {
+let _hasRedirectScript = (cmd: string): bool => {
   %raw(`/>\\s*\\S+\\.(mjs|sh|py|js|ts|cjs|bash)\\b/i.test(cmd)`)
 }
 
 // _hasInlineScript: checks for inline script execution
 @setRuntimeSideEffects
-let _hasInlineScript = (_cmd: string): bool => {
+let _hasInlineScript = (cmd: string): bool => {
   %raw(`/\b(node|python3?|deno|bun)\s+-(e|c)\b/i.test(cmd)`)
 }
 
 // _hasCatWrite: checks for cat-write pattern
 @setRuntimeSideEffects
-let _hasCatWrite = (_cmd: string): bool => {
+let _hasCatWrite = (cmd: string): bool => {
   %raw(`/\bcat\s+>\s*\S/.test(cmd)`)
 }
 
 // _hasBashC: checks for bash -c pattern
 @setRuntimeSideEffects
-let _hasBashC = (_cmd: string): bool => {
+let _hasBashC = (cmd: string): bool => {
   %raw(`/\bbash\s+-c\b/i.test(cmd)`)
 }
 
 // _stringifyArgs: converts args to a JSON string for fingerprinting
 @setRuntimeSideEffects
-let _stringifyArgs = (_args: dict<JSON.t>): string => {
+let _stringifyArgs = (args: Js.Dict.t<Js.Json.t>): string => {
   %raw(`JSON.stringify(args).slice(0, 120)`)
 }
 
@@ -381,7 +375,7 @@ let _stringifyArgs = (_args: dict<JSON.t>): string => {
 // newGuardState
 // ---------------------------------------------------------------------------
 
-let _newGuardState = (policy: guardPolicy): guardState => {
+let newGuardState = (policy: guardPolicy): guardState => {
   {
     budget: policy.budget,
     toolCallCount: 0,
@@ -392,9 +386,9 @@ let _newGuardState = (policy: guardPolicy): guardState => {
     blockedCount: 0,
     consecutiveNonProducing: 0,
     deliverableExecuted: false,
-    ttfa: Nullable.null,
-    seen: Dict.make(),
-    lastBlock: Nullable.null,
+    ttfa: Js.Nullable.null,
+    seen: Js.Dict.empty(),
+    lastBlock: Js.Nullable.null,
   }
 }
 
@@ -403,7 +397,7 @@ let _newGuardState = (policy: guardPolicy): guardState => {
 // ---------------------------------------------------------------------------
 
 @setRuntimeSideEffects
-let _fingerprintToolCall = (_tool: string, _args: dict<JSON.t>): string => {
+let _fingerprintToolCall = (tool: string, args: Js.Dict.t<Js.Json.t>): string => {
   %raw(`
     (function(tool, args) {
       var a = args || {};
@@ -424,102 +418,106 @@ let _fingerprintToolCall = (_tool: string, _args: dict<JSON.t>): string => {
 
 let isSelfScript = (call: guardCall, policy: guardPolicy): bool => {
   // Get target from args (filePath, path, or file key)
-  let args: dict<JSON.t> = switch call.args {
-  | Some(a) => a->Nullable.toOption->Belt.Option.getWithDefault(Dict.make())
-  | None => Dict.make()
+  let args: Js.Dict.t<Js.Json.t> = switch call.args {
+    | Some(a) => a->Js.Nullable.toOption->Belt.Option.getWithDefault(Js.Dict.empty())
+    | None => Js.Dict.empty()
   }
-  let target = switch args->Dict.get("filePath") {
-  | Some(v) => v->JSON.stringify
-  | None =>
-    switch args->Dict.get("path") {
-    | Some(v) => v->JSON.stringify
+  let target = switch args->Js.Dict.get("filePath") {
+    | Some(v) => v->Js.Json.stringify
     | None =>
-      switch args->Dict.get("file") {
-      | Some(v) => v->JSON.stringify
-      | None => ""
+      switch args->Js.Dict.get("path") {
+      | Some(v) => v->Js.Json.stringify
+      | None =>
+        switch args->Js.Dict.get("file") {
+        | Some(v) => v->Js.Json.stringify
+        | None => ""
+        }
       }
-    }
   }
   let targetStr = target
 
   // Intent exemption: deliverableIsScript === true => never self-script
-  switch policy.deliverableIsScript->Nullable.toOption {
+  switch policy.deliverableIsScript->Js.Nullable.toOption {
   | Some(true) => false
-  | _ => // deliverablePath exemption
-    switch policy.deliverablePath->Nullable.toOption {
-    | Some(dp) =>
-      if targetStr === dp {
-        false
-      } // Check for bash/shell ad-hoc execution
-      else if call.tool === "bash" || call.tool === "shell" {
-        let cmd = switch args->Dict.get("command") {
-        | Some(v) => {
-            let s: string = Obj.magic(v)
-            s
+  | _ => {
+      // deliverablePath exemption
+      switch policy.deliverablePath->Js.Nullable.toOption {
+      | Some(dp) =>
+        if targetStr === dp {
+          false
+        } else {
+          // Check for bash/shell ad-hoc execution
+          if call.tool === "bash" || call.tool === "shell" {
+            let cmd = switch args->Js.Dict.get("command") {
+            | Some(v) => {
+                let s: string = Obj.magic(v)
+                s
+              }
+            | None =>
+              switch args->Js.Dict.get("cmd") {
+              | Some(v) => {
+                  let s: string = Obj.magic(v)
+                  s
+                }
+              | None => ""
+              }
+            }
+            let cmdStr = cmd
+            if cmdStr === "" {
+              false
+            } else {
+              _hasHeredoc(cmdStr) ||
+                _hasRedirectScript(cmdStr) ||
+                _hasInlineScript(cmdStr) ||
+                _hasCatWrite(cmdStr) ||
+                _hasBashC(cmdStr)
+            }
+          } else if _hasToolSet(call.tool, _WRITE_TOOLS) {
+            // WRITE-to-script (OPT-IN): only when blockScriptWrites === true
+            switch policy.blockScriptWrites->Js.Nullable.toOption {
+            | Some(true) => _hasScriptExt(targetStr)
+            | _ => false
+            }
+          } else {
+            false
           }
-        | None =>
-          switch args->Dict.get("cmd") {
+        }
+      | None =>
+        // No deliverablePath exemption — check for bash/shell ad-hoc
+        if call.tool === "bash" || call.tool === "shell" {
+          let cmd = switch args->Js.Dict.get("command") {
           | Some(v) => {
               let s: string = Obj.magic(v)
               s
             }
-          | None => ""
-          }
-        }
-        let cmdStr = cmd
-        if cmdStr === "" {
-          false
-        } else {
-          _hasHeredoc(cmdStr) ||
-          _hasRedirectScript(cmdStr) ||
-          _hasInlineScript(cmdStr) ||
-          _hasCatWrite(cmdStr) ||
-          _hasBashC(cmdStr)
-        }
-      } else if _hasToolSet(call.tool, _WRITE_TOOLS) {
-        // WRITE-to-script (OPT-IN): only when blockScriptWrites === true
-        switch policy.blockScriptWrites->Nullable.toOption {
-        | Some(true) => _hasScriptExt(targetStr)
-        | _ => false
-        }
-      } else {
-        false
-      }
-    | None =>
-      // No deliverablePath exemption — check for bash/shell ad-hoc
-      if call.tool === "bash" || call.tool === "shell" {
-        let cmd = switch args->Dict.get("command") {
-        | Some(v) => {
-            let s: string = Obj.magic(v)
-            s
-          }
-        | None =>
-          switch args->Dict.get("cmd") {
-          | Some(v) => {
-              let s: string = Obj.magic(v)
-              s
+          | None =>
+            switch args->Js.Dict.get("cmd") {
+            | Some(v) => {
+                let s: string = Obj.magic(v)
+                s
+              }
+            | None => ""
             }
-          | None => ""
           }
-        }
-        let cmdStr = cmd
-        if cmdStr === "" {
-          false
+          let cmdStr = cmd
+          if cmdStr === "" {
+            false
+          } else {
+            _hasHeredoc(cmdStr) ||
+              _hasRedirectScript(cmdStr) ||
+              _hasInlineScript(cmdStr) ||
+              _hasCatWrite(cmdStr) ||
+              _hasBashC(cmdStr)
+          }
+        } else if _hasToolSet(call.tool, _WRITE_TOOLS) {
+          // WRITE-to-script (OPT-IN): only when blockScriptWrites === true
+          switch policy.blockScriptWrites->Js.Nullable.toOption {
+          | Some(true) => _hasScriptExt(targetStr)
+          | _ => false
+          }
         } else {
-          _hasHeredoc(cmdStr) ||
-          _hasRedirectScript(cmdStr) ||
-          _hasInlineScript(cmdStr) ||
-          _hasCatWrite(cmdStr) ||
-          _hasBashC(cmdStr)
+          false
         }
-      } else if _hasToolSet(call.tool, _WRITE_TOOLS) {
-        // WRITE-to-script (OPT-IN): only when blockScriptWrites === true
-        switch policy.blockScriptWrites->Nullable.toOption {
-        | Some(true) => _hasScriptExt(targetStr)
-        | _ => false
-        }
-      } else {
-        false
       }
     }
   }
@@ -548,9 +546,9 @@ let classify = (call: guardCall, policy: guardPolicy): guardKind => {
 // ---------------------------------------------------------------------------
 
 let evaluateGuards = (state: guardState, call: guardCall, policy: guardPolicy): guardDecision => {
-  let args: dict<JSON.t> = switch call.args {
-  | Some(a) => a->Nullable.toOption->Belt.Option.getWithDefault(Dict.make())
-  | None => Dict.make()
+  let args: Js.Dict.t<Js.Json.t> = switch call.args {
+    | Some(a) => a->Js.Nullable.toOption->Belt.Option.getWithDefault(Js.Dict.empty())
+    | None => Js.Dict.empty()
   }
   let fp = _fingerprintToolCall(call.tool, args)
   let kind = classify(call, policy)
@@ -567,13 +565,15 @@ let evaluateGuards = (state: guardState, call: guardCall, policy: guardPolicy): 
   }
 
   switch effectiveKind {
-  | #finish => {allow: true, guard: Nullable.null, observation: Nullable.null}
+  | #finish =>
+    { allow: true, guard: Js.Nullable.null, observation: Js.Nullable.null }
 
-  | #self_script => {
+  | #self_script =>
+    {
       allow: false,
-      guard: Nullable.make("anti_self_script"),
-      observation: Nullable.make(
-        "DENIED: do not author or run a throwaway script. Do the task directly — write/edit the real target file, or run the actual build/test command.",
+      guard: Js.Nullable.return("anti_self_script"),
+      observation: Js.Nullable.return(
+        "DENIED: do not author or run a throwaway script. Do the task directly — write/edit the real target file, or run the actual build/test command."
       ),
     }
 
@@ -582,83 +582,78 @@ let evaluateGuards = (state: guardState, call: guardCall, policy: guardPolicy): 
     if state.toolCallCount >= state.budget {
       {
         allow: false,
-        guard: Nullable.make("iteration_cap"),
-        observation: Nullable.make(
-          "DENIED: tool-call budget " ++
-          Belt.Int.toString(
-            state.budget,
-          ) ++ " exhausted. Stop now and emit your final answer with what you have.",
-        ),
-      }
-    } // CLAUSE 4: redundancy (only for read)
-    else if effectiveKind === #read {
-      let seenCount = switch Dict.get(state.seen, fp) {
-      | Some(c) => c
-      | None => 0
-      }
-      if seenCount >= policy.sameOpRetryCap {
-        {
-          allow: false,
-          guard: Nullable.make("redundant_read"),
-          observation: Nullable.make(
-            "DENIED: you already ran this exact read (" ++
-            fp ++ "). Reuse the result you already have; take a producing action or finish.",
-          ),
-        }
-      } else if state.consecutiveNonProducing >= policy.readDraftCap {
-        {
-          allow: false,
-          guard: Nullable.make("read_budget"),
-          observation: Nullable.make(
-            "DENIED: read/draft budget exhausted (" ++
-            Belt.Int.toString(
-              policy.readDraftCap,
-            ) ++ " consecutive non-producing actions). Take a producing action now (write/edit) or finish.",
-          ),
-        }
-      } // CLAUSE 6: deliverable_first
-      else if (
-        policy.deliverableFirst !== false &&
-        !(policy.deliverableSignal->Nullable.isNullable) &&
-        state.deliverableExecuted === false &&
-        (effectiveKind === #read || effectiveKind === #other)
-      ) {
-        {
-          allow: false,
-          guard: Nullable.make("deliverable_first"),
-          observation: Nullable.make(
-            "DENIED: you have not produced the deliverable yet. Your next action must be the deliverable (" ++
-            switch policy.deliverableSignal->Nullable.toOption {
-            | Some(s) => s
-            | None => ""
-            } ++ ") before further exploration.",
-          ),
-        }
-      } else {
-        // CLAUSE 7: allow
-        {allow: true, guard: Nullable.null, observation: Nullable.null}
-      }
-    } // Non-read: skip clauses 4-5, check deliverable_first
-    else if (
-      policy.deliverableFirst !== false &&
-      !(policy.deliverableSignal->Nullable.isNullable) &&
-      state.deliverableExecuted === false &&
-      (effectiveKind === #read || effectiveKind === #other)
-    ) {
-      {
-        allow: false,
-        guard: Nullable.make("deliverable_first"),
-        observation: Nullable.make(
-          "DENIED: you have not produced the deliverable yet. Your next action must be the deliverable (" ++
-          switch policy.deliverableSignal->Nullable.toOption {
-          | Some(s) => s
-          | None => ""
-          } ++ ") before further exploration.",
+        guard: Js.Nullable.return("iteration_cap"),
+        observation: Js.Nullable.return(
+          "DENIED: tool-call budget " ++ Belt.Int.toString(state.budget) ++ " exhausted. Stop now and emit your final answer with what you have."
         ),
       }
     } else {
-      // CLAUSE 7: allow
-      {allow: true, guard: Nullable.null, observation: Nullable.null}
+      // CLAUSE 4: redundancy (only for read)
+      if effectiveKind === #read {
+        let seenCount = switch Js.Dict.get(state.seen, fp) {
+        | Some(c) => c
+        | None => 0
+        }
+        if seenCount >= policy.sameOpRetryCap {
+          {
+            allow: false,
+            guard: Js.Nullable.return("redundant_read"),
+            observation: Js.Nullable.return(
+              "DENIED: you already ran this exact read (" ++ fp ++ "). Reuse the result you already have; take a producing action or finish."
+            ),
+          }
+        } else if state.consecutiveNonProducing >= policy.readDraftCap {
+          {
+            allow: false,
+            guard: Js.Nullable.return("read_budget"),
+            observation: Js.Nullable.return(
+              "DENIED: read/draft budget exhausted (" ++ Belt.Int.toString(policy.readDraftCap) ++ " consecutive non-producing actions). Take a producing action now (write/edit) or finish."
+            ),
+          }
+        } else {
+          // CLAUSE 6: deliverable_first
+          if policy.deliverableFirst !== false &&
+             !(policy.deliverableSignal->Js.Nullable.isNullable) &&
+             state.deliverableExecuted === false &&
+             (effectiveKind === #read || effectiveKind === #other) {
+            {
+              allow: false,
+              guard: Js.Nullable.return("deliverable_first"),
+              observation: Js.Nullable.return(
+                "DENIED: you have not produced the deliverable yet. Your next action must be the deliverable (" ++
+                (switch policy.deliverableSignal->Js.Nullable.toOption {
+                | Some(s) => s
+                | None => ""
+                }) ++ ") before further exploration."
+              ),
+            }
+          } else {
+            // CLAUSE 7: allow
+            { allow: true, guard: Js.Nullable.null, observation: Js.Nullable.null }
+          }
+        }
+      } else {
+        // Non-read: skip clauses 4-5, check deliverable_first
+        if policy.deliverableFirst !== false &&
+           !(policy.deliverableSignal->Js.Nullable.isNullable) &&
+           state.deliverableExecuted === false &&
+           (effectiveKind === #read || effectiveKind === #other) {
+          {
+            allow: false,
+            guard: Js.Nullable.return("deliverable_first"),
+            observation: Js.Nullable.return(
+              "DENIED: you have not produced the deliverable yet. Your next action must be the deliverable (" ++
+              (switch policy.deliverableSignal->Js.Nullable.toOption {
+              | Some(s) => s
+              | None => ""
+              }) ++ ") before further exploration."
+            ),
+          }
+        } else {
+          // CLAUSE 7: allow
+          { allow: true, guard: Js.Nullable.null, observation: Js.Nullable.null }
+        }
+      }
     }
   }
 }
@@ -681,10 +676,10 @@ let updateState = (
   } else {
     state.toolCallCount = state.toolCallCount + 1
 
-    let args: dict<JSON.t> = switch call.args {
-    | Some(a) => a->Nullable.toOption->Belt.Option.getWithDefault(Dict.make())
-    | None => Dict.make()
-    }
+    let args: Js.Dict.t<Js.Json.t> = switch call.args {
+    | Some(a) => a->Js.Nullable.toOption->Belt.Option.getWithDefault(Js.Dict.empty())
+    | None => Js.Dict.empty()
+  }
     let fp = _fingerprintToolCall(call.tool, args)
 
     switch kind {
@@ -699,7 +694,7 @@ let updateState = (
         state.consecutiveNonProducing = 0
         if opts.ok && !state.deliverableExecuted {
           state.deliverableExecuted = true
-          state.ttfa = Nullable.make(state.toolCallCount)
+          state.ttfa = Js.Nullable.return(state.toolCallCount)
         }
         state
       }
@@ -707,11 +702,11 @@ let updateState = (
     | #read => {
         state.readCount = state.readCount + 1
         state.consecutiveNonProducing = state.consecutiveNonProducing + 1
-        let existing = switch Dict.get(state.seen, fp) {
+        let existing = switch Js.Dict.get(state.seen, fp) {
         | Some(c) => c
         | None => 0
         }
-        Dict.set(state.seen, fp, existing + 1)
+        Js.Dict.set(state.seen, fp, existing + 1)
         state
       }
 
@@ -730,7 +725,7 @@ let updateState = (
 let recordBlock = (state: guardState, decision: guardDecision): guardState => {
   state.lastBlock = decision.guard
   state.blockedCount = state.blockedCount + 1
-  switch decision.guard->Nullable.toOption {
+  switch decision.guard->Js.Nullable.toOption {
   | Some("redundant_read") => state.redundantCount = state.redundantCount + 1
   | _ => ()
   }
@@ -742,7 +737,7 @@ let recordBlock = (state: guardState, decision: guardDecision): guardState => {
 // ---------------------------------------------------------------------------
 
 let forcingMessage = (state: guardState, policy: guardPolicy): string => {
-  let deliverable = switch policy.deliverableSignal->Nullable.toOption {
+  let deliverable = switch policy.deliverableSignal->Js.Nullable.toOption {
   | None => "n/a"
   | Some(_) =>
     if state.deliverableExecuted {
@@ -752,41 +747,39 @@ let forcingMessage = (state: guardState, policy: guardPolicy): string => {
     }
   }
 
-  let next = switch policy.deliverableSignal->Nullable.toOption {
+  let next = switch policy.deliverableSignal->Js.Nullable.toOption {
   | Some(sig) =>
     if !state.deliverableExecuted {
       "run the deliverable (" ++ sig ++ ")"
     } else {
       "take a producing action (write/edit) or emit your final answer"
     }
-  | None => "take a producing action (write/edit) or emit your final answer"
+  | None =>
+    "take a producing action (write/edit) or emit your final answer"
   }
 
   "[budget " ++
-  Belt.Int.toString(state.toolCallCount) ++
-  "/" ++
-  Belt.Int.toString(state.budget) ++
-  " | deliverable=" ++
-  deliverable ++
-  " | reads_since_produce=" ++
-  Belt.Int.toString(state.consecutiveNonProducing) ++
-  "] NEXT: " ++
-  next
+    Belt.Int.toString(state.toolCallCount) ++ "/" ++
+    Belt.Int.toString(state.budget) ++
+    " | deliverable=" ++ deliverable ++
+    " | reads_since_produce=" ++
+    Belt.Int.toString(state.consecutiveNonProducing) ++
+    "] NEXT: " ++ next
 }
 
 // ---------------------------------------------------------------------------
 // trajectoryMetrics
 // ---------------------------------------------------------------------------
 
-let trajectoryMetrics = (state: guardState): dict<unknown> => {
+let trajectoryMetrics = (state: guardState): Js.Dict.t<unknown> => {
   let ratio = if state.execCount === 0 {
     Belt.Float.fromInt(state.readCount)
   } else {
     Belt.Float.fromInt(state.readCount) /. Belt.Float.fromInt(state.execCount)
   }
-  let ttfaVal = switch state.ttfa->Nullable.toOption {
-  | Some(v) => v
-  | None => 0
+  let ttfaVal = switch state.ttfa->Js.Nullable.toOption {
+    | Some(v) => v
+    | None => 0
   }
   // Pass local values explicitly to IIFE since %raw cannot capture let bindings
   %raw(`(function() { return arguments[0]; })`)({
@@ -797,7 +790,7 @@ let trajectoryMetrics = (state: guardState): dict<unknown> => {
     "deliverable_executed": state.deliverableExecuted,
     "blocked_count": state.blockedCount,
     "redundant_count": state.redundantCount,
-    "consecutive_non_producing": state.consecutiveNonProducing,
+    "consecutive_non_producing": state.consecutiveNonProducing
   })
 }
 
@@ -819,7 +812,7 @@ let _ERROR_PREFIXES: array<string> = [
 ]
 
 @setRuntimeSideEffects
-let observationOk = (_output: JSON.t): bool => {
+let observationOk = (output: Js.Json.t): bool => {
   // Inline ERROR_PREFIXES array since %raw cannot capture module-level let bindings
   %raw(`
     (function(output) {
@@ -838,64 +831,57 @@ let observationOk = (_output: JSON.t): bool => {
 // buildGuardPolicy (from enforce.ts)
 // ---------------------------------------------------------------------------
 
-let buildGuardPolicy = (cfg: routerConfigMinimal, _tier: Nullable.t<string>): guardPolicy => {
+let buildGuardPolicy = (cfg: routerConfigMinimal, _tier: Js.Nullable.t<string>): guardPolicy => {
   let gg = switch cfg.enforcement {
   | Some(e) => e.guard
   | None => None
   }
   {
     budget: switch gg {
-    | Some(g) =>
-      switch g.budget {
-      | Some(v) => v
+      | Some(g) => switch g.budget {
+        | Some(v) => v
+        | None => defaultGuardBudget
+        }
       | None => defaultGuardBudget
-      }
-    | None => defaultGuardBudget
-    },
+      },
     readDraftCap: switch gg {
-    | Some(g) =>
-      switch g.readDraftCap {
-      | Some(v) => v
+      | Some(g) => switch g.readDraftCap {
+        | Some(v) => v
+        | None => 3
+        }
       | None => 3
-      }
-    | None => 3
-    },
+      },
     sameOpRetryCap: switch gg {
-    | Some(g) =>
-      switch g.sameOpRetryCap {
-      | Some(v) => v
+      | Some(g) => switch g.sameOpRetryCap {
+        | Some(v) => v
+        | None => 1
+        }
       | None => 1
-      }
-    | None => 1
-    },
+      },
     blockSelfScript: switch gg {
-    | Some(g) =>
-      switch g.blockSelfScript {
-      | Some(v) => v
+      | Some(g) => switch g.blockSelfScript {
+        | Some(v) => v
+        | None => true
+        }
       | None => true
-      }
-    | None => true
-    },
+      },
     deliverableFirst: switch gg {
-    | Some(g) =>
-      switch g.deliverableFirst {
-      | Some(v) => v
+      | Some(g) => switch g.deliverableFirst {
+        | Some(v) => v
+        | None => true
+        }
       | None => true
-      }
-    | None => true
-    },
-    deliverableSignal: Nullable.null,
-    // always null in Wave 1
-    deliverablePath: Nullable.null,
-    deliverableIsScript: Nullable.null,
+      },
+    deliverableSignal: Js.Nullable.null,  // always null in Wave 1
+    deliverablePath: Js.Nullable.null,
+    deliverableIsScript: Js.Nullable.null,
     blockScriptWrites: switch gg {
-    | Some(g) =>
-      switch g.blockScriptWrites {
-      | Some(v) => Nullable.make(v)
-      | None => Nullable.null
-      }
-    | None => Nullable.null
-    },
+      | Some(g) => switch g.blockScriptWrites {
+        | Some(v) => Js.Nullable.return(v)
+        | None => Js.Nullable.null
+        }
+      | None => Js.Nullable.null
+      },
   }
 }
 
@@ -903,34 +889,27 @@ let buildGuardPolicy = (cfg: routerConfigMinimal, _tier: Nullable.t<string>): gu
 // formatScorecard (from enforce.ts)
 // ---------------------------------------------------------------------------
 
-let formatScorecard = (state: guardState, tier: Nullable.t<string>): string => {
-  let ttfaStr = switch state.ttfa->Nullable.toOption {
+let formatScorecard = (state: guardState, tier: Js.Nullable.t<string>): string => {
+  let ttfaStr = switch state.ttfa->Js.Nullable.toOption {
   | Some(v) => Belt.Int.toString(v)
   | None => "n/a"
   }
-  let tierStr = switch tier->Nullable.toOption {
+  let tierStr = switch tier->Js.Nullable.toOption {
   | Some(t) => t
   | None => "?"
   }
-  "[router scorecard | tier=" ++
-  tierStr ++
-  " | ttfa=" ++
-  ttfaStr ++
-  " | read:exec=" ++
-  Belt.Int.toString(state.readCount) ++
-  ":" ++
+  "[router scorecard | tier=" ++ tierStr ++
+  " | ttfa=" ++ ttfaStr ++
+  " | read:exec=" ++ Belt.Int.toString(state.readCount) ++ ":" ++
   Belt.Int.toString(state.execCount) ++
-  " | self_scripts=" ++
-  Belt.Int.toString(state.selfScriptCount) ++
-  " | tool_calls=" ++
-  Belt.Int.toString(state.toolCallCount) ++
-  " | blocks=" ++
-  Belt.Int.toString(state.blockedCount) ++
+  " | self_scripts=" ++ Belt.Int.toString(state.selfScriptCount) ++
+  " | tool_calls=" ++ Belt.Int.toString(state.toolCallCount) ++
+  " | blocks=" ++ Belt.Int.toString(state.blockedCount) ++
   " | stop=" ++
-  switch state.lastBlock->Nullable.toOption {
+  (switch state.lastBlock->Js.Nullable.toOption {
   | Some(b) => b
   | None => "none"
-  } ++ "]"
+  }) ++ "]"
 }
 
 // ---------------------------------------------------------------------------
@@ -940,9 +919,7 @@ let formatScorecard = (state: guardState, tier: Nullable.t<string>): string => {
 let _DEFAULT_ENV_GATE = "MODEL_ROUTER_ENFORCE"
 
 @setRuntimeSideEffects
-let _resolveEnforcementMode = (
-  _params: resolveEnforcementModeParams,
-): resolveEnforcementModeResult => {
+let _resolveEnforcementMode = (params: resolveEnforcementModeParams): resolveEnforcementModeResult => {
   %raw(`
     (function(params) {
       var enf = params.config && params.config.enforcement;
@@ -967,7 +944,7 @@ let _resolveEnforcementMode = (
 
 // scrubText: redacts secrets from a string (duplicated from guard/scrub.ts to avoid cycle)
 @setRuntimeSideEffects
-let _scrubText = (_input: string): string => {
+let _scrubText = (input: string): string => {
   %raw(`
     (function(input) {
       if (typeof input !== 'string' || input.length === 0) return input;
@@ -992,7 +969,7 @@ let _scrubText = (_input: string): string => {
 }
 
 let guardBeforeCall = (params: guardBeforeCallParams): beforeResult => {
-  let tierStr = params.tier->Nullable.toOption
+  let tierStr = params.tier->Js.Nullable.toOption
   let modeResult = _resolveEnforcementMode({
     config: Some(params.cfg),
     tier: tierStr,
@@ -1002,7 +979,7 @@ let guardBeforeCall = (params: guardBeforeCallParams): beforeResult => {
 
   // Trivial downgrade
   let effectiveMode = if mode === "enforced" {
-    switch params.trivial->Nullable.toOption {
+    switch params.trivial->Js.Nullable.toOption {
     | Some(true) =>
       // Check proportional.trivialBypass (default true)
       switch params.cfg.enforcement {
@@ -1024,42 +1001,38 @@ let guardBeforeCall = (params: guardBeforeCallParams): beforeResult => {
   }
 
   if effectiveMode === "off" {
-    {block: false, message: Nullable.null, mode: "off", guard: Nullable.null}
+    { block: false, message: Js.Nullable.null, mode: "off", guard: Js.Nullable.null }
   } else {
     let policy = buildGuardPolicy(params.cfg, params.tier)
     let state = params.store.ensure(params.sessionID, policy)
-    let call: guardCall = {tool: params.tool, args: params.toolArgs}
+    let call: guardCall = { tool: params.tool, args: params.toolArgs }
     let decision = evaluateGuards(state, call, policy)
 
     if decision.allow {
-      {block: false, message: Nullable.null, mode: effectiveMode, guard: Nullable.null}
+      { block: false, message: Js.Nullable.null, mode: effectiveMode, guard: Js.Nullable.null }
     } else if effectiveMode === "enforced" {
       // Count the refused attempt
-      let _ = updateState(state, call, {ok: false}, policy)
+      let _ = updateState(state, call, { ok: false }, policy)
       let _ = recordBlock(state, decision)
       let msg = _scrubText(
-        switch decision.observation->Nullable.toOption {
+        (switch decision.observation->Js.Nullable.toOption {
         | Some(o) => o
         | None => ""
-        } ++
-        "\n" ++
-        forcingMessage(state, policy),
+        }) ++ "\n" ++ forcingMessage(state, policy)
       )
-      {block: true, message: Nullable.make(msg), mode: effectiveMode, guard: decision.guard}
+      { block: true, message: Js.Nullable.return(msg), mode: effectiveMode, guard: decision.guard }
     } else {
       // advisory: never block; record the would-block and stash a banner
       let _ = recordBlock(state, decision)
       let note = _scrubText(
         "[⚠ GUARD:" ++
-        switch decision.guard->Nullable.toOption {
+        (switch decision.guard->Js.Nullable.toOption {
         | Some(g) => g
         | None => ""
-        } ++
-        "] " ++
-        forcingMessage(state, policy),
+        }) ++ "] " ++ forcingMessage(state, policy)
       )
       params.store.setPendingNote(params.sessionID, note)
-      {block: false, message: Nullable.null, mode: effectiveMode, guard: decision.guard}
+      { block: false, message: Js.Nullable.null, mode: effectiveMode, guard: decision.guard }
     }
   }
 }
@@ -1069,30 +1042,30 @@ let guardBeforeCall = (params: guardBeforeCallParams): beforeResult => {
 // ---------------------------------------------------------------------------
 
 let guardAfterCall = (params: guardAfterCallParams): unit => {
-  let state = params.store.get(params.sessionID)->Nullable.toOption
+  let state = params.store.get(params.sessionID)->Js.Nullable.toOption
   switch state {
   | None => ()
   | Some(s) => {
       let policy = buildGuardPolicy(params.cfg, params.tier)
-      let call: guardCall = {tool: params.tool, args: params.toolArgs}
-  let okResult = observationOk(
-    switch params.output_.output->Nullable.toOption {
+      let call: guardCall = { tool: params.tool, args: params.toolArgs }
+      let okResult = observationOk(
+        switch params.output.output->Js.Nullable.toOption {
         | Some(o) => o
-        | None => JSON.Encode.null
-        },
+        | None => Js.Json.null
+        }
       )
-      let _ = updateState(s, call, {ok: okResult}, policy)
-      let note = params.store.takePendingNote(params.sessionID)->Nullable.toOption
+      let _ = updateState(s, call, { ok: okResult }, policy)
+      let note = params.store.takePendingNote(params.sessionID)->Js.Nullable.toOption
       switch note {
       | Some(n) => {
-          let existing = switch params.output_.output->Nullable.toOption {
+          let existing = switch params.output.output->Js.Nullable.toOption {
           | Some(String(s)) => Some(s)
           | Some(_) => None
           | None => None
           }
           switch existing {
-          | Some(e) => params.output_.output = Nullable.make(JSON.Encode.string(e ++ "\n\n" ++ n))
-          | None => params.output_.output = Nullable.make(JSON.Encode.string(n))
+          | Some(e) => params.output.output = Js.Nullable.return(Js.Json.string(e ++ "\n\n" ++ n))
+          | None => params.output.output = Js.Nullable.return(Js.Json.string(n))
           }
         }
       | None => ()

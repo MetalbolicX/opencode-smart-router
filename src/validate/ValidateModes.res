@@ -16,16 +16,18 @@
 // Guard: throws if obj is not a plain object (not null, string, number, etc.)
 // Js.Dict.get uses the 'in' operator internally which throws for non-objects,
 // so we must check upfront.
-let _ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
+let ensureIsConfigObject = (obj: Js.Dict.t<Js.Json.t>): unit => {
   if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
-    throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
+    raise(
+      Js.Exn.raiseError("tiers.json: expected a JSON object at root"),
+    )
   }
 }
 
 // Guard: throws if val is not a plain object
-let ensureIsObject = (_val: JSON.t, path: string): unit => {
+let ensureIsObject = (val: Js.Json.t, path: string): unit => {
   if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
-    throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
+    raise(Js.Exn.raiseError(`tiers.json: ${path} must be an object`))
   }
 }
 
@@ -34,36 +36,52 @@ let ensureIsObject = (_val: JSON.t, path: string): unit => {
 // Validates a single mode: must be an object; defaultTier/description must be strings.
 // ---------------------------------------------------------------------------
 
-let validateMode = (modeName: string, mode: dict<JSON.t>): unit => {
+let validateMode = (modeName: string, mode: Js.Dict.t<Js.Json.t>): unit => {
   // Guard: mode must be a non-null object (not null, number, string, etc.)
   // Js.Dict.get uses the 'in' operator internally which throws for non-objects,
   // so we must check upfront.
   if %raw(`!(mode && typeof mode === 'object' && !Array.isArray(mode))`) {
-    throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}' must be an object`))
+    raise(Js.Exn.raiseError(`tiers.json: mode '${modeName}' must be an object`))
   }
 
   // defaultTier: required, must be a string
-  switch Dict.get(mode, "defaultTier") {
+  switch Js.Dict.get(mode, "defaultTier") {
   | Some(json) =>
-    switch JSON.Decode.string(json) {
+    switch Js.Json.decodeString(json) {
     | Some(_) => ()
     | None =>
-      throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}.defaultTier' must be a string`))
+      raise(
+        Js.Exn.raiseError(
+          `tiers.json: mode '${modeName}.defaultTier' must be a string`,
+        ),
+      )
     }
   | None =>
-    throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}.defaultTier' must be a string`))
+    raise(
+      Js.Exn.raiseError(
+        `tiers.json: mode '${modeName}.defaultTier' must be a string`,
+      ),
+    )
   }
 
   // description: required, must be a string
-  switch Dict.get(mode, "description") {
+  switch Js.Dict.get(mode, "description") {
   | Some(json) =>
-    switch JSON.Decode.string(json) {
+    switch Js.Json.decodeString(json) {
     | Some(_) => ()
     | None =>
-      throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}.description' must be a string`))
+      raise(
+        Js.Exn.raiseError(
+          `tiers.json: mode '${modeName}.description' must be a string`,
+        ),
+      )
     }
   | None =>
-    throw(JsError.throwWithMessage(`tiers.json: mode '${modeName}.description' must be a string`))
+    raise(
+      Js.Exn.raiseError(
+        `tiers.json: mode '${modeName}.description' must be a string`,
+      ),
+    )
   }
 }
 
@@ -73,35 +91,42 @@ let validateMode = (modeName: string, mode: dict<JSON.t>): unit => {
 // Iterates over each mode entry and calls validateMode.
 // ---------------------------------------------------------------------------
 
-let validateModes = (obj: dict<JSON.t>): unit => {
+let validateModes = (obj: Js.Dict.t<Js.Json.t>): unit => {
   // modes is optional — return early if absent
-  switch Dict.get(obj, "modes") {
+  switch Js.Dict.get(obj, "modes") {
   | Some(json) => {
       // modes must be an object (not null, array, etc.)
       ensureIsObject(json, "'modes'")
-      switch JSON.Decode.object(json) {
+      switch Js.Json.decodeObject(json) {
       | Some(modes) => {
-          let keys = Dict.keysToArray(modes)
+          let keys = Js.Dict.keys(modes)
           let rec go = (keys: list<string>): unit =>
             switch keys {
             | list{} => ()
             | list{k, ...rest} =>
-              switch Dict.get(modes, k) {
+              switch Js.Dict.get(modes, k) {
               | Some(modeJson) =>
-                switch JSON.Decode.object(modeJson) {
+                switch Js.Json.decodeObject(modeJson) {
                 | Some(mode) => {
                     validateMode(k, mode)
                     go(rest)
                   }
                 | None =>
-                  throw(JsError.throwWithMessage(`tiers.json: mode '${k}' must be an object`))
+                  raise(
+                    Js.Exn.raiseError(
+                      `tiers.json: mode '${k}' must be an object`,
+                    ),
+                  )
                 }
               | None => go(rest)
               }
             }
           go(List.fromArray(keys))
         }
-      | None => throw(JsError.throwWithMessage("tiers.json: 'modes' must be a non-null object"))
+      | None =>
+        raise(
+          Js.Exn.raiseError("tiers.json: 'modes' must be a non-null object"),
+        )
       }
     }
   | None => ()

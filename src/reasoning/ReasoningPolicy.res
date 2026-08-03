@@ -33,14 +33,14 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: dict<float>,
+  recommended?: Js.Dict.t<float>,
 }
 
 type tierConfig = {
   model: string,
   variant?: string,
-  thinking?: {budgetTokens?: int},
-  reasoning?: {effort?: string},
+  thinking?: { budgetTokens?: int },
+  reasoning?: { effort?: string },
   description: string,
   whenToUse: array<string>,
   capability?: reasoningCapability,
@@ -55,7 +55,7 @@ type adaptiveSignals = {
 
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<unknown>,
+  options?: Js.Dict.t<unknown>,
 }
 
 // Mutually recursive types — reasoningPolicyConfig references adaptivePolicyConfig
@@ -69,9 +69,9 @@ type keywordRule = {
 
 type adaptivePolicyConfig = {
   trivialLevel: option<string>,
-  adaptive_defaultLevel: option<string>,
+  defaultLevel: option<string>,
   keywordRules: option<array<keywordRule>>,
-  tierDefaults: option<dict<string>>,
+  tierDefaults: option<Js.Dict.t<string>>,
   surfaceDecision: option<bool>,
 }
 
@@ -127,7 +127,7 @@ let resolveReasoningOverride = (
   tier: tierConfig,
   policy: option<reasoningPolicyConfig>,
   sessionOverride: option<reasoningLevel>,
-  _signals: adaptiveSignals,
+  signals: adaptiveSignals,
 ): option<resolvedReasoning> => {
   let mode = _getMode(policy)
 
@@ -136,43 +136,42 @@ let resolveReasoningOverride = (
   switch mode {
   | Some("static") => _nullResult()->Some
   | None => _nullResult()->Some
-  | _ => // Manual mode: sessionOverride ?? defaultLevel, then translate
-    switch mode {
-    | Some("manual") => {
-        let level = switch sessionOverride {
-        | Some(l) => Some(l)
-        | None => {
-            let dl = _getDefaultLevel(policy)
-            switch dl {
-            | Some(s) => _levelFromString(s)
-            | None => None
+  | _ => {
+      // Manual mode: sessionOverride ?? defaultLevel, then translate
+      switch mode {
+      | Some("manual") => {
+          let level = switch sessionOverride {
+          | Some(l) => Some(l)
+          | None => {
+              let dl = _getDefaultLevel(policy)
+              switch dl {
+              | Some(s) => _levelFromString(s)
+              | None => None
+              }
             }
           }
-        }
-        switch level {
-        | Some(l) => {
-            let cap: ReasoningTranslate.reasoningCapability = switch tier.capability {
-            | Some(c) => (c :> ReasoningTranslate.reasoningCapability)
-            | None =>
-              (ReasoningCapability.inferCapability(
-                (tier :> ReasoningCapability.tierConfig),
-              ) :> ReasoningTranslate.reasoningCapability)
+          switch level {
+          | Some(l) => {
+              let cap: ReasoningTranslate.reasoningCapability = switch tier.capability {
+              | Some(c) => (c :> ReasoningTranslate.reasoningCapability)
+              | None => (ReasoningCapability.inferCapability(tier :> ReasoningCapability.tierConfig) :> ReasoningTranslate.reasoningCapability)
+              }
+              switch ReasoningTranslate.translateLevel(cap, l) {
+              | Some(r) => Some(r :> resolvedReasoning)
+              | None => _nullResult()->Some
+              }
             }
-            switch ReasoningTranslate.translateLevel(cap, l) {
-            | Some(r) => Some((r :> resolvedReasoning))
-            | None => _nullResult()->Some
-            }
+          | None => _nullResult()->Some
           }
-        | None => _nullResult()->Some
         }
+
+      // Adaptive mode: Phase 2 will replace with call to selectAdaptiveLevel.
+      // For Phase 1, stub to null (adaptive.ts not yet ported).
+      | Some("adaptive") => _nullResult()->Some
+
+      // Unknown mode (not static, not manual, not adaptive): fail soft to null
+      | _ => _nullResult()->Some
       }
-
-    // Adaptive mode: Phase 2 will replace with call to selectAdaptiveLevel.
-    // For Phase 1, stub to null (adaptive.ts not yet ported).
-    | Some("adaptive") => _nullResult()->Some
-
-    // Unknown mode (not static, not manual, not adaptive): fail soft to null
-    | _ => _nullResult()->Some
     }
   }
 }

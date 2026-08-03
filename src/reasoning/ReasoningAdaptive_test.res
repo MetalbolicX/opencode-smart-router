@@ -102,157 +102,132 @@ test("selectAdaptiveLevel: does not consult defaultLevel when adaptive block is 
 // ---------------------------------------------------------------------------
 
 test("selectAdaptiveLevel: applies trivialLevel when isTrivial is true", () => {
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: Some("minimal"),
-      defaultLevel: None,
-      keywordRules: None,
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, isTrivial: true}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: Some("minimal"),
+    defaultLevel: None,
+    keywordRules: None,
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, isTrivial: true }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#minimal, ReasoningAdaptive.getLevelOption(result))
 })
 
 test("selectAdaptiveLevel: returns null when isTrivial is true and trivialLevel is absent", () => {
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("elevated"),
-      keywordRules: None,
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, isTrivial: true}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("elevated"),
+    keywordRules: None,
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, isTrivial: true }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionLevelNull(~operator="level", result)
 })
 
-test(
-  "selectAdaptiveLevel: returns null when isTrivial is true and trivialLevel is explicitly null",
-  () => {
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: Some("normal"),
-        keywordRules: None,
-        tierDefaults: None,
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {...baseSignals, isTrivial: true}
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    assertionLevelNull(~operator="level", result)
-  },
-)
-
-test(
-  "selectAdaptiveLevel: does NOT consult tierDefaults or keywordRules when isTrivial is true",
-  () => {
-    let tierDefaults: dict<string> = Dict.make()
-    Dict.set(tierDefaults, "medium", "elevated")
-    let rule: ReasoningAdaptive.keywordRule = {
-      keywords: ["refactor"],
-      level: "max",
-      match: None,
-      excludeKeywords: None,
-    }
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: Some("minimal"),
-        defaultLevel: None,
-        keywordRules: Some([rule]),
-        tierDefaults: Some(tierDefaults),
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {
-      ...baseSignals,
-      isTrivial: true,
-      prompt: "refactor this module",
-      tierName: "medium",
-    }
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    assertionSome(~operator="level", ~expected=#minimal, ReasoningAdaptive.getLevelOption(result))
-  },
-)
-
-// ---------------------------------------------------------------------------
-// Branch 3 — tierDefaults wins over defaultLevel
-// ---------------------------------------------------------------------------
-
-test("selectAdaptiveLevel: returns tierDefaults[tierName] when tier is listed", () => {
-  let tierDefaults: dict<string> = Dict.make()
-  Dict.set(tierDefaults, "heavy", "elevated")
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: None,
-      tierDefaults: Some(tierDefaults),
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, tierName: "heavy"}
+test("selectAdaptiveLevel: returns null when isTrivial is true and trivialLevel is explicitly null", () => {
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: None,
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, isTrivial: true }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-  assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
+  assertionLevelNull(~operator="level", result)
 })
 
-test(
-  "selectAdaptiveLevel: falls through to defaultLevel when tierName is not in tierDefaults",
-  () => {
-    let tierDefaults: dict<string> = Dict.make()
-    Dict.set(tierDefaults, "heavy", "elevated")
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: Some("normal"),
-        keywordRules: None,
-        tierDefaults: Some(tierDefaults),
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {...baseSignals, tierName: "fast"}
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
-  },
-)
-
-test("selectAdaptiveLevel: treats empty tierDefaults as absent", () => {
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("elevated"),
-      keywordRules: None,
-      tierDefaults: Some(Dict.make()),
-      surfaceDecision: None,
-    }),
-  )
-  let result = ReasoningAdaptive.selectAdaptiveLevel(baseSignals, Some(policy))
-  assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
-})
-
-test("selectAdaptiveLevel: tierDefaults wins over keywordRules", () => {
-  let tierDefaults: dict<string> = Dict.make()
-  Dict.set(tierDefaults, "medium", "elevated")
+test("selectAdaptiveLevel: does NOT consult tierDefaults or keywordRules when isTrivial is true", () => {
+  let tierDefaults: Js.Dict.t<string> = Js.Dict.empty()
+  Js.Dict.set(tierDefaults, "medium", "elevated")
   let rule: ReasoningAdaptive.keywordRule = {
     keywords: ["refactor"],
     level: "max",
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([rule]),
-      tierDefaults: Some(tierDefaults),
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: Some("minimal"),
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: Some(tierDefaults),
+    surfaceDecision: None,
+  }))
+  let signals = {
+    ...baseSignals,
+    isTrivial: true,
+    prompt: "refactor this module",
+    tierName: "medium",
+  }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  assertionSome(~operator="level", ~expected=#minimal, ReasoningAdaptive.getLevelOption(result))
+})
+
+// ---------------------------------------------------------------------------
+// Branch 3 — tierDefaults wins over defaultLevel
+// ---------------------------------------------------------------------------
+
+test("selectAdaptiveLevel: returns tierDefaults[tierName] when tier is listed", () => {
+  let tierDefaults: Js.Dict.t<string> = Js.Dict.empty()
+  Js.Dict.set(tierDefaults, "heavy", "elevated")
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: None,
+    tierDefaults: Some(tierDefaults),
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, tierName: "heavy" }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
+})
+
+test("selectAdaptiveLevel: falls through to defaultLevel when tierName is not in tierDefaults", () => {
+  let tierDefaults: Js.Dict.t<string> = Js.Dict.empty()
+  Js.Dict.set(tierDefaults, "heavy", "elevated")
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: None,
+    tierDefaults: Some(tierDefaults),
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, tierName: "fast" }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
+})
+
+test("selectAdaptiveLevel: treats empty tierDefaults as absent", () => {
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("elevated"),
+    keywordRules: None,
+    tierDefaults: Some(Js.Dict.empty()),
+    surfaceDecision: None,
+  }))
+  let result = ReasoningAdaptive.selectAdaptiveLevel(baseSignals, Some(policy))
+  assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
+})
+
+test("selectAdaptiveLevel: tierDefaults wins over keywordRules", () => {
+  let tierDefaults: Js.Dict.t<string> = Js.Dict.empty()
+  Js.Dict.set(tierDefaults, "medium", "elevated")
+  let rule: ReasoningAdaptive.keywordRule = {
+    keywords: ["refactor"],
+    level: "max",
+    match: None,
+    excludeKeywords: None,
+  }
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: Some(tierDefaults),
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     tierName: "medium",
@@ -279,15 +254,13 @@ test("selectAdaptiveLevel: first matching keyword rule wins", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule1, rule2]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule1, rule2]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     prompt: "please fix the bug and refactor the module",
@@ -303,15 +276,13 @@ test("selectAdaptiveLevel: matches keywords found in description", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     prompt: "implement a new endpoint",
@@ -328,15 +299,13 @@ test("selectAdaptiveLevel: matches keywords found in prompt", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     prompt: "debug the failing test",
@@ -353,16 +322,14 @@ test("selectAdaptiveLevel: is case-insensitive via stem mode default", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "refactoring the auth module"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "refactoring the auth module" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
 })
@@ -374,16 +341,14 @@ test("selectAdaptiveLevel: substring mode matches inflections", () => {
     match: Some("substring"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "we are refactoring this code"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "we are refactoring this code" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
 })
@@ -401,16 +366,14 @@ test("selectAdaptiveLevel: skips rules with empty keyword arrays", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([ruleEmpty, ruleMatch]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "refactor this"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([ruleEmpty, ruleMatch]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "refactor this" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
 })
@@ -422,22 +385,16 @@ test("selectAdaptiveLevel: reason includes rule index, keyword, mode, and source
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "please refactor this"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "please refactor this" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-  assertionEqual(
-    ~operator="reason",
-    ReasoningAdaptive.getReason(result),
-    `keyword match: rule[0] "refactor" (stem) in prompt`,
-  )
+  assertionEqual(~operator="reason", ReasoningAdaptive.getReason(result), `keyword match: rule[0] "refactor" (stem) in prompt`)
 })
 
 test("selectAdaptiveLevel: first matching keyword within a multi-keyword rule wins", () => {
@@ -447,22 +404,16 @@ test("selectAdaptiveLevel: first matching keyword within a multi-keyword rule wi
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "review the architecture"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "review the architecture" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-  assertionEqual(
-    ~operator="reason",
-    ReasoningAdaptive.getReason(result),
-    `keyword match: rule[0] "architecture" (stem) in prompt`,
-  )
+  assertionEqual(~operator="reason", ReasoningAdaptive.getReason(result), `keyword match: rule[0] "architecture" (stem) in prompt`)
 })
 
 // ---------------------------------------------------------------------------
@@ -476,44 +427,37 @@ test("selectAdaptiveLevel: skips a rule whose keywords field is missing without 
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([malformedRule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "implement a button"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([malformedRule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "implement a button" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   // Malformed rule has empty keywords array — treated as non-matching; falls through to null
   assertionLevelNull(~operator="level", result)
 })
 
-test(
-  "selectAdaptiveLevel: falls through to defaultLevel when every keyword rule is malformed",
-  () => {
-    let malformedRule: ReasoningAdaptive.keywordRule = {
-      keywords: [],
-      level: "max",
-      match: None,
-      excludeKeywords: None,
-    }
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: Some("normal"),
-        keywordRules: Some([malformedRule]),
-        tierDefaults: None,
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {...baseSignals, prompt: "refactor this"}
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
-  },
-)
+test("selectAdaptiveLevel: falls through to defaultLevel when every keyword rule is malformed", () => {
+  let malformedRule: ReasoningAdaptive.keywordRule = {
+    keywords: [],
+    level: "max",
+    match: None,
+    excludeKeywords: None,
+  }
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([malformedRule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "refactor this" }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
+})
 
 // ---------------------------------------------------------------------------
 // Branch 5 — fallthrough to defaultLevel
@@ -526,16 +470,14 @@ test("selectAdaptiveLevel: returns defaultLevel when no rule matches", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "implement a button"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "implement a button" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
 })
@@ -547,16 +489,14 @@ test("selectAdaptiveLevel: returns null when no rule matches AND defaultLevel is
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "implement a button"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "implement a button" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionLevelNull(~operator="level", result)
 })
@@ -568,51 +508,42 @@ test("selectAdaptiveLevel: returns null when defaultLevel is explicitly null", (
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "implement a button"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "implement a button" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionLevelNull(~operator="level", result)
 })
 
-test(
-  "selectAdaptiveLevel: returns null when nothing is configured besides an empty adaptive block",
-  () => {
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: None,
-        keywordRules: None,
-        tierDefaults: None,
-        surfaceDecision: None,
-      }),
-    )
-    let result = ReasoningAdaptive.selectAdaptiveLevel(baseSignals, Some(policy))
-    assertionLevelNull(~operator="level", result)
-  },
-)
+test("selectAdaptiveLevel: returns null when nothing is configured besides an empty adaptive block", () => {
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: None,
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let result = ReasoningAdaptive.selectAdaptiveLevel(baseSignals, Some(policy))
+  assertionLevelNull(~operator="level", result)
+})
 
 // ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
 
 test("selectAdaptiveLevel: returns defaultLevel when prompt and description are both empty", () => {
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: None,
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: None,
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals: ReasoningAdaptive.adaptiveSignals = {
     prompt: "",
     description: "",
@@ -630,16 +561,14 @@ test("selectAdaptiveLevel: does not match keywords across tierName boundary", ()
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, tierName: "refactor"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, tierName: "refactor" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionLevelNull(~operator="level", result)
 })
@@ -651,29 +580,19 @@ test("selectAdaptiveLevel: is deterministic — same inputs produce same decisio
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "debug the flaky test"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "debug the flaky test" }
   let r1 = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   let r2 = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   let r3 = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-  assertionEqual(
-    ~operator="r1==r2",
-    ReasoningAdaptive.getReason(r1),
-    ReasoningAdaptive.getReason(r2),
-  )
-  assertionEqual(
-    ~operator="r2==r3",
-    ReasoningAdaptive.getReason(r2),
-    ReasoningAdaptive.getReason(r3),
-  )
+  assertionEqual(~operator="r1==r2", ReasoningAdaptive.getReason(r1), ReasoningAdaptive.getReason(r2))
+  assertionEqual(~operator="r2==r3", ReasoningAdaptive.getReason(r2), ReasoningAdaptive.getReason(r3))
 })
 
 // ---------------------------------------------------------------------------
@@ -687,26 +606,20 @@ test("selectAdaptiveLevel: stem default matches inflection debugging against deb
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     prompt: "debugging the race condition in the payments worker",
   }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
-  assertionEqual(
-    ~operator="reason",
-    ReasoningAdaptive.getReason(result),
-    `keyword match: rule[0] "debug" (stem) in prompt`,
-  )
+  assertionEqual(~operator="reason", ReasoningAdaptive.getReason(result), `keyword match: rule[0] "debug" (stem) in prompt`)
 })
 
 test("selectAdaptiveLevel: word mode strict — rejects inflection on last token", () => {
@@ -716,16 +629,14 @@ test("selectAdaptiveLevel: word mode strict — rejects inflection on last token
     match: Some("word"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "debugging the flaky test"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "debugging the flaky test" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   assertionLevelNull(~operator="level", result)
 })
@@ -743,44 +654,37 @@ test("selectAdaptiveLevel: excludeKeywords skips a matching rule", () => {
     match: None,
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([ruleFormat, ruleRefactor]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "format and refactor the auth module"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([ruleFormat, ruleRefactor]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "format and refactor the auth module" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   // format rule is excluded; refactor rule fires
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
 })
 
-test(
-  "selectAdaptiveLevel: falls through to defaultLevel when only matching rule is excluded",
-  () => {
-    let ruleFormat: ReasoningAdaptive.keywordRule = {
-      keywords: ["format"],
-      level: "minimal",
-      match: None,
-      excludeKeywords: Some(["refactor"]),
-    }
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: Some("normal"),
-        keywordRules: Some([ruleFormat]),
-        tierDefaults: None,
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {...baseSignals, prompt: "format the source and refactor the module"}
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
-  },
-)
+test("selectAdaptiveLevel: falls through to defaultLevel when only matching rule is excluded", () => {
+  let ruleFormat: ReasoningAdaptive.keywordRule = {
+    keywords: ["format"],
+    level: "minimal",
+    match: None,
+    excludeKeywords: Some(["refactor"]),
+  }
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([ruleFormat]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "format the source and refactor the module" }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
+})
 
 test("selectAdaptiveLevel: regex mode matches user-supplied pattern", () => {
   let rule: ReasoningAdaptive.keywordRule = {
@@ -789,15 +693,13 @@ test("selectAdaptiveLevel: regex mode matches user-supplied pattern", () => {
     match: Some("regex"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
   let signals = {
     ...baseSignals,
     prompt: "performance regression in the payments worker",
@@ -813,16 +715,14 @@ test("selectAdaptiveLevel: regex mode falls through on invalid pattern (fail-sof
     match: Some("regex"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "any task text"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "any task text" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   // fail-soft: invalid regex returns false, falls through to defaultLevel
   assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
@@ -835,45 +735,38 @@ test("selectAdaptiveLevel: substring mode matches test inside latest", () => {
     match: Some("substring"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: Some("normal"),
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "update the latest fixtures"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "update the latest fixtures" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
   // substring mode matches 'test' inside 'latest'
   assertionSome(~operator="level", ~expected=#elevated, ReasoningAdaptive.getLevelOption(result))
 })
 
-test(
-  "selectAdaptiveLevel: stem mode does NOT match test inside latest (cross-word false positive)",
-  () => {
-    let rule: ReasoningAdaptive.keywordRule = {
-      keywords: ["test"],
-      level: "elevated",
-      match: None, // stem by default
-      excludeKeywords: None,
-    }
-    let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-      Some({
-        trivialLevel: None,
-        defaultLevel: Some("normal"),
-        keywordRules: Some([rule]),
-        tierDefaults: None,
-        surfaceDecision: None,
-      }),
-    )
-    let signals = {...baseSignals, prompt: "update the latest fixtures"}
-    let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-    // stem mode: word-boundary start rejects 'test' as stem of 'latest'
-    assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
-  },
-)
+test("selectAdaptiveLevel: stem mode does NOT match test inside latest (cross-word false positive)", () => {
+  let rule: ReasoningAdaptive.keywordRule = {
+    keywords: ["test"],
+    level: "elevated",
+    match: None, // stem by default
+    excludeKeywords: None,
+  }
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: Some("normal"),
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "update the latest fixtures" }
+  let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
+  // stem mode: word-boundary start rejects 'test' as stem of 'latest'
+  assertionSome(~operator="level", ~expected=#normal, ReasoningAdaptive.getLevelOption(result))
+})
 
 test("selectAdaptiveLevel: reason records the rule's actual mode", () => {
   let rule: ReasoningAdaptive.keywordRule = {
@@ -882,20 +775,14 @@ test("selectAdaptiveLevel: reason records the rule's actual mode", () => {
     match: Some("substring"),
     excludeKeywords: None,
   }
-  let policy = ReasoningAdaptive.makePolicyWithAdaptive(
-    Some({
-      trivialLevel: None,
-      defaultLevel: None,
-      keywordRules: Some([rule]),
-      tierDefaults: None,
-      surfaceDecision: None,
-    }),
-  )
-  let signals = {...baseSignals, prompt: "update the latest fixtures"}
+  let policy = ReasoningAdaptive.makePolicyWithAdaptive(Some({
+    trivialLevel: None,
+    defaultLevel: None,
+    keywordRules: Some([rule]),
+    tierDefaults: None,
+    surfaceDecision: None,
+  }))
+  let signals = { ...baseSignals, prompt: "update the latest fixtures" }
   let result = ReasoningAdaptive.selectAdaptiveLevel(signals, Some(policy))
-  assertionEqual(
-    ~operator="reason",
-    ReasoningAdaptive.getReason(result),
-    `keyword match: rule[0] "test" (substring) in prompt`,
-  )
+  assertionEqual(~operator="reason", ReasoningAdaptive.getReason(result), `keyword match: rule[0] "test" (substring) in prompt`)
 })

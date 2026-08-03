@@ -17,7 +17,8 @@ open Test
 let assertionEqual = (~operator: string, expected: 'a, actual: 'a): unit =>
   assertion(~operator, (a, b) => a === b, actual, expected)
 
-let intEqual = (a: int, b: int): unit => assertion(~operator="int", (x, y) => x === y, a, b)
+let intEqual = (a: int, b: int): unit =>
+  assertion(~operator="int", (x, y) => x === y, a, b)
 
 let stringEqual = (actual: string, expected: string): unit =>
   assertion(~operator="string", (a, b) => a === b, actual, expected)
@@ -54,7 +55,7 @@ test("inferCapability: unknown variant => none", () => {
 test("inferCapability: reasoning.effort set => discrete/reasoning.effort", () => {
   let tier: ReasoningCapability.tierConfig = {
     model: "provider/model",
-    reasoning: {effort: "medium"},
+    reasoning: { effort: "medium" },
     description: "effort tier",
     whenToUse: [],
   }
@@ -75,7 +76,7 @@ test("inferCapability: reasoning.effort set => discrete/reasoning.effort", () =>
 test("inferCapability: thinking.budgetTokens set => budgeted/thinking.budgetTokens", () => {
   let tier: ReasoningCapability.tierConfig = {
     model: "provider/model",
-    thinking: {budgetTokens: 4096},
+    thinking: { budgetTokens: 4096 },
     description: "budget tier",
     whenToUse: [],
   }
@@ -85,12 +86,12 @@ test("inferCapability: thinking.budgetTokens set => budgeted/thinking.budgetToke
   // recommended ladder is the default { minimal: 1024, normal: 4096, elevated: 8192, max: 16000 }
   let rec__ = result.recommended
   let rec_normal = switch rec__ {
-  | Some(r) => Dict.get(r, "normal")
+  | Some(r) => Js.Dict.get(r, "normal")
   | None => None
   }
   switch rec_normal {
   | Some(v) => intEqual(Float.toInt(v), 4096)
-  | None => intEqual(1, 0) // fail deliberately
+  | None => intEqual(1, 0)  // fail deliberately
   }
 })
 
@@ -108,7 +109,11 @@ test("inferCapability: positional variant low/medium/high => discrete/variant", 
   let result = ReasoningCapability.inferCapability(tier)
   stringEqual(result.kind, "discrete")
   stringEqual(result.field->Belt.Option.getWithDefault(""), "variant")
-  assertionEqual(~operator="levels", result.levels->Belt.Option.getWithDefault([])->Array.length, 3)
+  assertionEqual(
+    ~operator="levels",
+    result.levels->Belt.Option.getWithDefault([])->Array.length,
+    3,
+  )
 })
 
 test("inferCapability: positional variant xhigh => 4-level ladder", () => {
@@ -164,7 +169,7 @@ test("inferCapability: effort takes precedence over variant", () => {
   let tier: ReasoningCapability.tierConfig = {
     model: "provider/model",
     variant: "thinking",
-    reasoning: {effort: "low"},
+    reasoning: { effort: "low" },
     description: "both effort and variant set",
     whenToUse: [],
   }
@@ -177,7 +182,7 @@ test("inferCapability: thinking.budgetTokens takes precedence over variant", () 
   let tier: ReasoningCapability.tierConfig = {
     model: "provider/model",
     variant: "high",
-    thinking: {budgetTokens: 8192},
+    thinking: { budgetTokens: 8192 },
     description: "both budget and variant set",
     whenToUse: [],
   }
@@ -193,7 +198,7 @@ test("inferCapability: thinking.budgetTokens takes precedence over variant", () 
 test("inferCapability: discrete with reasoning.effort sets field correctly", () => {
   let tier: ReasoningCapability.tierConfig = {
     model: "provider/model",
-    reasoning: {effort: "high"},
+    reasoning: { effort: "high" },
     description: "effort",
     whenToUse: [],
   }

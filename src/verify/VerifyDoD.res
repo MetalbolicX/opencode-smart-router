@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 type checkKind = [
-  | #run
+  #run
   | #fileExists
   | #schemaMatch
   | #testsPass
@@ -17,10 +17,10 @@ type checkKind = [
 
 type check = {
   kind: checkKind,
-  command: Nullable.t<string>,
-  expect: Nullable.t<string>,
-  path: Nullable.t<string>,
-  schema: Nullable.t<string>,
+  command: Js.Nullable.t<string>,
+  expect: Js.Nullable.t<string>,
+  path: Js.Nullable.t<string>,
+  schema: Js.Nullable.t<string>,
 }
 
 type dodKind = [#deterministic | #checker | #none]
@@ -31,15 +31,15 @@ type dod = {
   kind: dodKind,
   checks: array<check>,
   criteria: array<string>,
-  deliverable: Nullable.t<string>,
+  deliverable: Js.Nullable.t<string>,
   source: dodSource,
 }
 
 type inferHints = {
-  testCommand: Nullable.t<string>,
-  buildCommand: Nullable.t<string>,
-  lintCommand: Nullable.t<string>,
-  declaredPath: Nullable.t<string>,
+  testCommand: Js.Nullable.t<string>,
+  buildCommand: Js.Nullable.t<string>,
+  lintCommand: Js.Nullable.t<string>,
+  declaredPath: Js.Nullable.t<string>,
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ let validDodKinds: array<string> = ["deterministic", "checker", "none"]
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-let _stringInArray = (s: string, arr: array<string>): bool => {
+let stringInArray = (s: string, arr: array<string>): bool => {
   let found = ref(false)
   for i in 0 to Array.length(arr) - 1 {
     switch arr[i] {
@@ -73,22 +73,22 @@ let _stringInArray = (s: string, arr: array<string>): bool => {
 }
 
 // Parse key=value pairs: key="quoted" or key=bare
-let parseKvPairs = (s: string): dict<string> => {
-  let result = Dict.make()
-  let parts = String.split(s, " ")
+let parseKvPairs = (s: string): Js.Dict.t<string> => {
+  let result = Js.Dict.empty()
+  let parts = Js.String2.split(s, " ")
   for i in 0 to Array.length(parts) - 1 {
     switch parts[i] {
     | Some(part) =>
-      let eqIdx = String.indexOf("=", part)
+      let eqIdx = Js.String2.indexOf("=", part)
       if eqIdx > 0 {
-        let key = String.substring(part, ~start=0, ~end=eqIdx)
-        let rest = String.substring(part, ~start=eqIdx + 1, ~end=String.length(part))
-        let val = if String.startsWith(rest, "\"") && String.endsWith(rest, "\"") {
-          String.substring(rest, ~start=1, ~end=String.length(rest) - 1)
+        let key = Js.String2.substring(part, ~from=0, ~to_=eqIdx)
+        let rest = Js.String2.substring(part, ~from=eqIdx + 1, ~to_=Js.String2.length(part))
+        let val = if Js.String2.startsWith(rest, "\"") && Js.String2.endsWith(rest, "\"") {
+          Js.String2.substring(rest, ~from=1, ~to_=Js.String2.length(rest) - 1)
         } else {
           rest
         }
-        Dict.set(result, key, val)
+        Js.Dict.set(result, key, val)
       }
     | None => ()
     }
@@ -111,13 +111,13 @@ let summarizeDispatch = (text: string): string => {
       } else {
         switch lines[i] {
         | Some(trimmed) =>
-          let collapsed = String.replaceRegExp(String.trim(trimmed), /\\s+/, " ")
+          let collapsed = Js.String2.replaceByRe(Js.String2.trim(trimmed), %re("/\\s+/"), " ")
           if collapsed === "" {
             go(i + 1, acc)
           } else {
-            let result = if String.length(collapsed) > 120 {
-              Js.String.slice(collapsed, ~from=0, ~to_=120)
-            } else {
+          let result = if Js.String.length(collapsed) > 120 {
+            Js.String.slice(collapsed, ~from=0, ~to_=120)
+          } else {
               collapsed
             }
             result
@@ -146,28 +146,28 @@ let normalizeDoD = (d: dod): dod => {
     #none
   }
 
-  let rawDeliverable = switch d.deliverable->Nullable.toOption {
-  | Some(v) => String.trim(v)
-  | None => ""
+  let rawDeliverable = switch d.deliverable->Js.Nullable.toOption {
+    | Some(v) => Js.String.trim(v)
+    | None => ""
   }
-  let deliverable: Nullable.t<string> = if rawDeliverable !== "" {
-    Nullable.make(rawDeliverable)
+  let deliverable: Js.Nullable.t<string> = if rawDeliverable !== "" {
+    Js.Nullable.return(rawDeliverable)
   } else {
-    Nullable.null
+    Js.Nullable.null
   }
 
-  {kind, checks, criteria, deliverable, source: d.source}
+  { kind, checks, criteria, deliverable, source: d.source }
 }
 
 // ---------------------------------------------------------------------------
 // parseAcceptanceBlock — FAIL-CLOSED on malformed input
 // ---------------------------------------------------------------------------
 
-let makeCheckKindSet = (): dict<bool> => {
-  let s = Dict.make()
+let makeCheckKindSet = (): Js.Dict.t<bool> => {
+  let s = Js.Dict.empty()
   for i in 0 to Array.length(validCheckKinds) - 1 {
     switch validCheckKinds[i] {
-    | Some(k) => Dict.set(s, k, true)
+    | Some(k) => Js.Dict.set(s, k, true)
     | None => ()
     }
   }
@@ -176,11 +176,11 @@ let makeCheckKindSet = (): dict<bool> => {
 
 let checkKindSet = makeCheckKindSet()
 
-let makeDodKindSet = (): dict<bool> => {
-  let s = Dict.make()
+let makeDodKindSet = (): Js.Dict.t<bool> => {
+  let s = Js.Dict.empty()
   for i in 0 to Array.length(validDodKinds) - 1 {
     switch validDodKinds[i] {
-    | Some(k) => Dict.set(s, k, true)
+    | Some(k) => Js.Dict.set(s, k, true)
     | None => ()
     }
   }
@@ -189,8 +189,8 @@ let makeDodKindSet = (): dict<bool> => {
 
 let dodKindSet = makeDodKindSet()
 
-let openTagRe = /^\s*\[(acceptance|dod)\]\s*$/i
-let closeTagRe = /^\s*\[\/(acceptance|dod)\]\s*$/i
+let openTagRe = %re("/^\s*\[(acceptance|dod)\]\s*$/i")
+let closeTagRe = %re("/^\s*\[\/(acceptance|dod)\]\s*$/i")
 
 let findOpenTag = (lines: array<string>, start: int): int => {
   let rec go = (i: int): int => {
@@ -247,8 +247,8 @@ let sliceInner = (lines: array<string>, start: int, end: int): array<string> => 
 type parseState = {
   mutable checks: array<check>,
   mutable criteria: array<string>,
-  mutable deliverable: Nullable.t<string>,
-  mutable kindHint: Nullable.t<dodKind>,
+  mutable deliverable: Js.Nullable.t<string>,
+  mutable kindHint: Js.Nullable.t<dodKind>,
   mutable invalidKindDirective: bool,
 }
 
@@ -256,8 +256,8 @@ let makeInitialState = (): parseState => {
   {
     checks: [],
     criteria: [],
-    deliverable: Nullable.null,
-    kindHint: Nullable.null,
+    deliverable: Js.Nullable.null,
+    kindHint: Js.Nullable.null,
     invalidKindDirective: false,
   }
 }
@@ -284,19 +284,19 @@ let kindStrToDodKind = (s: string): dodKind => {
 }
 
 let processLine = (line: string, state: parseState): unit => {
-  let trimmed = String.trim(line)
+  let trimmed = Js.String2.trim(line)
   if trimmed === "" {
     ()
   } else {
-    let lline = String.toLowerCase(trimmed)
+    let lline = Js.String2.toLowerCase(trimmed)
 
-    if String.startsWith(lline, "check:") {
+    if Js.String2.startsWith(lline, "check:") {
       if state.invalidKindDirective {
         ()
       } else {
         let rest = String.slice(trimmed, ~start=6, ~end=String.length(trimmed))
-        let restTrimmed = String.trim(rest)
-        let spaceIdx = String.indexOf(restTrimmed, " ")
+        let restTrimmed = Js.String2.trim(rest)
+        let spaceIdx = Js.String2.indexOf(restTrimmed, " ")
         let kindStr = if spaceIdx === -1 {
           restTrimmed
         } else {
@@ -308,73 +308,73 @@ let processLine = (line: string, state: parseState): unit => {
           String.slice(restTrimmed, ~start=spaceIdx + 1, ~end=String.length(restTrimmed))
         }
 
-        if !Belt.Option.isSome(Dict.get(checkKindSet, kindStr)) {
+        if !Belt.Option.isSome(Js.Dict.get(checkKindSet, kindStr)) {
           ()
         } else {
           let kvPairs = parseKvPairs(remainder)
           let check: check = {
             kind: kindStrToCheckKind(kindStr),
-            command: switch Dict.get(kvPairs, "command") {
-            | Some(v) => Nullable.make(v)
-            | None => Nullable.null
+            command: switch Js.Dict.get(kvPairs, "command") {
+              | Some(v) => Js.Nullable.return(v)
+              | None => Js.Nullable.null
             },
-            expect: switch Dict.get(kvPairs, "expect") {
-            | Some(v) => Nullable.make(v)
-            | None => Nullable.null
+            expect: switch Js.Dict.get(kvPairs, "expect") {
+              | Some(v) => Js.Nullable.return(v)
+              | None => Js.Nullable.null
             },
-            path: switch Dict.get(kvPairs, "path") {
-            | Some(v) => Nullable.make(v)
-            | None => Nullable.null
+            path: switch Js.Dict.get(kvPairs, "path") {
+              | Some(v) => Js.Nullable.return(v)
+              | None => Js.Nullable.null
             },
-            schema: switch Dict.get(kvPairs, "schema") {
-            | Some(v) => Nullable.make(v)
-            | None => Nullable.null
+            schema: switch Js.Dict.get(kvPairs, "schema") {
+              | Some(v) => Js.Nullable.return(v)
+              | None => Js.Nullable.null
             },
           }
           state.checks = [...state.checks, check]
         }
       }
-    } else if String.startsWith(lline, "criteria:") {
+    } else if Js.String2.startsWith(lline, "criteria:") {
       if state.invalidKindDirective {
         ()
       } else {
-        let rest = String.slice(trimmed, ~start=9, ~end=String.length(trimmed))
-        let restTrimmed = String.trim(rest)
+      let rest = String.slice(trimmed, ~start=9, ~end=String.length(trimmed))
+      let restTrimmed = Js.String2.trim(rest)
         if restTrimmed !== "" {
           state.criteria = [...state.criteria, restTrimmed]
         }
       }
-    } else if String.startsWith(lline, "deliverable:") {
+    } else if Js.String2.startsWith(lline, "deliverable:") {
       if state.invalidKindDirective {
         ()
       } else {
         let rest = String.slice(trimmed, ~start=12, ~end=String.length(trimmed))
-        let restTrimmed = String.trim(rest)
+        let restTrimmed = Js.String2.trim(rest)
         state.deliverable = if restTrimmed !== "" {
-          Nullable.make(restTrimmed)
+          Js.Nullable.return(restTrimmed)
         } else {
-          Nullable.null
+          Js.Nullable.null
         }
       }
-    } else if String.startsWith(lline, "kind:") {
+    } else if Js.String2.startsWith(lline, "kind:") {
       let rest = String.slice(trimmed, ~start=5, ~end=String.length(trimmed))
-      let restTrimmed = String.trim(String.toLowerCase(rest))
+      let restTrimmed = Js.String2.trim(Js.String2.toLowerCase(rest))
       if restTrimmed === "" {
         // Empty kind value — fail closed
         state.invalidKindDirective = true
         state.checks = []
         state.criteria = []
-        state.deliverable = Nullable.null
-        state.kindHint = Nullable.make(#none)
-      } else if !Belt.Option.isSome(Dict.get(dodKindSet, restTrimmed)) {
+        state.deliverable = Js.Nullable.null
+        state.kindHint = Js.Nullable.return(#none)
+      } else if !Belt.Option.isSome(Js.Dict.get(dodKindSet, restTrimmed)) {
         // Unknown kind value — fail closed
         state.invalidKindDirective = true
         state.checks = []
         state.criteria = []
-        state.deliverable = Nullable.null
-        state.kindHint = Nullable.make(#none)
+        state.deliverable = Js.Nullable.null
+        state.kindHint = Js.Nullable.return(#none)
       } else {
-        state.kindHint = Nullable.make(kindStrToDodKind(restTrimmed))
+        state.kindHint = Js.Nullable.return(kindStrToDodKind(restTrimmed))
       }
     } else {
       // Unknown directive: skip
@@ -392,16 +392,16 @@ let processLines = (lines: array<string>, state: parseState): unit => {
   }
 }
 
-let parseAcceptanceBlock = (text: string, source: dodSource): Nullable.t<dod> => {
+let parseAcceptanceBlock = (text: string, source: dodSource): Js.Nullable.t<dod> => {
   let lines = Js.String.split("\n", text)
 
   let openIdx = findOpenTag(lines, 0)
   if openIdx === -1 {
-    Nullable.null
+    Js.Nullable.null
   } else {
     let closeIdx = findCloseTag(lines, openIdx + 1)
     if closeIdx === -1 {
-      Nullable.null
+      Js.Nullable.null
     } else {
       let innerLines = sliceInner(lines, openIdx + 1, closeIdx)
       let state = makeInitialState()
@@ -410,9 +410,9 @@ let parseAcceptanceBlock = (text: string, source: dodSource): Nullable.t<dod> =>
       let finalKind: dodKind = if state.invalidKindDirective {
         #none
       } else {
-        switch state.kindHint->Nullable.toOption {
-        | Some(k) => k
-        | None => #none
+        switch state.kindHint->Js.Nullable.toOption {
+          | Some(k) => k
+          | None => #none
         }
       }
 
@@ -424,7 +424,7 @@ let parseAcceptanceBlock = (text: string, source: dodSource): Nullable.t<dod> =>
         source,
       }
 
-      Nullable.make(normalizeDoD(result))
+      Js.Nullable.return(normalizeDoD(result))
     }
   }
 }
@@ -433,11 +433,11 @@ let parseAcceptanceBlock = (text: string, source: dodSource): Nullable.t<dod> =>
 // parseDoDFromDispatch / parseDoDFromAnnotation
 // ---------------------------------------------------------------------------
 
-let parseDoDFromDispatch = (dispatchText: string): Nullable.t<dod> => {
+let parseDoDFromDispatch = (dispatchText: string): Js.Nullable.t<dod> => {
   parseAcceptanceBlock(dispatchText, #explicit)
 }
 
-let parseDoDFromAnnotation = (annotationText: string): Nullable.t<dod> => {
+let parseDoDFromAnnotation = (annotationText: string): Js.Nullable.t<dod> => {
   parseAcceptanceBlock(annotationText, #annotation)
 }
 
@@ -446,123 +446,114 @@ let parseDoDFromAnnotation = (annotationText: string): Nullable.t<dod> => {
 // ---------------------------------------------------------------------------
 
 let inferDoD = (dispatchText: string, _tier: string, hints: inferHints): dod => {
-  let lower = String.toLowerCase(dispatchText)
+  let lower = Js.String2.toLowerCase(dispatchText)
 
-  let hasDeclaredPath = switch hints.declaredPath->Nullable.toOption {
-  | Some(p) => String.trim(p) !== ""
-  | None => false
+  let hasDeclaredPath = switch hints.declaredPath->Js.Nullable.toOption {
+    | Some(p) => Js.String2.trim(p) !== ""
+    | None => false
   }
 
-  let category: string = if /\\b(bug|fix|broken|regression|failing)\\b/->RegExp.test(lower) {
+  let category: string = if %re("/\\b(bug|fix|broken|regression|failing)\\b/")->RegExp.test(lower) {
     "bugfix"
-  } else if /\\b(refactor|rename|extract|restructure|cleanup|clean up)\\b/->RegExp.test(lower) {
+  } else if %re("/\\b(refactor|rename|extract|restructure|cleanup|clean up)\\b/")->RegExp.test(lower) {
     "refactor"
-  } else if /\\b(write|generate|emit|scaffold)\\b/->RegExp.test(lower) && hasDeclaredPath {
+  } else if %re("/\\b(write|generate|emit|scaffold)\\b/")->RegExp.test(lower) && hasDeclaredPath {
     "writeFile"
-  } else if (
-    /\\b(implement|add|feature|create|build|endpoint|function|component|fix)\\b/->RegExp.test(lower)
-  ) {
+  } else if %re("/\\b(implement|add|feature|create|build|endpoint|function|component|fix)\\b/")->RegExp.test(lower) {
     "impl"
-  } else if /\\b(test|spec|coverage)\\b/->RegExp.test(lower) {
+  } else if %re("/\\b(test|spec|coverage)\\b/")->RegExp.test(lower) {
     "test"
   } else {
     "unknown"
   }
 
   // Build checks immutably via let-chaining
-  let checks = if category === "bugfix" || category === "impl" {
-    let buildCheck = switch hints.buildCommand->Nullable.toOption {
-    | Some(cmd) if String.trim(cmd) !== "" =>
-      Some({
-        kind: #buildPasses,
-        command: Nullable.make(cmd),
-        expect: Nullable.null,
-        path: Nullable.null,
-        schema: Nullable.null,
-      })
-    | _ => None
-    }
-    let testCheck = switch hints.testCommand->Nullable.toOption {
-    | Some(cmd) if String.trim(cmd) !== "" =>
-      Some({
-        kind: #testsPass,
-        command: Nullable.make(cmd),
-        expect: Nullable.null,
-        path: Nullable.null,
-        schema: Nullable.null,
-      })
-    | _ => None
-    }
-    switch (buildCheck, testCheck) {
-    | (Some(bc), Some(tc)) => [bc, tc]
-    | (Some(bc), None) => [bc]
-    | (None, Some(tc)) => [tc]
-    | (None, None) => []
-    }
-  } else if category === "refactor" {
-    let buildCheck = switch hints.buildCommand->Nullable.toOption {
-    | Some(cmd) if String.trim(cmd) !== "" =>
-      Some({
-        kind: #buildPasses,
-        command: Nullable.make(cmd),
-        expect: Nullable.null,
-        path: Nullable.null,
-        schema: Nullable.null,
-      })
-    | _ => None
-    }
-    let lintCheck = switch hints.lintCommand->Nullable.toOption {
-    | Some(cmd) if String.trim(cmd) !== "" =>
-      Some({
-        kind: #lintClean,
-        command: Nullable.make(cmd),
-        expect: Nullable.null,
-        path: Nullable.null,
-        schema: Nullable.null,
-      })
-    | _ => None
-    }
-    switch (buildCheck, lintCheck) {
-    | (Some(bc), Some(lc)) => [bc, lc]
-    | (Some(bc), None) => [bc]
-    | (None, Some(lc)) => [lc]
-    | (None, None) => []
-    }
-  } else if category === "writeFile" {
-    switch hints.declaredPath->Nullable.toOption {
-    | Some(p) =>
-      let trimmed = String.trim(p)
-      if trimmed !== "" {
-        [
-          {
-            kind: #fileExists,
-            command: Nullable.null,
-            expect: Nullable.null,
-            path: Nullable.make(trimmed),
-            schema: Nullable.null,
-          },
-        ]
-      } else {
-        []
+  let checks =
+    if category === "bugfix" || category === "impl" {
+      let buildCheck = switch hints.buildCommand->Js.Nullable.toOption {
+        | Some(cmd) if Js.String2.trim(cmd) !== "" => Some({
+            kind: #buildPasses,
+            command: Js.Nullable.return(cmd),
+            expect: Js.Nullable.null,
+            path: Js.Nullable.null,
+            schema: Js.Nullable.null,
+          })
+        | _ => None
       }
-    | None => []
+      let testCheck = switch hints.testCommand->Js.Nullable.toOption {
+        | Some(cmd) if Js.String2.trim(cmd) !== "" => Some({
+            kind: #testsPass,
+            command: Js.Nullable.return(cmd),
+            expect: Js.Nullable.null,
+            path: Js.Nullable.null,
+            schema: Js.Nullable.null,
+          })
+        | _ => None
+      }
+      switch (buildCheck, testCheck) {
+      | (Some(bc), Some(tc)) => [bc, tc]
+      | (Some(bc), None) => [bc]
+      | (None, Some(tc)) => [tc]
+      | (None, None) => []
+      }
+    } else if category === "refactor" {
+      let buildCheck = switch hints.buildCommand->Js.Nullable.toOption {
+        | Some(cmd) if Js.String2.trim(cmd) !== "" => Some({
+            kind: #buildPasses,
+            command: Js.Nullable.return(cmd),
+            expect: Js.Nullable.null,
+            path: Js.Nullable.null,
+            schema: Js.Nullable.null,
+          })
+        | _ => None
+      }
+      let lintCheck = switch hints.lintCommand->Js.Nullable.toOption {
+        | Some(cmd) if Js.String2.trim(cmd) !== "" => Some({
+            kind: #lintClean,
+            command: Js.Nullable.return(cmd),
+            expect: Js.Nullable.null,
+            path: Js.Nullable.null,
+            schema: Js.Nullable.null,
+          })
+        | _ => None
+      }
+      switch (buildCheck, lintCheck) {
+      | (Some(bc), Some(lc)) => [bc, lc]
+      | (Some(bc), None) => [bc]
+      | (None, Some(lc)) => [lc]
+      | (None, None) => []
+      }
+    } else if category === "writeFile" {
+      switch hints.declaredPath->Js.Nullable.toOption {
+        | Some(p) =>
+          let trimmed = Js.String2.trim(p)
+          if trimmed !== "" {
+            [{
+              kind: #fileExists,
+              command: Js.Nullable.null,
+              expect: Js.Nullable.null,
+              path: Js.Nullable.return(trimmed),
+              schema: Js.Nullable.null,
+            }]
+          } else {
+            []
+          }
+        | None => []
+      }
+    } else if category === "test" {
+      switch hints.testCommand->Js.Nullable.toOption {
+        | Some(cmd) if Js.String2.trim(cmd) !== "" => [{
+            kind: #testsPass,
+            command: Js.Nullable.return(cmd),
+            expect: Js.Nullable.null,
+            path: Js.Nullable.null,
+            schema: Js.Nullable.null,
+          }]
+        | _ => []
+      }
+    } else {
+      []
     }
-  } else if category === "test" {
-    switch hints.testCommand->Nullable.toOption {
-    | Some(cmd) if String.trim(cmd) !== "" => [
-        {
-          kind: #testsPass,
-          command: Nullable.make(cmd),
-          expect: Nullable.null,
-          path: Nullable.null,
-          schema: Nullable.null,
-        },
-      ]
-    | _ => []
-    }
-  } else {
-    []
-  }
 
   let criteria: array<string> = if Array.length(checks) === 0 {
     let summary = summarizeDispatch(dispatchText)
@@ -576,14 +567,14 @@ let inferDoD = (dispatchText: string, _tier: string, hints: inferHints): dod => 
     []
   }
 
-  let rawPath = switch hints.declaredPath->Nullable.toOption {
-  | Some(p) => String.trim(p)
-  | None => ""
+  let rawPath = switch hints.declaredPath->Js.Nullable.toOption {
+    | Some(p) => Js.String2.trim(p)
+    | None => ""
   }
-  let deliverable: Nullable.t<string> = if rawPath !== "" {
-    Nullable.make(rawPath)
+  let deliverable: Js.Nullable.t<string> = if rawPath !== "" {
+    Js.Nullable.return(rawPath)
   } else {
-    Nullable.null
+    Js.Nullable.null
   }
 
   let kind: dodKind = if Array.length(checks) > 0 {
@@ -617,12 +608,12 @@ let isCheckable = (d: dod): bool => {
 // Accessors for test assertions (nullable field access)
 // ---------------------------------------------------------------------------
 
-let getCheckCommand = (c: check): Nullable.t<string> => c.command
-let getCheckExpect = (c: check): Nullable.t<string> => c.expect
-let getCheckPath = (c: check): Nullable.t<string> => c.path
-let getCheckSchema = (c: check): Nullable.t<string> => c.schema
+let getCheckCommand = (c: check): Js.Nullable.t<string> => c.command
+let getCheckExpect = (c: check): Js.Nullable.t<string> => c.expect
+let getCheckPath = (c: check): Js.Nullable.t<string> => c.path
+let getCheckSchema = (c: check): Js.Nullable.t<string> => c.schema
 let getCheckKind = (c: check): checkKind => c.kind
-let getDodDeliverable = (d: dod): Nullable.t<string> => d.deliverable
+let getDodDeliverable = (d: dod): Js.Nullable.t<string> => d.deliverable
 let getDodKind = (d: dod): dodKind => d.kind
 let getDodChecks = (d: dod): array<check> => d.checks
 let getDodCriteria = (d: dod): array<string> => d.criteria

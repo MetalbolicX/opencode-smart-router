@@ -28,15 +28,15 @@ type reasoningCapability = {
   baseline?: string,
   elevated?: string,
   levels?: array<string>,
-  recommended?: dict<float>,
+  recommended?: Js.Dict.t<float>,
 }
 
 // TierConfig minimal shape (fields actually read by resolveReasoningOverride)
 type tierConfig = {
   model: string,
   variant?: string,
-  thinking?: {budgetTokens?: int},
-  reasoning?: {effort?: string},
+  thinking?: { budgetTokens?: int },
+  reasoning?: { effort?: string },
   description: string,
   whenToUse: array<string>,
   capability?: reasoningCapability,
@@ -61,9 +61,9 @@ type rec reasoningPolicyConfig = {
 // Adaptive policy config minimal shape
 and adaptivePolicyConfig = {
   trivialLevel: option<string>,
-  adaptive_defaultLevel: option<string>,
+  defaultLevel: option<string>,
   keywordRules: option<array<keywordRule>>,
-  tierDefaults: option<dict<string>>,
+  tierDefaults: option<Js.Dict.t<string>>,
   surfaceDecision: option<bool>,
 }
 
@@ -78,7 +78,7 @@ and keywordRule = {
 // Resolved reasoning patch (matches ReasoningTranslate.resolvedReasoning)
 type resolvedReasoning = {
   variant?: string,
-  options?: dict<unknown>,
+  options?: Js.Dict.t<unknown>,
 }
 
 // Main export: resolve the effective reasoning patch for a tier.

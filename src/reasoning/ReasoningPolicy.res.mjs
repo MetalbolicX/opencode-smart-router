@@ -34,7 +34,7 @@ function _nullResult() {
   return null;
 }
 
-function resolveReasoningOverride(tier, policy, sessionOverride, _signals) {
+function resolveReasoningOverride(tier, policy, sessionOverride, signals) {
   let mode = _getMode(policy);
   if (mode === undefined) {
     return _nullResult();

@@ -24,34 +24,24 @@ open Test
 // For GREEN phase: valid input → no throw → assertion(0, 0) → PASS
 // For RED phase: function missing → ReferenceError → test fails
 let assertionNoThrow = (~operator: string, fn: unit => unit): unit =>
-  assertion(
-    ~operator,
-    (_a, _b) => true,
-    {
-      fn()
-      0
-    },
-    0,
-  )
+  assertion(~operator, (_a, _b) => true, { fn(); 0 }, 0)
 
 // ---------------------------------------------------------------------------
 // validateModes tests
 // ---------------------------------------------------------------------------
 
 test("validateModes: accepts a modes object with one valid mode", () => {
-  let dict: dict<JSON.t> = %raw(`{modes: {auto: {defaultTier: "fast", description: "Auto mode"}}}`)
+  let dict: Js.Dict.t<Js.Json.t> = %raw(`{modes: {auto: {defaultTier: "fast", description: "Auto mode"}}}`)
   assertionNoThrow(~operator="valid single mode", () => ValidateModes.validateModes(dict))
 })
 
 test("validateModes: accepts a modes object with multiple valid modes", () => {
-  let dict: dict<
-    JSON.t,
-  > = %raw(`{modes: {auto: {defaultTier: "fast", description: "Auto"}, careful: {defaultTier: "heavy", description: "Careful"}}}`)
+  let dict: Js.Dict.t<Js.Json.t> = %raw(`{modes: {auto: {defaultTier: "fast", description: "Auto"}, careful: {defaultTier: "heavy", description: "Careful"}}}`)
   assertionNoThrow(~operator="valid multi mode", () => ValidateModes.validateModes(dict))
 })
 
 test("validateModes: accepts empty modes object", () => {
-  let dict: dict<JSON.t> = %raw(`{modes: {}}`)
+  let dict: Js.Dict.t<Js.Json.t> = %raw(`{modes: {}}`)
   assertionNoThrow(~operator="empty modes", () => ValidateModes.validateModes(dict))
 })
 
@@ -60,11 +50,11 @@ test("validateModes: accepts empty modes object", () => {
 // ---------------------------------------------------------------------------
 
 test("validateMode: accepts a fully-specified valid mode", () => {
-  let mode: dict<JSON.t> = %raw(`{defaultTier: "fast", description: "Fast auto mode"}`)
+  let mode: Js.Dict.t<Js.Json.t> = %raw(`{defaultTier: "fast", description: "Fast auto mode"}`)
   assertionNoThrow(~operator="valid full mode", () => ValidateModes.validateMode("myMode", mode))
 })
 
 test("validateMode: accepts mode with minimal required fields", () => {
-  let mode: dict<JSON.t> = %raw(`{defaultTier: "tier1", description: "Minimal mode"}`)
+  let mode: Js.Dict.t<Js.Json.t> = %raw(`{defaultTier: "tier1", description: "Minimal mode"}`)
   assertionNoThrow(~operator="minimal mode", () => ValidateModes.validateMode("modeA", mode))
 })

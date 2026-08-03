@@ -50,7 +50,7 @@ type adaptivePolicyConfig = {
   trivialLevel: option<string>,
   defaultLevel: option<string>,
   keywordRules: option<array<keywordRule>>,
-  tierDefaults: option<dict<string>>,
+  tierDefaults: option<Js.Dict.t<string>>,
   surfaceDecision: option<bool>,
 }
 
@@ -64,7 +64,7 @@ type reasoningPolicyConfig = {
 
 // Return type — level is Js.Nullable.t at the TS boundary
 type adaptiveDecision = {
-  level: Nullable.t<reasoningLevel>,
+  level: Js.Nullable.t<reasoningLevel>,
   reason: string,
 }
 
@@ -72,9 +72,9 @@ type adaptiveDecision = {
 let selectAdaptiveLevel: (adaptiveSignals, option<reasoningPolicyConfig>) => adaptiveDecision
 
 // Accessor helpers (for test assertions)
-let getLevelNull: adaptiveDecision => Nullable.t<reasoningLevel>
-let getLevelOption: adaptiveDecision => option<reasoningLevel>
-let getReason: adaptiveDecision => string
+let getLevelNull: (adaptiveDecision) => Js.Nullable.t<reasoningLevel>
+let getLevelOption: (adaptiveDecision) => option<reasoningLevel>
+let getReason: (adaptiveDecision) => string
 
 // Test helper: build a ReasoningPolicyConfig with adaptive block
-let makePolicyWithAdaptive: option<adaptivePolicyConfig> => reasoningPolicyConfig
+let makePolicyWithAdaptive: (option<adaptivePolicyConfig>) => reasoningPolicyConfig

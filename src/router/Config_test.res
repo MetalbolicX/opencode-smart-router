@@ -26,7 +26,7 @@ let assertEqual = (a: 'a, b: 'a): unit => assertion((x, y) => x === y, a, b)
 // Test helpers
 // ---------------------------------------------------------------------------
 
-let json = (s: string): JSON.t => JSON.parseOrThrow(s)
+let json = (s: string): Js.Json.t => Js.Json.parseExn(s)
 
 // ---------------------------------------------------------------------------
 // Root required fields
@@ -50,9 +50,9 @@ test("Config.parse: valid minimal config returns Some", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) => {
-      stringEqual(config.activePreset, "multi-provider")
-      stringEqual(config.defaultTier, "fast")
-    }
+    stringEqual(config.activePreset, "multi-provider")
+    stringEqual(config.defaultTier, "fast")
+  }
   | None => assertion((_, _) => false, true, false)
   }
 })
@@ -90,9 +90,7 @@ test("Config.parse: missing defaultTier returns None", () => {
 })
 
 test("Config.parse: activePreset not string returns None", () => {
-  let result = Config.parse(
-    json(`{"activePreset":123,"presets":{},"rules":[],"defaultTier":"fast"}`),
-  )
+  let result = Config.parse(json(`{"activePreset":123,"presets":{},"rules":[],"defaultTier":"fast"}`))
   switch result {
   | Some(_) => assertion((_, _) => false, true, false)
   | None => pass()
@@ -100,9 +98,7 @@ test("Config.parse: activePreset not string returns None", () => {
 })
 
 test("Config.parse: empty presets object returns None", () => {
-  let result = Config.parse(
-    json(`{"activePreset":"test","presets":{},"rules":[],"defaultTier":"fast"}`),
-  )
+  let result = Config.parse(json(`{"activePreset":"test","presets":{},"rules":[],"defaultTier":"fast"}`))
   switch result {
   | Some(_) => assertion((_, _) => false, true, false)
   | None => pass()
@@ -196,9 +192,9 @@ test("Config.parse: tier with optional variant and costRatio parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "fast") {
+      switch Js.Dict.get(preset, "fast") {
       | Some(tier) => {
           switch tier.variant {
           | Some(v) => stringEqual(v, "high")
@@ -265,9 +261,9 @@ test("Config.parse: tier with reasoning.effort parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "heavy") {
+      switch Js.Dict.get(preset, "heavy") {
       | Some(tier) =>
         switch tier.reasoning {
         | Some(reas) =>
@@ -306,9 +302,9 @@ test("Config.parse: tier with thinking.budgetTokens parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "fast") {
+      switch Js.Dict.get(preset, "fast") {
       | Some(tier) =>
         switch tier.thinking {
         | Some(th) =>
@@ -355,11 +351,11 @@ test("Config.parse: modes.overrideRules parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch config.modes->Belt.Option.flatMap(modesDict => Dict.get(modesDict, "budget")) {
+    switch config.modes->Belt.Option.flatMap(modesDict => Js.Dict.get(modesDict, "budget")) {
     | Some(mode) => {
         stringEqual(mode.defaultTier, "fast")
         switch mode.overrideRules {
-        | Some(rules) => intEqual(Array.length(rules), 1)
+        | Some(rules) => intEqual(Js.Array.length(rules), 1)
         | None => assertion((_, _) => false, true, false)
         }
       }
@@ -458,7 +454,7 @@ test("Config.parse: enforcement perTier parsing", () => {
     | Some(enf) =>
       switch enf.perTier {
       | Some(pt) =>
-        switch Dict.get(pt, "fast") {
+        switch Js.Dict.get(pt, "fast") {
         | Some("off") => pass()
         | _ => assertion((_, _) => false, true, false)
         }
@@ -497,10 +493,12 @@ test("Config.parse: enforcement guard block parsing", () => {
     switch config.enforcement {
     | Some(enf) =>
       switch enf.guard {
-      | Some(guard) => switch guard.blockSelfScript {
-        | Some(true) => pass()
-        | Some(false) => assertion((_, _) => false, true, false)
-        | None => assertion((_, _) => false, true, false)
+      | Some(guard) => {
+          switch guard.blockSelfScript {
+          | Some(true) => pass()
+          | Some(false) => assertion((_, _) => false, true, false)
+          | None => assertion((_, _) => false, true, false)
+          }
         }
       | None => assertion((_, _) => false, true, false)
       }
@@ -538,9 +536,11 @@ test("Config.parse: enforcement verify block parsing", () => {
     switch config.enforcement {
     | Some(enf) =>
       switch enf.verify {
-      | Some(verify) => switch verify.require {
-        | Some("always") => pass()
-        | _ => assertion((_, _) => false, true, false)
+      | Some(verify) => {
+    switch verify.require {
+    | Some("always") => pass()
+    | _ => assertion((_, _) => false, true, false)
+    }
         }
       | None => assertion((_, _) => false, true, false)
       }
@@ -723,7 +723,7 @@ test("Config.parse: reasoningPolicy.keywordRules parses", () => {
       switch rp.adaptive {
       | Some(adapt) =>
         switch adapt.keywordRules {
-        | Some(rules) => intEqual(Array.length(rules), 2)
+        | Some(rules) => intEqual(Js.Array.length(rules), 2)
         | None => assertion((_, _) => false, true, false)
         }
       | None => assertion((_, _) => false, true, false)
@@ -768,7 +768,7 @@ test("Config.parse: reasoningPolicy.keywordRules level = minimal returns Some", 
       | Some(adapt) =>
         switch adapt.keywordRules {
         | Some(rules) =>
-          switch Array.length(rules) == 1 {
+          switch Js.Array.length(rules) == 1 {
           | true =>
             switch rules[0] {
             | Some(kr) =>
@@ -824,7 +824,7 @@ test("Config.parse: reasoningPolicy.keywordRules level = max returns Some", () =
       | Some(adapt) =>
         switch adapt.keywordRules {
         | Some(rules) =>
-          switch Array.length(rules) == 1 {
+          switch Js.Array.length(rules) == 1 {
           | true =>
             switch rules[0] {
             | Some(kr) =>
@@ -878,7 +878,7 @@ test("Config.parse: reasoningPolicy.adaptive.tierDefaults fast = elevated return
       | Some(adapt) =>
         switch adapt.tierDefaults {
         | Some(td) =>
-          switch Dict.get(td, "fast") {
+          switch Js.Dict.get(td, "fast") {
           | Some("elevated") => pass()
           | _ => assertion((_, _) => false, true, false)
           }
@@ -1014,9 +1014,9 @@ test("Config.parse: tier capability kind none parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "fast") {
+      switch Js.Dict.get(preset, "fast") {
       | Some(tier) =>
         switch tier.capability {
         | Some(cap) =>
@@ -1057,9 +1057,9 @@ test("Config.parse: tier capability kind binary parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "medium") {
+      switch Js.Dict.get(preset, "medium") {
       | Some(tier) =>
         switch tier.capability {
         | Some(cap) =>
@@ -1100,14 +1100,14 @@ test("Config.parse: tier capability kind discrete parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "light") {
+      switch Js.Dict.get(preset, "light") {
       | Some(tier) =>
         switch tier.capability {
         | Some(cap) =>
           switch cap {
-          | Discrete({levels: lv}) => intEqual(Array.length(lv), 3)
+          | Discrete({levels: lv}) => intEqual(Js.Array.length(lv), 3)
           | _ => assertion((_, _) => false, true, false)
           }
         | None => assertion((_, _) => false, true, false)
@@ -1148,16 +1148,16 @@ test("Config.parse: tier capability kind budgeted parses", () => {
   let result = Config.parse(json(input))
   switch result {
   | Some(config) =>
-    switch Dict.get(config.presets, "test") {
+    switch Js.Dict.get(config.presets, "test") {
     | Some(preset) =>
-      switch Dict.get(preset, "heavy") {
+      switch Js.Dict.get(preset, "heavy") {
       | Some(tier) =>
         switch tier.capability {
         | Some(cap) =>
           switch cap {
           | Budgeted({recommended: recMap}) =>
-            switch Dict.get(recMap, "normal") {
-            | Some(v) => intEqual(Float.toInt(v), 4096)
+    switch Js.Dict.get(recMap, "normal") {
+    | Some(v) => intEqual(Float.toInt(v), 4096)
             | None => assertion((_, _) => false, true, false)
             }
           | _ => assertion((_, _) => false, true, false)

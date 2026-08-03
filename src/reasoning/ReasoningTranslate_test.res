@@ -74,11 +74,11 @@ let binaryNoBaseline: ReasoningTranslate.reasoningCapability = {
 
 // Budgeted capability
 let budgetedCap: ReasoningTranslate.reasoningCapability = {
-  let d = Dict.make()
-  Dict.set(d, "minimal", 1024.0)
-  Dict.set(d, "normal", 4096.0)
-  Dict.set(d, "elevated", 8192.0)
-  Dict.set(d, "max", 16000.0)
+  let d = Js.Dict.empty()
+  Js.Dict.set(d, "minimal", 1024.0)
+  Js.Dict.set(d, "normal", 4096.0)
+  Js.Dict.set(d, "elevated", 8192.0)
+  Js.Dict.set(d, "max", 16000.0)
   {
     kind: "budgeted",
     field: "thinking.budgetTokens",
@@ -87,17 +87,29 @@ let budgetedCap: ReasoningTranslate.reasoningCapability = {
 }
 
 // None capability
-let noneCap: ReasoningTranslate.reasoningCapability = {kind: "none"}
+let noneCap: ReasoningTranslate.reasoningCapability = { kind: "none" }
 
 // ---------------------------------------------------------------------------
 // translateLevel — none channel: always null
 // ---------------------------------------------------------------------------
 
 test("translateLevel: none returns null for every level", () => {
-  assertionNone(~operator="minimal", ReasoningTranslate.translateLevel(noneCap, #minimal))
-  assertionNone(~operator="normal", ReasoningTranslate.translateLevel(noneCap, #normal))
-  assertionNone(~operator="elevated", ReasoningTranslate.translateLevel(noneCap, #elevated))
-  assertionNone(~operator="max", ReasoningTranslate.translateLevel(noneCap, #max))
+  assertionNone(
+    ~operator="minimal",
+    ReasoningTranslate.translateLevel(noneCap, #minimal),
+  )
+  assertionNone(
+    ~operator="normal",
+    ReasoningTranslate.translateLevel(noneCap, #normal),
+  )
+  assertionNone(
+    ~operator="elevated",
+    ReasoningTranslate.translateLevel(noneCap, #elevated),
+  )
+  assertionNone(
+    ~operator="max",
+    ReasoningTranslate.translateLevel(noneCap, #max),
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -109,7 +121,10 @@ test("translateLevel: binary — elevated and max return elevated variant", () =
     ~operator="elevated",
     ReasoningTranslate.translateLevel(binaryWithBaseline, #elevated),
   )
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(binaryWithBaseline, #max))
+  assertionSome(
+    ~operator="max",
+    ReasoningTranslate.translateLevel(binaryWithBaseline, #max),
+  )
 })
 
 test("translateLevel: binary — elevated/max also work when no baseline declared", () => {
@@ -128,12 +143,21 @@ test("translateLevel: binary — minimal and normal return baseline variant", ()
     ~operator="minimal",
     ReasoningTranslate.translateLevel(binaryWithBaseline, #minimal),
   )
-  assertionSome(~operator="normal", ReasoningTranslate.translateLevel(binaryWithBaseline, #normal))
+  assertionSome(
+    ~operator="normal",
+    ReasoningTranslate.translateLevel(binaryWithBaseline, #normal),
+  )
 })
 
 test("translateLevel: binary — minimal/normal return null when no baseline", () => {
-  assertionNone(~operator="minimal", ReasoningTranslate.translateLevel(binaryNoBaseline, #minimal))
-  assertionNone(~operator="normal", ReasoningTranslate.translateLevel(binaryNoBaseline, #normal))
+  assertionNone(
+    ~operator="minimal",
+    ReasoningTranslate.translateLevel(binaryNoBaseline, #minimal),
+  )
+  assertionNone(
+    ~operator="normal",
+    ReasoningTranslate.translateLevel(binaryNoBaseline, #normal),
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -147,27 +171,27 @@ test("translateLevel: discrete 3-level — rank formula clamps correctly", () =>
   // elevated(2)-> round(4/3) -> 1 -> medium  (same as normal!)
   // max(3)     -> round(1)   -> 1 -> high
   assertionSome(~operator="minimal", ReasoningTranslate.translateLevel(discrete3, #minimal))
-  assertionSome(~operator="normal", ReasoningTranslate.translateLevel(discrete3, #normal))
-  assertionSome(~operator="elevated", ReasoningTranslate.translateLevel(discrete3, #elevated))
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(discrete3, #max))
+  assertionSome(~operator="normal",  ReasoningTranslate.translateLevel(discrete3, #normal))
+  assertionSome(~operator="elevated",ReasoningTranslate.translateLevel(discrete3, #elevated))
+  assertionSome(~operator="max",     ReasoningTranslate.translateLevel(discrete3, #max))
 })
 
 test("translateLevel: discrete 4-level — linear mapping", () => {
   // Math.round((rank/3)*(4-1)) = Math.round(rank * 1):
   // minimal(0)->0->low, normal(1)->1->medium, elevated(2)->2->high, max(3)->3->xhigh
   assertionSome(~operator="minimal", ReasoningTranslate.translateLevel(discrete4, #minimal))
-  assertionSome(~operator="normal", ReasoningTranslate.translateLevel(discrete4, #normal))
-  assertionSome(~operator="elevated", ReasoningTranslate.translateLevel(discrete4, #elevated))
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(discrete4, #max))
+  assertionSome(~operator="normal",  ReasoningTranslate.translateLevel(discrete4, #normal))
+  assertionSome(~operator="elevated",ReasoningTranslate.translateLevel(discrete4, #elevated))
+  assertionSome(~operator="max",     ReasoningTranslate.translateLevel(discrete4, #max))
 })
 
 test("translateLevel: discrete 2-level — elevated/max clamp to high", () => {
   // Math.round((rank/3)*(2-1)) = Math.round(rank/3):
   // minimal(0)->0->low, normal(1)->0->low, elevated(2)->1->high, max(3)->1->high
   assertionSome(~operator="minimal", ReasoningTranslate.translateLevel(discrete2, #minimal))
-  assertionSome(~operator="normal", ReasoningTranslate.translateLevel(discrete2, #normal))
-  assertionSome(~operator="elevated", ReasoningTranslate.translateLevel(discrete2, #elevated))
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(discrete2, #max))
+  assertionSome(~operator="normal",  ReasoningTranslate.translateLevel(discrete2, #normal))
+  assertionSome(~operator="elevated",ReasoningTranslate.translateLevel(discrete2, #elevated))
+  assertionSome(~operator="max",     ReasoningTranslate.translateLevel(discrete2, #max))
 })
 
 // ---------------------------------------------------------------------------
@@ -180,8 +204,14 @@ test("translateLevel: discrete reasoning.effort — routes to options.reasoning_
     field: "reasoning.effort",
     levels: ["low", "medium", "high"],
   }
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(cap, #max))
-  assertionSome(~operator="minimal", ReasoningTranslate.translateLevel(cap, #minimal))
+  assertionSome(
+    ~operator="max",
+    ReasoningTranslate.translateLevel(cap, #max),
+  )
+  assertionSome(
+    ~operator="minimal",
+    ReasoningTranslate.translateLevel(cap, #minimal),
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -189,10 +219,22 @@ test("translateLevel: discrete reasoning.effort — routes to options.reasoning_
 // ---------------------------------------------------------------------------
 
 test("translateLevel: budgeted — returns options.budget_tokens per level", () => {
-  assertionSome(~operator="minimal", ReasoningTranslate.translateLevel(budgetedCap, #minimal))
-  assertionSome(~operator="normal", ReasoningTranslate.translateLevel(budgetedCap, #normal))
-  assertionSome(~operator="elevated", ReasoningTranslate.translateLevel(budgetedCap, #elevated))
-  assertionSome(~operator="max", ReasoningTranslate.translateLevel(budgetedCap, #max))
+  assertionSome(
+    ~operator="minimal",
+    ReasoningTranslate.translateLevel(budgetedCap, #minimal),
+  )
+  assertionSome(
+    ~operator="normal",
+    ReasoningTranslate.translateLevel(budgetedCap, #normal),
+  )
+  assertionSome(
+    ~operator="elevated",
+    ReasoningTranslate.translateLevel(budgetedCap, #elevated),
+  )
+  assertionSome(
+    ~operator="max",
+    ReasoningTranslate.translateLevel(budgetedCap, #max),
+  )
 })
 
 test("translateLevel: budgeted — never writes .variant", () => {

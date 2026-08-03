@@ -21,7 +21,12 @@
 // ---------------------------------------------------------------------------
 
 // Module aliases for internal reference (calling into sub-modules)
-// NOTE: Root, Presets, Modes, Simple, Enforcement, Reasoning module aliases removed - unused
+module Root = ValidateRoot
+module Presets = ValidatePresets
+module Modes = ValidateModes
+module Simple = ValidateSimple
+module Enforcement = ValidateEnforcement
+module Reasoning = ValidateReasoning
 
 // ---------------------------------------------------------------------------
 // Root validators
@@ -129,7 +134,7 @@ let validateAdaptiveSurfaceDecision = ValidateReasoning.validateAdaptiveSurfaceD
 // Throws with a "tiers.json:" prefix on the first failure.
 // ---------------------------------------------------------------------------
 
-let validateConfig = (obj: dict<JSON.t>): dict<JSON.t> => {
+let validateConfig = (obj: Js.Dict.t<Js.Json.t>): Js.Dict.t<Js.Json.t> => {
   // Root-level checks
   ValidateRoot.validateRootFields(obj)
   ValidateRoot.validateRulesAndDefaultTier(obj)

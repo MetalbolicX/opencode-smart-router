@@ -2,6 +2,7 @@
 
 import * as Test from "rescript-test/src/Test.res.mjs";
 import * as Config from "./Config.res.mjs";
+import * as Js_dict from "@rescript/runtime/lib/es6/Js_dict.js";
 import * as Belt_Option from "@rescript/runtime/lib/es6/Belt_Option.js";
 
 function stringEqual(message, a, b) {
@@ -184,11 +185,11 @@ Test.test("Config.parse: tier with optional variant and costRatio parses", () =>
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["fast"];
+  let tier = Js_dict.get(preset, "fast");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -250,11 +251,11 @@ Test.test("Config.parse: tier with reasoning.effort parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["heavy"];
+  let tier = Js_dict.get(preset, "heavy");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -291,11 +292,11 @@ Test.test("Config.parse: tier with thinking.budgetTokens parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["fast"];
+  let tier = Js_dict.get(preset, "fast");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -336,7 +337,7 @@ Test.test("Config.parse: modes.overrideRules parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let mode = Belt_Option.flatMap(result.modes, modesDict => modesDict["budget"]);
+  let mode = Belt_Option.flatMap(result.modes, modesDict => Js_dict.get(modesDict, "budget"));
   if (mode === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -437,7 +438,7 @@ Test.test("Config.parse: enforcement perTier parsing", () => {
   if (pt === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let match = pt["fast"];
+  let match = Js_dict.get(pt, "fast");
   if (match === "off") {
     return Test.pass(undefined, undefined);
   }
@@ -857,7 +858,7 @@ Test.test("Config.parse: reasoningPolicy.adaptive.tierDefaults fast = elevated r
   if (td === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let match = td["fast"];
+  let match = Js_dict.get(td, "fast");
   if (match === "elevated") {
     return Test.pass(undefined, undefined);
   }
@@ -982,11 +983,11 @@ Test.test("Config.parse: tier capability kind none parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["fast"];
+  let tier = Js_dict.get(preset, "fast");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -1025,11 +1026,11 @@ Test.test("Config.parse: tier capability kind binary parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["medium"];
+  let tier = Js_dict.get(preset, "medium");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -1066,11 +1067,11 @@ Test.test("Config.parse: tier capability kind discrete parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["light"];
+  let tier = Js_dict.get(preset, "light");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -1112,11 +1113,11 @@ Test.test("Config.parse: tier capability kind budgeted parses", () => {
   if (result === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let preset = result.presets["test"];
+  let preset = Js_dict.get(result.presets, "test");
   if (preset === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
-  let tier = preset["heavy"];
+  let tier = Js_dict.get(preset, "heavy");
   if (tier === undefined) {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
@@ -1125,7 +1126,7 @@ Test.test("Config.parse: tier capability kind budgeted parses", () => {
     return Test.assertion(undefined, undefined, (param, param$1) => false, true, false);
   }
   if (typeof cap === "object" && cap.TAG === "Budgeted") {
-    let v = cap.recommended["normal"];
+    let v = Js_dict.get(cap.recommended, "normal");
     if (v !== undefined) {
       return intEqual(undefined, v | 0, 4096);
     } else {

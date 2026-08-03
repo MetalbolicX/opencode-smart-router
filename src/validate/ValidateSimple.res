@@ -17,16 +17,18 @@
 // Guard: throws if obj is not a plain object (not null, string, number, etc.)
 // Js.Dict.get uses the 'in' operator internally which throws for non-objects,
 // so we must check upfront.
-let _ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
+let ensureIsConfigObject = (obj: Js.Dict.t<Js.Json.t>): unit => {
   if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
-    throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
+    raise(
+      Js.Exn.raiseError("tiers.json: expected a JSON object at root"),
+    )
   }
 }
 
 // Guard: throws if val is not a plain object (used for sub-object checks)
-let ensureIsObject = (_val: JSON.t, path: string): unit => {
+let ensureIsObject = (val: Js.Json.t, path: string): unit => {
   if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
-    throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
+    raise(Js.Exn.raiseError(`tiers.json: ${path} must be an object`))
   }
 }
 
@@ -36,25 +38,25 @@ let ensureIsObject = (_val: JSON.t, path: string): unit => {
 // tierCaps is optional — returns early if absent.
 // ---------------------------------------------------------------------------
 
-let validateTierCaps = (obj: dict<JSON.t>): unit => {
-  switch Dict.get(obj, "tierCaps") {
+let validateTierCaps = (obj: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(obj, "tierCaps") {
   | Some(json) => {
       ensureIsObject(json, "'tierCaps'")
-      switch JSON.Decode.object(json) {
+      switch Js.Json.decodeObject(json) {
       | Some(caps) => {
-          let keys = Dict.keysToArray(caps)
+          let keys = Js.Dict.keys(caps)
           let rec go = (keys: list<string>): unit =>
             switch keys {
             | list{} => ()
             | list{k, ...rest} =>
-              switch Dict.get(caps, k) {
+              switch Js.Dict.get(caps, k) {
               | Some(capJson) =>
-                switch JSON.Decode.float(capJson) {
-                | Some(_cap) =>
+                switch Js.Json.decodeNumber(capJson) {
+                | Some(cap) =>
                   // Must be finite and >= 1
                   if %raw(`!(Number.isFinite(cap) && cap >= 1)`) {
-                    throw(
-                      JsError.throwWithMessage(
+                    raise(
+                      Js.Exn.raiseError(
                         `tiers.json: tierCaps.'${k}' must be a positive integer`,
                       ),
                     )
@@ -62,8 +64,8 @@ let validateTierCaps = (obj: dict<JSON.t>): unit => {
                     go(rest)
                   }
                 | None =>
-                  throw(
-                    JsError.throwWithMessage(
+                  raise(
+                    Js.Exn.raiseError(
                       `tiers.json: tierCaps.'${k}' must be a positive integer`,
                     ),
                   )
@@ -73,7 +75,8 @@ let validateTierCaps = (obj: dict<JSON.t>): unit => {
             }
           go(List.fromArray(keys))
         }
-      | None => throw(JsError.throwWithMessage("tiers.json: 'tierCaps' must be a non-null object"))
+      | None =>
+        raise(Js.Exn.raiseError("tiers.json: 'tierCaps' must be a non-null object"))
       }
     }
   | None => ()
@@ -86,23 +89,27 @@ let validateTierCaps = (obj: dict<JSON.t>): unit => {
 // tierPrompts is optional — returns early if absent.
 // ---------------------------------------------------------------------------
 
-let validateTierPrompts = (obj: dict<JSON.t>): unit => {
-  switch Dict.get(obj, "tierPrompts") {
+let validateTierPrompts = (obj: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(obj, "tierPrompts") {
   | Some(json) => {
       ensureIsObject(json, "'tierPrompts'")
-      switch JSON.Decode.object(json) {
+      switch Js.Json.decodeObject(json) {
       | Some(prompts) => {
-          let keys = Dict.keysToArray(prompts)
+          let keys = Js.Dict.keys(prompts)
           let rec go = (keys: list<string>): unit =>
             switch keys {
             | list{} => ()
             | list{k, ...rest} =>
-              switch Dict.get(prompts, k) {
+              switch Js.Dict.get(prompts, k) {
               | Some(promptJson) =>
-                switch JSON.Decode.string(promptJson) {
+                switch Js.Json.decodeString(promptJson) {
                 | Some(_) => go(rest)
                 | None =>
-                  throw(JsError.throwWithMessage(`tiers.json: tierPrompts.'${k}' must be a string`))
+                  raise(
+                    Js.Exn.raiseError(
+                      `tiers.json: tierPrompts.'${k}' must be a string`,
+                    ),
+                  )
                 }
               | None => go(rest)
               }
@@ -110,7 +117,7 @@ let validateTierPrompts = (obj: dict<JSON.t>): unit => {
           go(List.fromArray(keys))
         }
       | None =>
-        throw(JsError.throwWithMessage("tiers.json: 'tierPrompts' must be a non-null object"))
+        raise(Js.Exn.raiseError("tiers.json: 'tierPrompts' must be a non-null object"))
       }
     }
   | None => ()
@@ -123,24 +130,24 @@ let validateTierPrompts = (obj: dict<JSON.t>): unit => {
 // taskPatterns is optional — returns early if absent.
 // ---------------------------------------------------------------------------
 
-let validateTaskPatterns = (obj: dict<JSON.t>): unit => {
-  switch Dict.get(obj, "taskPatterns") {
+let validateTaskPatterns = (obj: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(obj, "taskPatterns") {
   | Some(json) => {
       ensureIsObject(json, "'taskPatterns'")
-      switch JSON.Decode.object(json) {
+      switch Js.Json.decodeObject(json) {
       | Some(patterns) => {
-          let keys = Dict.keysToArray(patterns)
+          let keys = Js.Dict.keys(patterns)
           let rec go = (keys: list<string>): unit =>
             switch keys {
             | list{} => ()
             | list{k, ...rest} =>
-              switch Dict.get(patterns, k) {
+              switch Js.Dict.get(patterns, k) {
               | Some(patternsJson) =>
-                switch JSON.Decode.array(patternsJson) {
+                switch Js.Json.decodeArray(patternsJson) {
                 | Some(_) => go(rest)
                 | None =>
-                  throw(
-                    JsError.throwWithMessage(
+                  raise(
+                    Js.Exn.raiseError(
                       `tiers.json: taskPatterns.'${k}' must be an array of strings`,
                     ),
                   )
@@ -151,7 +158,7 @@ let validateTaskPatterns = (obj: dict<JSON.t>): unit => {
           go(List.fromArray(keys))
         }
       | None =>
-        throw(JsError.throwWithMessage("tiers.json: 'taskPatterns' must be a non-null object"))
+        raise(Js.Exn.raiseError("tiers.json: 'taskPatterns' must be a non-null object"))
       }
     }
   | None => ()

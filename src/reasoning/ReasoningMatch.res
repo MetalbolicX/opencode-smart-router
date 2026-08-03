@@ -14,7 +14,7 @@
 // Since _doTest takes pattern as a PARAMETER (not from %raw), it works.
 // ---------------------------------------------------------------------------
 
-let _patCache: dict<string> = Dict.make()
+let _patCache: Js.Dict.t<string> = Js.Dict.empty()
 
 type matchMode = [
   | #word
@@ -23,12 +23,12 @@ type matchMode = [
   | #regex
 ]
 
-let normalizeSignalText = (_raw: string): string => {
+let normalizeSignalText = (raw: string): string => {
   %raw(`raw.toLowerCase().split(/\s+/).join(' ').trim()`)
 }
 
 @setRuntimeSideEffects
-let _escapeRe = (_s: string): string => {
+let _escapeRe = (s: string): string => {
   %raw(`s.replace(/[.*+?^$( )|[\\\\]\\\\]/g, '\\\\$&')`)
 }
 
@@ -38,43 +38,46 @@ let _buildPattern = (keyword: string, mm: matchMode): string => {
   mm === #word
     ? {
         let tokens = kwLower->String.split(" ")->Array.map(_escapeRe)
-        "\\b" ++ tokens->Array.join("\\s+") ++ "\\b"
+        "\\b" ++ tokens->Array.joinWith("\\s+") ++ "\\b"
       }
     : mm === #substring
-    ? {
-      kwLower->String.split(" ")->Array.map(_escapeRe)->Array.join("\\s+")
-    }
-    : mm === #regex
-    ? kwLower
-    : {
-        // stem
-        let tokens = kwLower->String.split(" ")
-        let tokLen = tokens->Array.length
-        tokLen === 0
-          ? "\\b\\w*"
-          : tokLen === 1
-          ? {
-            let firstTok = switch tokens->Belt.Array.get(0) {
-            | Some(v) => v
-            | None => ""
-            }
-            "\\b" ++ firstTok ++ "\\w*"
+      ? {
+          kwLower
+          ->String.split(" ")
+          ->Array.map(_escapeRe)
+          ->Array.joinWith("\\s+")
+        }
+      : mm === #regex
+        ? kwLower
+        : {
+            // stem
+            let tokens = kwLower->String.split(" ")
+            let tokLen = tokens->Array.length
+            tokLen === 0
+              ? "\\b\\w*"
+              : tokLen === 1
+                ? {
+                    let firstTok = switch tokens->Belt.Array.get(0) {
+                    | Some(v) => v
+                    | None => ""
+                    }
+                    "\\b" ++ firstTok ++ "\\w*"
+                  }
+                : {
+                    let lastTok = switch tokens->Belt.Array.get(tokLen - 1) {
+                    | Some(v) => v
+                    | None => ""
+                    }
+                    let headToks = tokens->Belt.Array.slice(~offset=0, ~len=tokLen - 1)
+                    let escHead = headToks->Array.map(_escapeRe)->Array.joinWith("\\s+")
+                    "\\b" ++ escHead ++ "\\s+" ++ lastTok ++ "\\w*"
+                  }
           }
-          : {
-              let lastTok = switch tokens->Belt.Array.get(tokLen - 1) {
-              | Some(v) => v
-              | None => ""
-              }
-              let headToks = tokens->Belt.Array.slice(~offset=0, ~len=tokLen - 1)
-              let escHead = headToks->Array.map(_escapeRe)->Array.join("\\s+")
-              "\\b" ++ escHead ++ "\\s+" ++ lastTok ++ "\\w*"
-            }
-      }
 }
 
 // _doTest: takes pattern string and text as params; %raw is the return expr.
 // Since pat and signalTxt are function params, %raw can access them directly.
-let _doTest = (_pat: string, _signalTxt: string): bool => {
+let _doTest = (pat: string, signalTxt: string): bool => {
   %raw(`(function(pat, signalTxt) {
     try { return (new RegExp(pat, "i")).test(signalTxt); } catch(e) { return false; }
   })(pat, signalTxt)`)
@@ -82,8 +85,8 @@ let _doTest = (_pat: string, _signalTxt: string): bool => {
 
 // _testPat: takes cache dict + key, retrieves pattern, calls _doTest.
 // This function is NOT inlinable because it uses %raw indirectly via _doTest.
-let _testPat = (cache: dict<string>, key: string, signalTxt: string): bool => {
-  switch Dict.get(cache, key) {
+let _testPat = (cache: Js.Dict.t<string>, key: string, signalTxt: string): bool => {
+  switch Js.Dict.get(cache, key) {
   | Some(pat) => _doTest(pat, signalTxt)
   | None => false
   }
@@ -95,7 +98,7 @@ let matchSignal = (signalTxt: string, keyword: string, mm: matchMode): bool => {
   } else {
     let pat = _buildPattern(keyword, mm)
     // Touch pat to preserve the let-binding (workaround for bug #1).
-    Dict.set(_patCache, "pat", pat)
+    Js.Dict.set(_patCache, "pat", pat)
     _testPat(_patCache, "pat", signalTxt)
   }
 }

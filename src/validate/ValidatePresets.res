@@ -16,11 +16,11 @@
 // ---------------------------------------------------------------------------
 
 // Helper: extract a string field from a dict, returning "" if absent or non-string.
-let getStringField = (dict: dict<JSON.t>, key: string): string => {
-  switch Dict.get(dict, key) {
+let getStringField = (dict: Js.Dict.t<Js.Json.t>, key: string): string => {
+  switch Js.Dict.get(dict, key) {
   | None => ""
   | Some(json) =>
-    switch JSON.Decode.string(json) {
+    switch Js.Json.decodeString(json) {
     | Some(s) => s
     | None => ""
     }
@@ -36,23 +36,25 @@ let getStringField = (dict: dict<JSON.t>, key: string): string => {
 // Guard: throws if tier is not a plain object (not null, string, number, etc.)
 // Js.Dict.get uses the 'in' operator internally which throws for non-objects,
 // so we must check upfront.
-let ensureIsObject = (_tier: dict<JSON.t>, presetName: string, tierName: string): unit => {
+let ensureIsObject = (tier: Js.Dict.t<Js.Json.t>, presetName: string, tierName: string): unit => {
   if %raw(`!(tier && typeof tier === 'object' && !Array.isArray(tier))`) {
-    throw(
-      JsError.throwWithMessage(`tiers.json: tier '${presetName}.${tierName}' must be an object`),
+    raise(
+      Js.Exn.raiseError(
+        `tiers.json: tier '${presetName}.${tierName}' must be an object`,
+      ),
     )
   }
 }
 
-let validateTier = (presetName: string, tierName: string, tier: dict<JSON.t>): unit => {
+let validateTier = (presetName: string, tierName: string, tier: Js.Dict.t<Js.Json.t>): unit => {
   // Guard: tier must be a non-null object (not a primitive like string/number/null)
   ensureIsObject(tier, presetName, tierName)
 
   // model: required, non-empty string
   let modelVal = getStringField(tier, "model")
   if modelVal === "" {
-    throw(
-      JsError.throwWithMessage(
+    raise(
+      Js.Exn.raiseError(
         `tiers.json: '${presetName}.${tierName}.model' must be a non-empty string`,
       ),
     )
@@ -62,8 +64,8 @@ let validateTier = (presetName: string, tierName: string, tier: dict<JSON.t>): u
   // slash <= 0 covers missing-or-leading slash; slash >= length-1 covers missing-or-trailing
   let slashIdx = modelVal->String.indexOf("/")
   if slashIdx <= 0 || slashIdx >= modelVal->String.length - 1 {
-    throw(
-      JsError.throwWithMessage(
+    raise(
+      Js.Exn.raiseError(
         `tiers.json: '${presetName}.${tierName}.model' must be provider/model (got ${modelVal})`,
       ),
     )
@@ -72,28 +74,28 @@ let validateTier = (presetName: string, tierName: string, tier: dict<JSON.t>): u
   // description: required, must be a string
   let descVal = getStringField(tier, "description")
   if descVal === "" {
-    throw(
-      JsError.throwWithMessage(
+    raise(
+      Js.Exn.raiseError(
         `tiers.json: '${presetName}.${tierName}.description' must be a string`,
       ),
     )
   }
 
   // whenToUse: required, must be an array
-  switch Dict.get(tier, "whenToUse") {
+  switch Js.Dict.get(tier, "whenToUse") {
   | Some(json) =>
-    switch JSON.Decode.array(json) {
+    switch Js.Json.decodeArray(json) {
     | Some(_) => ()
     | None =>
-      throw(
-        JsError.throwWithMessage(
+      raise(
+        Js.Exn.raiseError(
           `tiers.json: '${presetName}.${tierName}.whenToUse' must be an array`,
         ),
       )
     }
   | None =>
-    throw(
-      JsError.throwWithMessage(
+    raise(
+      Js.Exn.raiseError(
         `tiers.json: '${presetName}.${tierName}.whenToUse' must be an array`,
       ),
     )
@@ -106,29 +108,35 @@ let validateTier = (presetName: string, tierName: string, tier: dict<JSON.t>): u
 // ---------------------------------------------------------------------------
 
 // Guard: throws if preset is not a plain object
-let ensurePresetIsObject = (_preset: dict<JSON.t>, presetName: string): unit => {
+let ensurePresetIsObject = (preset: Js.Dict.t<Js.Json.t>, presetName: string): unit => {
   if %raw(`!(preset && typeof preset === 'object' && !Array.isArray(preset))`) {
-    throw(JsError.throwWithMessage(`tiers.json: preset '${presetName}' must be an object`))
+    raise(
+      Js.Exn.raiseError(`tiers.json: preset '${presetName}' must be an object`),
+    )
   }
 }
 
-let validatePreset = (presetName: string, preset: dict<JSON.t>): unit => {
+let validatePreset = (presetName: string, preset: Js.Dict.t<Js.Json.t>): unit => {
   // Guard: preset must be a non-null object (not number, string, null, etc.)
   ensurePresetIsObject(preset, presetName)
-  let keys = List.fromArray(Dict.keysToArray(preset))
+  let keys = List.fromArray(Js.Dict.keys(preset))
   let rec go = (keys: list<string>): unit =>
     switch keys {
     | list{} => ()
     | list{k, ...rest} =>
-      switch Dict.get(preset, k) {
+      switch Js.Dict.get(preset, k) {
       | Some(tierJson) =>
-        switch JSON.Decode.object(tierJson) {
+        switch Js.Json.decodeObject(tierJson) {
         | Some(tier) => {
             validateTier(presetName, k, tier)
             go(rest)
           }
         | None =>
-          throw(JsError.throwWithMessage(`tiers.json: tier '${presetName}.${k}' must be an object`))
+          raise(
+            Js.Exn.raiseError(
+              `tiers.json: tier '${presetName}.${k}' must be an object`,
+            ),
+          )
         }
       | None => go(rest)
       }
@@ -143,37 +151,45 @@ let validatePreset = (presetName: string, preset: dict<JSON.t>): unit => {
 // ---------------------------------------------------------------------------
 
 // Guard: throws if obj is not a plain object
-let ensureIsConfigObject = (_obj: dict<JSON.t>): unit => {
+let ensureIsConfigObject = (obj: Js.Dict.t<Js.Json.t>): unit => {
   if %raw(`!(obj && typeof obj === 'object' && !Array.isArray(obj))`) {
-    throw(JsError.throwWithMessage("tiers.json: expected a JSON object at root"))
+    raise(
+      Js.Exn.raiseError("tiers.json: expected a JSON object at root"),
+    )
   }
 }
 
-let validatePresets = (obj: dict<JSON.t>): unit => {
+let validatePresets = (obj: Js.Dict.t<Js.Json.t>): unit => {
   // Guard: obj must be a non-null object
   ensureIsConfigObject(obj)
-  switch Dict.get(obj, "presets") {
+  switch Js.Dict.get(obj, "presets") {
   | Some(json) =>
-    switch JSON.Decode.object(json) {
+    switch Js.Json.decodeObject(json) {
     | Some(presets) => {
-        let keys = Dict.keysToArray(presets)
+        let keys = Js.Dict.keys(presets)
         switch Array.length(keys) {
         | 0 =>
-          throw(JsError.throwWithMessage("tiers.json: 'presets' must have at least one preset"))
+          raise(
+            Js.Exn.raiseError("tiers.json: 'presets' must have at least one preset"),
+          )
         | _ => {
             let rec go = (keys: list<string>): unit =>
               switch keys {
               | list{} => ()
               | list{k, ...rest} =>
-                switch Dict.get(presets, k) {
+                switch Js.Dict.get(presets, k) {
                 | Some(presetJson) =>
-                  switch JSON.Decode.object(presetJson) {
+                  switch Js.Json.decodeObject(presetJson) {
                   | Some(preset) => {
                       validatePreset(k, preset)
                       go(rest)
                     }
                   | None =>
-                    throw(JsError.throwWithMessage(`tiers.json: preset '${k}' must be an object`))
+                    raise(
+                      Js.Exn.raiseError(
+                        `tiers.json: preset '${k}' must be an object`,
+                      ),
+                    )
                   }
                 | None => go(rest)
                 }
@@ -182,8 +198,10 @@ let validatePresets = (obj: dict<JSON.t>): unit => {
           }
         }
       }
-    | None => throw(JsError.throwWithMessage("tiers.json: 'presets' must be a non-null object"))
+    | None =>
+      raise(Js.Exn.raiseError("tiers.json: 'presets' must be a non-null object"))
     }
-  | None => throw(JsError.throwWithMessage("tiers.json: 'presets' must be a non-null object"))
+  | None =>
+    raise(Js.Exn.raiseError("tiers.json: 'presets' must be a non-null object"))
   }
 }

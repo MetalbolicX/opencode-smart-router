@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 // Validate the root-level scalar fields: activePreset must be a non-empty string.
-let validateRootFields: dict<JSON.t> => unit
+let validateRootFields: (Js.Dict.t<Js.Json.t>) => unit
 
 // Validate rules (array of strings) and defaultTier (string).
-let validateRulesAndDefaultTier: dict<JSON.t> => unit
+let validateRulesAndDefaultTier: (Js.Dict.t<Js.Json.t>) => unit

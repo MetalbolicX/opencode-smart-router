@@ -14,10 +14,10 @@
 // explicit `null` (not undefined) when floorTier is absent.
 type escalatePolicy = {
   ladder: array<string>,
-  floorTier: Nullable.t<string>,
+  floorTier: Js.Nullable.t<string>,
   maxAttemptsPerTier: int,
   maxTotalAttempts: int,
-  costMultiple: Nullable.t<int>,
+  costMultiple: Js.Nullable.t<int>,
 }
 
 // Type: mutable ladder state (tracks progress through tiers)
@@ -28,7 +28,7 @@ type ladderState = {
   attemptsThisTier: int,
   totalAttempts: int,
   escalations: int,
-  firstAttemptCost: Nullable.t<int>,
+  firstAttemptCost: Js.Nullable.t<int>,
   cumulativeCost: int,
 }
 
@@ -51,9 +51,9 @@ type ladderActionKind = [
 // receives explicit null (not undefined) when those fields are absent.
 type ladderAction = {
   action: ladderActionKind,
-  tier: Nullable.t<string>,
-  forcingMessage: Nullable.t<string>,
-  reason: Nullable.t<string>,
+  tier: Js.Nullable.t<string>,
+  forcingMessage: Js.Nullable.t<string>,
+  reason: Js.Nullable.t<string>,
 }
 
 // AbortSignal type (JS runtime object — checked via external)
@@ -66,19 +66,13 @@ type routerConfig = {
   presets: dict<dict<JSON.t>>,
   rules: array<string>,
   defaultTier: string,
-  enforcement: option<
-    {
-      escalate: option<
-        {
-          floorTier: option<option<string>>,
-          ladder: option<array<string>>,
-          maxAttemptsPerTier: option<int>,
-          maxTotalAttempts: option<int>,
-          costCeiling: option<{base: option<string>, multiple: option<float>}>,
-        },
-      >,
-    },
-  >,
+  enforcement: option<{escalate: option<{
+    floorTier: option<option<string>>,
+    ladder: option<array<string>>,
+    maxAttemptsPerTier: option<int>,
+    maxTotalAttempts: option<int>,
+    costCeiling: option<{base: option<string>, multiple: option<float>}>,
+  }>}>,
 }
 
 // ---------------------------------------------------------------------------
@@ -100,17 +94,17 @@ let recordAttempt: (ladderState, ~costUnits: int=?) => ladderState
 
 // Returns the next tier after the current one, or null if at the top
 // Uses Js.Nullable.t so TS receives explicit null (not undefined) at the boundary.
-let nextTierAfter: (string, escalatePolicy) => Nullable.t<string>
+let nextTierAfter: (string, escalatePolicy) => Js.Nullable.t<string>
 
 // Builds the forcing message shown to the model when retrying/escalating
-let buildLadderForcingMessage: array<string> => string
+let buildLadderForcingMessage: (array<string>) => string
 
 // Decides the next action given current state, verdict, and policy
 // signal is optional — None means no abort, Some(signal) checks s.aborted
 // verdict uses Js.Nullable.t so TS null is handled correctly at the boundary.
 let nextAction: (
   ladderState,
-  Nullable.t<ladderVerdict>,
+  Js.Nullable.t<ladderVerdict>,
   escalatePolicy,
   option<abortSignal>,
 ) => ladderAction
@@ -120,7 +114,7 @@ let advance: (ladderState, ladderAction) => ladderState
 
 // Builds an EscalatePolicy from a RouterConfig
 // resolveLadder is imported from TierLadder.res.mjs (pure)
-let buildEscalatePolicy: routerConfig => escalatePolicy
+let buildEscalatePolicy: (routerConfig) => escalatePolicy
 
 // Formats a scorecard string for a finished delegation
 let formatLadderScorecard: (ladderState, bool, string) => string

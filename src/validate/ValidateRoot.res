@@ -14,14 +14,16 @@
 // validateRootFields
 // Validates that `activePreset` is a non-empty string.
 // ---------------------------------------------------------------------------
-let validateRootFields = (obj: dict<JSON.t>): unit => {
-  switch Dict.get(obj, "activePreset") {
+let validateRootFields = (obj: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(obj, "activePreset") {
   | Some(json) =>
-    switch JSON.Decode.string(json) {
+    switch Js.Json.decodeString(json) {
     | Some(s) if s !== "" => ()
-    | _ => throw(JsError.throwWithMessage("tiers.json: 'activePreset' must be a non-empty string"))
+    | _ =>
+      raise(Js.Exn.raiseError("tiers.json: 'activePreset' must be a non-empty string"))
     }
-  | None => throw(JsError.throwWithMessage("tiers.json: 'activePreset' must be a non-empty string"))
+  | None =>
+    raise(Js.Exn.raiseError("tiers.json: 'activePreset' must be a non-empty string"))
   }
 }
 
@@ -31,34 +33,40 @@ let validateRootFields = (obj: dict<JSON.t>): unit => {
 // ---------------------------------------------------------------------------
 
 // Check every element of a Js.Json.t array is a string
-let rec checkStringArray = (arr: list<JSON.t>): unit =>
+let rec checkStringArray = (arr: list<Js.Json.t>): unit =>
   switch arr {
   | list{} => ()
   | list{head, ...rest} =>
-    switch JSON.Decode.string(head) {
+    switch Js.Json.decodeString(head) {
     | Some(_) => checkStringArray(rest)
-    | None => throw(JsError.throwWithMessage("tiers.json: 'rules' must be an array of strings"))
+    | None =>
+      raise(Js.Exn.raiseError("tiers.json: 'rules' must be an array of strings"))
     }
   }
 
-let validateRulesAndDefaultTier = (obj: dict<JSON.t>): unit => {
+let validateRulesAndDefaultTier = (obj: Js.Dict.t<Js.Json.t>): unit => {
   // Validate rules: must be an array of strings
-  switch Dict.get(obj, "rules") {
+  switch Js.Dict.get(obj, "rules") {
   | Some(json) =>
-    switch JSON.Decode.array(json) {
-    | Some(arr) => checkStringArray(List.fromArray(arr))
-    | None => throw(JsError.throwWithMessage("tiers.json: 'rules' must be an array of strings"))
+    switch Js.Json.decodeArray(json) {
+    | Some(arr) =>
+      checkStringArray(List.fromArray(arr))
+    | None =>
+      raise(Js.Exn.raiseError("tiers.json: 'rules' must be an array of strings"))
     }
-  | None => throw(JsError.throwWithMessage("tiers.json: 'rules' must be an array of strings"))
+  | None =>
+    raise(Js.Exn.raiseError("tiers.json: 'rules' must be an array of strings"))
   }
 
   // Validate defaultTier: must be a string
-  switch Dict.get(obj, "defaultTier") {
+  switch Js.Dict.get(obj, "defaultTier") {
   | Some(json) =>
-    switch JSON.Decode.string(json) {
+    switch Js.Json.decodeString(json) {
     | Some(s) if s !== "" => ()
-    | _ => throw(JsError.throwWithMessage("tiers.json: 'defaultTier' must be a string"))
+    | _ =>
+      raise(Js.Exn.raiseError("tiers.json: 'defaultTier' must be a string"))
     }
-  | None => throw(JsError.throwWithMessage("tiers.json: 'defaultTier' must be a string"))
+  | None =>
+    raise(Js.Exn.raiseError("tiers.json: 'defaultTier' must be a string"))
   }
 }

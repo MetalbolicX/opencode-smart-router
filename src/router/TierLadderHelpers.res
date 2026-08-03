@@ -13,10 +13,10 @@ let getCostRatio = (tier: Config.tierConfig): float =>
 let defaultThreeTier = (): array<string> => ["fast", "medium", "heavy"]
 
 let resolveFromPreset = (cfg: Config.t): array<string> => {
-  let preset = Dict.get(cfg.presets, cfg.activePreset)
+  let preset = Js.Dict.get(cfg.presets, cfg.activePreset)
   switch preset {
   | Some(p) => {
-      let tierNames = Dict.keysToArray(p)
+      let tierNames = Js.Dict.keys(p)
       let len = Array.length(tierNames)
       if len > 0 {
         // Build array of (name, costRatio) pairs

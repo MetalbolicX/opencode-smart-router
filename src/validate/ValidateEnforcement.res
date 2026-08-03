@@ -25,9 +25,9 @@ let verifyRequireModes: array<string> = ["never", "whenDoDPresent", "always"]
 // ---------------------------------------------------------------------------
 
 // Guard: throws if val is not a plain object (for sub-object checks in enforcement)
-let ensureIsObjectVal = (_val: JSON.t, path: string): unit => {
+let ensureIsObjectVal = (val: Js.Json.t, path: string): unit => {
   if %raw(`!(val && typeof val === 'object' && !Array.isArray(val))`) {
-    throw(JsError.throwWithMessage(`tiers.json: ${path} must be an object`))
+    raise(Js.Exn.raiseError(`tiers.json: ${path} must be an object`))
   }
 }
 
@@ -36,7 +36,7 @@ let stringInArray = (s: string, arr: array<string>): bool => {
   let rec go = (i: int): bool => {
     if i >= Array.length(arr) {
       false
-    } else if Array.getUnsafe(arr, i) == s {
+    } else if Array.unsafe_get(arr, i) == s {
       true
     } else {
       go(i + 1)
@@ -49,11 +49,11 @@ let stringInArray = (s: string, arr: array<string>): bool => {
 // validateEnforcement — top-level dispatcher
 // ---------------------------------------------------------------------------
 
-let rec validateEnforcement = (obj: dict<JSON.t>): unit => {
-  switch Dict.get(obj, "enforcement") {
+let rec validateEnforcement = (obj: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(obj, "enforcement") {
   | Some(json) => {
       ensureIsObjectVal(json, "enforcement")
-      switch JSON.Decode.object(json) {
+      switch Js.Json.decodeObject(json) {
       | Some(enf) => {
           validateEnforcementMode(enf)
           validateEnforcementVerify(enf)
@@ -61,7 +61,8 @@ let rec validateEnforcement = (obj: dict<JSON.t>): unit => {
           validateEnforcementPerTier(enf)
           validateEnforcementGuard(enf)
         }
-      | None => throw(JsError.throwWithMessage("tiers.json: enforcement must be a non-null object"))
+      | None =>
+        raise(Js.Exn.raiseError("tiers.json: enforcement must be a non-null object"))
       }
     }
   | None => ()
@@ -75,19 +76,23 @@ let rec validateEnforcement = (obj: dict<JSON.t>): unit => {
 // Throws if mode is present but not a valid string value.
 // ---------------------------------------------------------------------------
 
-and validateEnforcementMode = (enf: dict<JSON.t>): unit => {
-  switch Dict.get(enf, "mode") {
+and validateEnforcementMode = (enf: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(enf, "mode") {
   | Some(modeJson) =>
-    switch JSON.Decode.string(modeJson) {
+    switch Js.Json.decodeString(modeJson) {
     | Some(mode) =>
       if !stringInArray(mode, enforcementModes) {
-        throw(
-          JsError.throwWithMessage(`tiers.json: enforcement.mode must be one of off|advisory|enforced`),
+        raise(
+          Js.Exn.raiseError(
+            `tiers.json: enforcement.mode must be one of off|advisory|enforced`,
+          ),
         )
       }
     | None =>
-      throw(
-        JsError.throwWithMessage(`tiers.json: enforcement.mode must be one of off|advisory|enforced`),
+      raise(
+        Js.Exn.raiseError(
+          `tiers.json: enforcement.mode must be one of off|advisory|enforced`,
+        ),
       )
     }
   | None => ()
@@ -102,54 +107,60 @@ and validateEnforcementMode = (enf: dict<JSON.t>): unit => {
 //   graderPolicy in {atLeastProducerTier}.
 // ---------------------------------------------------------------------------
 
-and validateEnforcementVerify = (enf: dict<JSON.t>): unit => {
-  switch Dict.get(enf, "verify") {
-  | Some(json) => // Permissive skip: non-object verify is ignored so older configs survive.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
-      ()
-    } else {
-      switch JSON.Decode.object(json) {
-      | Some(verify) => {
-          // Validate graderPolicy if present
-          switch Dict.get(verify, "graderPolicy") {
-          | Some(gpJson) =>
-            switch JSON.Decode.string(gpJson) {
-            | Some(gp) =>
-              if gp != "atLeastProducerTier" {
-                throw(
-                  JsError.throwWithMessage(`tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"`),
+and validateEnforcementVerify = (enf: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(enf, "verify") {
+  | Some(json) => {
+      // Permissive skip: non-object verify is ignored so older configs survive.
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+        ()
+      } else {
+        switch Js.Json.decodeObject(json) {
+        | Some(verify) => {
+            // Validate graderPolicy if present
+            switch Js.Dict.get(verify, "graderPolicy") {
+            | Some(gpJson) =>
+              switch Js.Json.decodeString(gpJson) {
+              | Some(gp) =>
+                if gp != "atLeastProducerTier" {
+                  raise(
+                    Js.Exn.raiseError(
+                      `tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"`,
+                    ),
+                  )
+                }
+              | None =>
+                raise(
+                  Js.Exn.raiseError(
+                    `tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"`,
+                  ),
                 )
               }
-            | None =>
-              throw(
-                JsError.throwWithMessage(`tiers.json: enforcement.verify.graderPolicy must be "atLeastProducerTier"`),
-              )
+            | None => ()
             }
-          | None => ()
-          }
-          // Validate require if present
-          switch Dict.get(verify, "require") {
-          | Some(reqJson) =>
-            switch JSON.Decode.string(reqJson) {
-            | Some(req) =>
-              if !stringInArray(req, verifyRequireModes) {
-                throw(
-                  JsError.throwWithMessage(`tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always`),
+            // Validate require if present
+            switch Js.Dict.get(verify, "require") {
+            | Some(reqJson) =>
+              switch Js.Json.decodeString(reqJson) {
+              | Some(req) =>
+                if !stringInArray(req, verifyRequireModes) {
+                  raise(
+                    Js.Exn.raiseError(
+                      `tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always`,
+                    ),
+                  )
+                }
+              | None =>
+                raise(
+                  Js.Exn.raiseError(
+                    `tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always (got ${Js.Json.stringify(reqJson)})`,
+                  ),
                 )
               }
-            | None =>
-              throw(
-                JsError.throwWithMessage(
-                  `tiers.json: enforcement.verify.require must be one of never|whenDoDPresent|always (got ${JSON.stringify(
-                      reqJson,
-                    )})`,
-                ),
-              )
+            | None => ()
             }
-          | None => ()
           }
+        | None => ()
         }
-      | None => ()
       }
     }
   | None => ()
@@ -164,100 +175,102 @@ and validateEnforcementVerify = (enf: dict<JSON.t>): unit => {
 //   maxTotalAttempts (integer >= 1), floorTier (string | null).
 // ---------------------------------------------------------------------------
 
-and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
-  switch Dict.get(enf, "escalate") {
-  | Some(json) => // Permissive skip: non-object escalate is ignored so older configs survive.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
-      ()
-    } else {
-      switch JSON.Decode.object(json) {
-      | Some(escalate) => {
-          validateEscalateCostCeiling(escalate)
-          // Validate ladder
-          switch Dict.get(escalate, "ladder") {
-          | Some(ladderJson) =>
-            switch JSON.Decode.array(ladderJson) {
-            | Some(ladder) => {
-                let rec goLadder = (i: int): unit => {
-                  if i >= Array.length(ladder) {
-                    ()
-                  } else {
-                    let item = Array.getUnsafe(ladder, i)
-                    switch JSON.Decode.string(item) {
-                    | Some(_) => goLadder(i + 1)
-                    | None =>
-                      throw(
-                        JsError.throwWithMessage(
-                          "tiers.json: enforcement.escalate.ladder must be an array of strings",
-                        ),
-                      )
+and validateEnforcementEscalate = (enf: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(enf, "escalate") {
+  | Some(json) => {
+      // Permissive skip: non-object escalate is ignored so older configs survive.
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+        ()
+      } else {
+        switch Js.Json.decodeObject(json) {
+        | Some(escalate) => {
+            validateEscalateCostCeiling(escalate)
+            // Validate ladder
+            switch Js.Dict.get(escalate, "ladder") {
+            | Some(ladderJson) =>
+              switch Js.Json.decodeArray(ladderJson) {
+              | Some(ladder) => {
+                  let rec goLadder = (i: int): unit => {
+                    if i >= Js.Array.length(ladder) {
+                      ()
+                    } else {
+                      let item = Js.Array.unsafe_get(ladder, i)
+                      switch Js.Json.decodeString(item) {
+                      | Some(_) => goLadder(i + 1)
+                      | None =>
+                        raise(
+                          Js.Exn.raiseError(
+                            "tiers.json: enforcement.escalate.ladder must be an array of strings",
+                          ),
+                        )
+                      }
                     }
                   }
+                  goLadder(0)
                 }
-                goLadder(0)
-              }
-            | None =>
-              throw(
-                JsError.throwWithMessage(
-                  "tiers.json: enforcement.escalate.ladder must be an array of strings",
-                ),
-              )
-            }
-          | None => ()
-          }
-          // Validate maxAttemptsPerTier
-          switch Dict.get(escalate, "maxAttemptsPerTier") {
-          | Some(matJson) =>
-            switch JSON.Decode.float(matJson) {
-            | Some(_mat) =>
-              if %raw(`!(Number.isInteger(mat) && mat >= 0)`) {
-                throw(
-                  JsError.throwWithMessage(
-                    "tiers.json: enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
-                  ),
-                )
-              }
-            | None => ()
-            }
-          | None => ()
-          }
-          // Validate maxTotalAttempts
-          switch Dict.get(escalate, "maxTotalAttempts") {
-          | Some(mtaJson) =>
-            switch JSON.Decode.float(mtaJson) {
-            | Some(_mta) =>
-              if %raw(`!(Number.isInteger(mta) && mta >= 1)`) {
-                throw(
-                  JsError.throwWithMessage(
-                    "tiers.json: enforcement.escalate.maxTotalAttempts must be an integer >= 1",
-                  ),
-                )
-              }
-            | None => ()
-            }
-          | None => ()
-          }
-          // Validate floorTier (string | null)
-          switch Dict.get(escalate, "floorTier") {
-          | Some(ftJson) =>
-            // null is allowed; other non-strings are not
-            if %raw(`ftJson === null`) {
-              () // null is allowed
-            } else {
-              switch JSON.Decode.string(ftJson) {
-              | Some(_) => ()
               | None =>
-                throw(
-                  JsError.throwWithMessage(
-                    "tiers.json: enforcement.escalate.floorTier must be a string or null",
+                raise(
+                  Js.Exn.raiseError(
+                    "tiers.json: enforcement.escalate.ladder must be an array of strings",
                   ),
                 )
               }
+            | None => ()
             }
-          | None => ()
+            // Validate maxAttemptsPerTier
+            switch Js.Dict.get(escalate, "maxAttemptsPerTier") {
+            | Some(matJson) =>
+              switch Js.Json.decodeNumber(matJson) {
+              | Some(mat) =>
+                if %raw(`!(Number.isInteger(mat) && mat >= 0)`) {
+                  raise(
+                    Js.Exn.raiseError(
+                      "tiers.json: enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
+                    ),
+                  )
+                }
+              | None => ()
+              }
+            | None => ()
+            }
+            // Validate maxTotalAttempts
+            switch Js.Dict.get(escalate, "maxTotalAttempts") {
+            | Some(mtaJson) =>
+              switch Js.Json.decodeNumber(mtaJson) {
+              | Some(mta) =>
+                if %raw(`!(Number.isInteger(mta) && mta >= 1)`) {
+                  raise(
+                    Js.Exn.raiseError(
+                      "tiers.json: enforcement.escalate.maxTotalAttempts must be an integer >= 1",
+                    ),
+                  )
+                }
+              | None => ()
+              }
+            | None => ()
+            }
+            // Validate floorTier (string | null)
+            switch Js.Dict.get(escalate, "floorTier") {
+            | Some(ftJson) =>
+              // null is allowed; other non-strings are not
+              if %raw(`ftJson === null`) {
+                () // null is allowed
+              } else {
+                switch Js.Json.decodeString(ftJson) {
+                | Some(_) => ()
+                | None =>
+                  raise(
+                    Js.Exn.raiseError(
+                      "tiers.json: enforcement.escalate.floorTier must be a string or null",
+                    ),
+                  )
+                }
+              }
+            | None => ()
+            }
           }
+        | None => ()
         }
-      | None => ()
       }
     }
   | None => ()
@@ -271,46 +284,48 @@ and validateEnforcementEscalate = (enf: dict<JSON.t>): unit => {
 // Validates each tier value in {off, advisory, enforced}.
 // ---------------------------------------------------------------------------
 
-and validateEnforcementPerTier = (enf: dict<JSON.t>): unit => {
-  switch Dict.get(enf, "perTier") {
-  | Some(json) => // Permissive skip: non-object perTier is ignored.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
-      ()
-    } else {
-      switch JSON.Decode.object(json) {
-      | Some(perTier) => {
-          let keys = Dict.keysToArray(perTier)
-          let rec go = (i: int): unit => {
-            if i >= Array.length(keys) {
-              ()
-            } else {
-              let k = Array.getUnsafe(keys, i)
-              switch Dict.get(perTier, k) {
-              | Some(tierModeJson) =>
-                switch JSON.Decode.string(tierModeJson) {
-                | Some(tierMode) =>
-                  if !stringInArray(tierMode, enforcementModes) {
-                    throw(
-                      JsError.throwWithMessage(
+and validateEnforcementPerTier = (enf: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(enf, "perTier") {
+  | Some(json) => {
+      // Permissive skip: non-object perTier is ignored.
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+        ()
+      } else {
+        switch Js.Json.decodeObject(json) {
+        | Some(perTier) => {
+            let keys = Js.Dict.keys(perTier)
+            let rec go = (i: int): unit => {
+              if i >= Js.Array.length(keys) {
+                ()
+              } else {
+                let k = Js.Array.unsafe_get(keys, i)
+                switch Js.Dict.get(perTier, k) {
+                | Some(tierModeJson) =>
+                  switch Js.Json.decodeString(tierModeJson) {
+                  | Some(tierMode) =>
+                    if !stringInArray(tierMode, enforcementModes) {
+                      raise(
+                        Js.Exn.raiseError(
+                          `tiers.json: enforcement.perTier.${k} must be one of off|advisory|enforced`,
+                        ),
+                      )
+                    }
+                  | None =>
+                    raise(
+                      Js.Exn.raiseError(
                         `tiers.json: enforcement.perTier.${k} must be one of off|advisory|enforced`,
                       ),
                     )
                   }
-                | None =>
-                  throw(
-                    JsError.throwWithMessage(
-                      `tiers.json: enforcement.perTier.${k} must be one of off|advisory|enforced`,
-                    ),
-                  )
+                | None => ()
                 }
-              | None => ()
+                go(i + 1)
               }
-              go(i + 1)
             }
+            go(0)
           }
-          go(0)
+        | None => ()
         }
-      | None => ()
       }
     }
   | None => ()
@@ -324,41 +339,47 @@ and validateEnforcementPerTier = (enf: dict<JSON.t>): unit => {
 // Validates: budget (number >= 1), blockScriptWrites (boolean).
 // ---------------------------------------------------------------------------
 
-and validateEnforcementGuard = (enf: dict<JSON.t>): unit => {
-  switch Dict.get(enf, "guard") {
-  | Some(json) => // Permissive skip: non-object guard is ignored.
-    if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
-      ()
-    } else {
-      switch JSON.Decode.object(json) {
-      | Some(guard) => {
-          // Validate budget
-          switch Dict.get(guard, "budget") {
-          | Some(budgetJson) =>
-            switch JSON.Decode.float(budgetJson) {
-            | Some(_budget) =>
-              if %raw(`!(Number.isFinite(budget) && budget >= 1)`) {
-                throw(JsError.throwWithMessage("enforcement.guard.budget must be a number >= 1"))
+and validateEnforcementGuard = (enf: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(enf, "guard") {
+  | Some(json) => {
+      // Permissive skip: non-object guard is ignored.
+      if %raw(`!(json && typeof json === 'object' && !Array.isArray(json))`) {
+        ()
+      } else {
+        switch Js.Json.decodeObject(json) {
+        | Some(guard) => {
+            // Validate budget
+            switch Js.Dict.get(guard, "budget") {
+            | Some(budgetJson) =>
+              switch Js.Json.decodeNumber(budgetJson) {
+              | Some(budget) =>
+                if %raw(`!(Number.isFinite(budget) && budget >= 1)`) {
+                  raise(
+                    Js.Exn.raiseError("enforcement.guard.budget must be a number >= 1"),
+                  )
+                }
+              | None =>
+                raise(
+                  Js.Exn.raiseError("enforcement.guard.budget must be a number >= 1"),
+                )
               }
-            | None =>
-              throw(JsError.throwWithMessage("enforcement.guard.budget must be a number >= 1"))
+            | None => ()
             }
-          | None => ()
-          }
-          // Validate blockScriptWrites
-          switch Dict.get(guard, "blockScriptWrites") {
-          | Some(bswJson) =>
-            switch JSON.Decode.bool(bswJson) {
-            | Some(_) => ()
-            | None =>
-              throw(
-                JsError.throwWithMessage("enforcement.guard.blockScriptWrites must be a boolean"),
-              )
+            // Validate blockScriptWrites
+            switch Js.Dict.get(guard, "blockScriptWrites") {
+            | Some(bswJson) =>
+              switch Js.Json.decodeBoolean(bswJson) {
+              | Some(_) => ()
+              | None =>
+                raise(
+                  Js.Exn.raiseError("enforcement.guard.blockScriptWrites must be a boolean"),
+                )
+              }
+            | None => ()
             }
-          | None => ()
           }
+        | None => ()
         }
-      | None => ()
       }
     }
   | None => ()
@@ -369,35 +390,37 @@ and validateEnforcementGuard = (enf: dict<JSON.t>): unit => {
 // validateEscalateCostCeiling — nested inside escalate validation
 // ---------------------------------------------------------------------------
 
-and validateEscalateCostCeiling = (escalate: dict<JSON.t>): unit => {
-  switch Dict.get(escalate, "costCeiling") {
-  | Some(ccJson) => // Permissive skip: non-object costCeiling is ignored.
-    if %raw(`!(ccJson && typeof ccJson === 'object' && !Array.isArray(ccJson))`) {
-      ()
-    } else {
-      switch JSON.Decode.object(ccJson) {
-      | Some(cc) =>
-        switch Dict.get(cc, "multiple") {
-        | Some(multJson) =>
-          switch JSON.Decode.float(multJson) {
-          | Some(mult) =>
-            if mult <= 0.0 {
-              throw(
-                JsError.throwWithMessage(
+and validateEscalateCostCeiling = (escalate: Js.Dict.t<Js.Json.t>): unit => {
+  switch Js.Dict.get(escalate, "costCeiling") {
+  | Some(ccJson) => {
+      // Permissive skip: non-object costCeiling is ignored.
+      if %raw(`!(ccJson && typeof ccJson === 'object' && !Array.isArray(ccJson))`) {
+        ()
+      } else {
+        switch Js.Json.decodeObject(ccJson) {
+        | Some(cc) =>
+          switch Js.Dict.get(cc, "multiple") {
+          | Some(multJson) =>
+            switch Js.Json.decodeNumber(multJson) {
+            | Some(mult) =>
+              if mult <= 0.0 {
+                raise(
+                  Js.Exn.raiseError(
+                    "tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0",
+                  ),
+                )
+              }
+            | None =>
+              raise(
+                Js.Exn.raiseError(
                   "tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0",
                 ),
               )
             }
-          | None =>
-            throw(
-              JsError.throwWithMessage(
-                "tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0",
-              ),
-            )
+          | None => ()
           }
         | None => ()
         }
-      | None => ()
       }
     }
   | None => ()
