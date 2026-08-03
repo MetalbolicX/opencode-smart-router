@@ -249,6 +249,53 @@ In `~/.config/opencode/opencode.json`:
 }
 ```
 
+## Testing
+
+The project has two test surfaces — a TypeScript adapter suite (vitest) and
+a ReScript parity suite (rescript-test / `retest`). Both must be green
+before a PR merges.
+
+### Quick command reference
+
+| Command                       | What it runs                                   |
+|-------------------------------|------------------------------------------------|
+| `pnpm test`                   | TypeScript unit + integration tests (vitest)    |
+| `pnpm run test:res`           | ReScript parity suite (`src/**/*_test.res.mjs`) |
+| `pnpm run test:parity`        | `pnpm run res:build && pnpm run test:res`        |
+| `pnpm run test:coverage`      | vitest with coverage                            |
+| `pnpm run smoke`              | Optional smoke tests against a live opencode instance |
+
+The command is `pnpm run test:res` (note the `test:` prefix). It is NOT
+`pnpm run res:test` — that script does not exist.
+
+### Build before you test
+
+Before running `pnpm test`, build the project once so the compiled
+`.res.mjs` modules and the `tiers.json` config are up to date:
+
+```sh
+pnpm install
+pnpm run build
+pnpm test
+```
+
+The full `build` script chains `res:build → build:tiers → tsc → rolldown →
+build:copy-res`. If you skip it, vitest may import stale
+`.res.mjs` outputs or a missing `tiers.json`, surfacing red herrings that
+are NOT your regression.
+
+### ReScript-only rapid loop
+
+When you're iterating on ReScript pure-logic (the `src/{reasoning,guard,validate,verify,config,router}/` ReScript modules):
+
+```sh
+pnpm run res:build          # or `pnpm run res:dev` for the watcher
+pnpm run test:res           # runs only the ReScript parity suite
+```
+
+`res:dev` starts `rescript build -w` so recompiles happen on every save.
+`test:parity` is the one-shot "build then test" convenience.
+
 ## Updating
 
 ```bash
