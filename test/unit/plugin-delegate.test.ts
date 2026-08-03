@@ -954,7 +954,7 @@ describe("executeDelegate — parentSessionID propagation", () => {
       ...ctxBase.ctx,
       seams: { exec: ctxBase.ctx.seams.exec, fs: ctxBase.ctx.seams.fs },
     };
-    const { buildGateDeps } = await import("../../src/verify/dispatch");
+    const { buildGateDeps } = await import("../../src/verify/dispatch-io");
     const createCalls: unknown[] = [];
     const wrappedCtx: PluginContext = {
       ...ctx,

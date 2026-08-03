@@ -189,8 +189,8 @@ let makeDodKindSet = (): Js.Dict.t<bool> => {
 
 let dodKindSet = makeDodKindSet()
 
-let openTagRe = %re("/^\\s*\\[(acceptance|dod)\\]\\s*$/i")
-let closeTagRe = %re("/^\\s*\\[(acceptance|dod)\\]\\s*$/i")
+let openTagRe = %re("/^\s*\[(acceptance|dod)\]\s*$/i")
+let closeTagRe = %re("/^\s*\[\/(acceptance|dod)\]\s*$/i")
 
 let findOpenTag = (lines: array<string>, start: int): int => {
   let rec go = (i: int): int => {

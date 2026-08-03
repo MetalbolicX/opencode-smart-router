@@ -112,9 +112,9 @@ function makeDodKindSet() {
 
 let dodKindSet = makeDodKindSet();
 
-let openTagRe = /^\\s*\\[(acceptance|dod)\\]\\s*$/i;
+let openTagRe = /^\s*\[(acceptance|dod)\]\s*$/i;
 
-let closeTagRe = /^\\s*\\[(acceptance|dod)\\]\\s*$/i;
+let closeTagRe = /^\s*\[\/(acceptance|dod)\]\s*$/i;
 
 function findOpenTag(lines, start) {
   let _i = start;

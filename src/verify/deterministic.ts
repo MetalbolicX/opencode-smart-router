@@ -3,7 +3,7 @@
 // PURE: no Node built-ins; all I/O goes through DeterministicDeps seams.
 
 import { scrubText } from "../guard/scrub";
-import type { Check, DoD } from "./dod";
+import type { check as Check, dod as DoD } from "./Verify.res.mjs";
 import type { DeterministicDeps, ExecResult, MutexRegistry, Verdict } from "./types";
 
 // ---------------------------------------------------------------------------
