@@ -460,36 +460,31 @@
     },
     "multi-provider": {
       "fast": {
-        "model": "opencode-go/mimo-v2.5",
-        "variant": "medium",
+        "model": "minimax-coding-plan/MiniMax-M2.5",
         "costRatio": 1,
-        "description": "Mimo v2.5 for fast exploration and simple tasks",
+        "description": "MiniMax M2.5 for fast exploration and simple tasks (no reasoning levels)",
         "steps": 30,
         "capability": {
-          "kind": "discrete",
-          "field": "variant",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
+          "kind": "none"
         },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration: symbol/file location (search, grep, glob)",
+          "File reads, directory listings, and quick lookups",
+          "Documentation lookup and type/existence checks",
+          "Git status, log, and read-only reconnaissance"
         ]
       },
       "light": {
-        "model": "opencode-go/mimo-v2.5",
-        "variant": "high",
+        "model": "openai/gpt-5.6-luna",
         "costRatio": 2,
-        "description": "Mimo v2.5 high for localized edits and small fixes",
+        "description": "GPT-5.6 Luna for localized edits and small fixes with medium reasoning effort",
         "steps": 40,
+        "reasoning": {
+          "effort": "medium"
+        },
         "capability": {
           "kind": "discrete",
-          "field": "variant",
+          "field": "reasoning.effort",
           "levels": [
             "low",
             "medium",
@@ -497,16 +492,17 @@
           ]
         },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Single-file edits and small fixes (typo, constant, one function)",
+          "Config tweaks and parameter changes within one file",
+          "Mechanical single-file refactors (extract/rename in one file)",
+          "Targeted version bump in a single manifest"
         ]
       },
       "medium": {
-        "model": "minimax-coding-plan/MiniMax-M3",
+        "model": "minimax-coding-plan/MiniMax-M2.7",
         "variant": "thinking",
         "costRatio": 5,
-        "description": "MiniMax M3 for implementation, refactoring, and tests",
+        "description": "MiniMax M2.7 for implementation, refactoring, and tests",
         "steps": 50,
         "capability": {
           "kind": "binary",
@@ -514,11 +510,12 @@
           "elevated": "thinking"
         },
         "whenToUse": [
-          "Feature implementation",
-          "Refactoring",
-          "Writing tests",
-          "Code review",
-          "Bug fixes"
+          "Feature implementation spanning one or more files",
+          "Multi-file refactoring and structural changes",
+          "Writing tests for new or changed code",
+          "Bug fixes needing edits across multiple locations (≤2 attempts)",
+          "API endpoints, build fixes, and file creation",
+          "Routine code review of a change or PR"
         ]
       },
       "focused": {
@@ -533,18 +530,20 @@
           "elevated": "thinking"
         },
         "whenToUse": [
-          "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Deep debugging isolated to one module or package",
+          "Complex bug isolation within a single system",
+          "Thorough single-system code review (one module in depth)",
+          "Targeted performance analysis within one module",
+          "Multi-system scope → escalate to heavy"
         ]
       },
       "heavy": {
-        "model": "openai/gpt-5.4",
+        "model": "openai/gpt-5.6-terra",
         "costRatio": 20,
-        "description": "GPT-5.4 for architecture, complex debugging, and security",
+        "description": "GPT-5.6 Terra for architecture, complex debugging, and security with extended reasoning",
         "steps": 120,
         "reasoning": {
-          "effort": "high",
+          "effort": "xhigh",
           "summary": "detailed"
         },
         "capability": {
@@ -553,14 +552,16 @@
           "levels": [
             "low",
             "medium",
-            "high"
+            "high",
+            "xhigh"
           ]
         },
         "whenToUse": [
-          "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
-          "Security review",
-          "Performance optimization"
+          "Architecture decisions and design tradeoffs",
+          "Multi-system coordination and cross-module integration",
+          "Complex debugging after 2+ prior failures (root-cause analysis)",
+          "Security audits and compliance review",
+          "Migration strategy and global performance optimization"
         ]
       }
     }
