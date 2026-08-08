@@ -4,70 +4,73 @@
       "fast": {
         "model": "anthropic/claude-haiku-4-5",
         "costRatio": 1,
-        "description": "Haiku 4.5 for exploration, search, and simple reads",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "anthropic/claude-haiku-4-5",
         "costRatio": 2,
-        "description": "Haiku 4.5 for localized edits, small fixes, and config tweaks",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Simple edits and small fixes",
+          "Simple edits and small fixes within one file",
           "Config tweaks and parameter changes",
           "Single-file refactoring",
-          "Quick bug fixes"
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "anthropic/claude-sonnet-4-6",
         "variant": "max",
         "costRatio": 5,
-        "description": "Sonnet 4.6 max for implementation, refactoring, and tests",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "binary", "field": "variant", "elevated": "max" },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
           "Code review",
-          "Bug fixes"
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "anthropic/claude-sonnet-4-6",
         "variant": "max",
         "costRatio": 10,
-        "description": "Sonnet 4.6 max for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "binary", "field": "variant", "elevated": "max" },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
+          "Complex bug isolation in one module/package",
           "Single-system code review",
-          "Targeted performance analysis"
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "anthropic/claude-opus-4-8",
         "variant": "max",
         "costRatio": 20,
-        "description": "Opus 4.8 max for architecture, complex debugging, and security",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "capability": { "kind": "binary", "field": "variant", "elevated": "max" },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     },
@@ -75,66 +78,73 @@
       "fast": {
         "model": "openai/gpt-5.4-mini-fast",
         "costRatio": 1,
-        "description": "GPT-5.4 Mini Fast for fast exploration and simple tasks",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads",
-          "Quick lookups"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "openai/gpt-5.4-mini-fast",
         "costRatio": 2,
-        "description": "GPT-5.4 Mini Fast for localized edits and small fixes",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Simple edits and small fixes within one file",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
         "costRatio": 5,
-        "description": "GPT-5.5 fast default settings for implementation and standard coding",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
-          "Bug fixes"
+          "Code review",
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
         "costRatio": 10,
-        "description": "GPT-5.5 fast high for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Complex bug isolation in one module/package",
+          "Single-system code review",
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "openai/gpt-5.5-fast",
         "variant": "xhigh",
         "costRatio": 20,
-        "description": "GPT-5.4 xhigh for architecture and complex tasks",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high", "xhigh"] },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     },
@@ -142,66 +152,71 @@
       "fast": {
         "model": "github-copilot/claude-haiku-4-5",
         "costRatio": 1,
-        "description": "Claude Haiku 4.5 via GitHub Copilot for fast exploration and simple tasks",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "github-copilot/claude-haiku-4-5",
         "costRatio": 2,
-        "description": "Claude Haiku 4.5 via GitHub Copilot for localized edits and small fixes",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Simple edits and small fixes within one file",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "github-copilot/claude-sonnet-4-6",
         "costRatio": 5,
-        "description": "Claude Sonnet 4.5 via GitHub Copilot for implementation, refactoring, and tests",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
           "Code review",
-          "Bug fixes"
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "github-copilot/claude-sonnet-4-6",
         "costRatio": 10,
-        "description": "Claude Sonnet 4.6 via GitHub Copilot for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "none" },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Complex bug isolation in one module/package",
+          "Single-system code review",
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "github-copilot/claude-opus-4-6",
         "variant": "thinking",
         "costRatio": 20,
-        "description": "Claude Opus 4.6 via GitHub Copilot for architecture, complex debugging, and security",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "capability": { "kind": "binary", "field": "variant", "elevated": "thinking" },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     },
@@ -209,65 +224,70 @@
       "fast": {
         "model": "google/gemini-2.5-flash",
         "costRatio": 1,
-        "description": "Gemini 2.5 Flash for fast exploration and simple tasks",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "google/gemini-2.5-flash",
         "costRatio": 2,
-        "description": "Gemini 2.5 Flash for localized edits and small fixes",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Simple edits and small fixes within one file",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "google/gemini-2.5-pro",
         "costRatio": 5,
-        "description": "Gemini 2.5 Pro for implementation, refactoring, and tests",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
           "Code review",
-          "Bug fixes"
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "google/gemini-2.5-pro",
         "costRatio": 10,
-        "description": "Gemini 2.5 Pro for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "none" },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Complex bug isolation in one module/package",
+          "Single-system code review",
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "google/gemini-3-pro-preview",
         "costRatio": 20,
-        "description": "Gemini 3 Pro Preview for architecture, complex debugging, and security",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "capability": { "kind": "none" },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     },
@@ -275,67 +295,73 @@
       "fast": {
         "model": "anthropic/claude-haiku-4-5",
         "costRatio": 1,
-        "description": "Haiku 4.5 for exploration, search, and simple reads",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "anthropic/claude-haiku-4-5",
         "costRatio": 2,
-        "description": "Haiku 4.5 for localized edits and small fixes",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "none" },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Simple edits and small fixes within one file",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
         "costRatio": 5,
-        "description": "GPT-5.5 fast default settings for implementation and standard coding",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
-          "Bug fixes"
+          "Code review",
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "openai/gpt-5.5-fast",
         "variant": "high",
         "costRatio": 10,
-        "description": "GPT-5.5 fast high for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Complex bug isolation in one module/package",
+          "Single-system code review",
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "anthropic/claude-opus-4-8",
         "variant": "max",
         "costRatio": 20,
-        "description": "Claude Opus 4.8 max for architecture, complex debugging, and security",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "capability": { "kind": "binary", "field": "variant", "elevated": "max" },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     },
@@ -344,61 +370,64 @@
         "model": "opencode-go/mimo-v2.5",
         "variant": "medium",
         "costRatio": 1,
-        "description": "Mimo v2.5 for fast exploration and simple tasks",
+        "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Codebase exploration and search",
-          "Simple file reads and listing",
-          "Grep/glob operations",
-          "Quick lookups and research"
+          "Codebase exploration and parallel search",
+          "Locating files and code patterns (grep/glob/ast-grep)",
+          "Quick lookups and type/existence checks",
+          "Read-only recon feeding another tier"
         ]
       },
       "light": {
         "model": "opencode-go/mimo-v2.5",
         "variant": "high",
         "costRatio": 2,
-        "description": "Mimo v2.5 high for localized edits and small fixes",
+        "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
         "capability": { "kind": "discrete", "field": "variant", "levels": ["low", "medium", "high"] },
         "whenToUse": [
-          "Simple edits and small fixes",
-          "Config tweaks",
-          "Single-file refactoring"
+          "Simple edits and small fixes within one file",
+          "Config tweaks and parameter changes",
+          "Single-file refactoring",
+          "Quick localized bug fixes"
         ]
       },
       "medium": {
         "model": "minimax-coding-plan/MiniMax-M3",
         "variant": "thinking",
         "costRatio": 5,
-        "description": "MiniMax M3 for implementation, refactoring, and tests",
+        "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
         "capability": { "kind": "binary", "field": "variant", "elevated": "thinking" },
         "whenToUse": [
-          "Feature implementation",
+          "Feature implementation (multi-file allowed)",
           "Refactoring",
           "Writing tests",
           "Code review",
-          "Bug fixes"
+          "Standard bug fixes (≤2 attempts)",
+          "Build-fix and create-file"
         ]
       },
       "focused": {
         "model": "minimax-coding-plan/MiniMax-M3",
         "variant": "thinking",
         "costRatio": 10,
-        "description": "MiniMax M3 thinking for deep single-system analysis and debugging",
+        "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
         "capability": { "kind": "binary", "field": "variant", "elevated": "thinking" },
         "whenToUse": [
           "Deep single-system debugging",
-          "Complex bug isolation",
-          "Single-system code review"
+          "Complex bug isolation in one module/package",
+          "Single-system code review",
+          "Targeted performance analysis in one system"
         ]
       },
       "heavy": {
         "model": "openai/gpt-5.4",
         "costRatio": 20,
-        "description": "GPT-5.4 for architecture, complex debugging, and security",
+        "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
         "reasoning": {
           "effort": "high",
@@ -407,9 +436,11 @@
         "capability": { "kind": "discrete", "field": "reasoning.effort", "levels": ["low", "medium", "high"] },
         "whenToUse": [
           "Architecture decisions",
-          "Complex debugging (after 2+ failures)",
+          "Complex debugging after ≥2 prior failures",
           "Security review",
-          "Performance optimization"
+          "Performance optimization",
+          "Multi-system tradeoff analysis",
+          "Migration strategy and RCA"
         ]
       }
     }
