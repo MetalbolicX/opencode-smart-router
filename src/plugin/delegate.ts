@@ -463,7 +463,16 @@ export const executeDelegate = async (
             // The classifier's abort path is the canonical AbortError check,
             // matching the previous `instanceof DOMException && name ===
             // "AbortError"` test byte-for-byte.
-            const classified = classifyPromptError(err);
+            // Operator-supplied patterns from tiers.json
+            // (`nonRetryableErrorPatterns`) are appended to the built-in
+            // table so gateways with localized billing denials fail closed on
+            // attempt 1 instead of burning the ladder. Compiled per call from
+            // the config validated at load; invalid regexes are rejected
+            // there, so this cannot throw.
+            const extraNonRetryable = (ctx.initialConfig.nonRetryableErrorPatterns ?? []).map(
+              ({ pattern, reason }) => ({ pattern: new RegExp(pattern, "i"), reason }),
+            );
+            const classified = classifyPromptError(err, extraNonRetryable);
             if (classified.kind === "abort") {
               return "";
             }
