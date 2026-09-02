@@ -790,6 +790,38 @@ Defines provider fallback order when a delegated task fails:
 }
 ```
 
+### Non-retryable error patterns
+
+Some providers (notably OpenAI-compatible relay gateways) return billing denials as
+localized plain text with **no HTTP status code and no error code** — for example
+`预扣费额度失败, 用户剩余额度: ＄0.62, 需要预扣费额度: ＄0.80`. The built-in classifier
+table only matches English terms, so these fall through to the retryable path and the
+escalation ladder burns an attempt on every tier before giving up.
+
+Add your gateway's wording to fail closed on the first attempt:
+
+```json
+{
+  "nonRetryableErrorPatterns": [
+    {
+      "pattern": "预扣费|剩余额度|额度不足|余额不足|欠费|请充值|잔액|残高不足",
+      "reason": "insufficient billing or subscription"
+    }
+  ]
+}
+```
+
+- `pattern` — JS regex **source string**, always matched case-insensitively. Compiled and
+  validated at config load, so an invalid regex fails fast with a clear error instead of
+  silently never matching.
+- `reason` — short string surfaced in the TUI toast (`Delegation failed: <reason>`) and in
+  the `routing.nonretryable` telemetry event.
+
+Entries are appended to the built-in table and evaluated after it (first match wins), so
+they can only add denials — they can never make a built-in non-retryable error retryable.
+Keep them narrow: a pattern matching transient text (`rate limit`, `overloaded`) would
+turn a recoverable failure into a hard stop.
+
 ### Environment variables
 
 All variables are optional. They override corresponding `tiers.json` settings at runtime.

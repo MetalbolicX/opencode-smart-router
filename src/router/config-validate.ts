@@ -61,6 +61,7 @@ export const validateConfig = (raw: unknown): RouterConfig => {
   validateTierCaps(raw);
   validateTierPrompts(raw);
   validateTaskPatterns(raw);
+  validateNonRetryableErrorPatterns(raw);
   validateEnforcement(raw);
   validateReasoningPolicy(raw);
   return raw as unknown as RouterConfig;
@@ -707,4 +708,39 @@ const validateAdaptiveSurfaceDecision = (value: unknown): void => {
       `tiers.json: reasoningPolicy.adaptive.surfaceDecision must be a boolean (got ${JSON.stringify(value)})`,
     );
   }
+};
+
+// ---------------------------------------------------------------------------
+// nonRetryableErrorPatterns
+// ---------------------------------------------------------------------------
+
+export const validateNonRetryableErrorPatterns = (obj: Record<string, unknown>): void => {
+  const raw = obj.nonRetryableErrorPatterns;
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    throw new Error("tiers.json: 'nonRetryableErrorPatterns' must be an array");
+  }
+  raw.forEach((entry, i) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`tiers.json: 'nonRetryableErrorPatterns[${i}]' must be an object`);
+    }
+    if (typeof entry.pattern !== "string" || !entry.pattern) {
+      throw new Error(
+        `tiers.json: 'nonRetryableErrorPatterns[${i}].pattern' must be a non-empty string`,
+      );
+    }
+    if (typeof entry.reason !== "string" || !entry.reason) {
+      throw new Error(
+        `tiers.json: 'nonRetryableErrorPatterns[${i}].reason' must be a non-empty string`,
+      );
+    }
+    try {
+      new RegExp(entry.pattern, "i");
+    } catch (err) {
+      throw new Error(
+        `tiers.json: 'nonRetryableErrorPatterns[${i}].pattern' is not a valid regex: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  });
 };

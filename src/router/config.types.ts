@@ -285,6 +285,12 @@ export interface RouterConfig {
   tierPrompts?: Record<string, string>;
   /** Read-only tool-call caps per tier, enforced at runtime via tool.execute.after banner injection. */
   tierCaps?: Record<string, number>;
+  /** Operator-supplied non-retryable error patterns, matched against the
+   *  provider's error message in addition to the built-in table. Each entry is
+   *  a JS regex source string (case-insensitive) plus a short reason surfaced
+   *  in the toast and telemetry. Use for gateways whose billing denials are
+   *  localized or otherwise unmatched by the built-ins. */
+  nonRetryableErrorPatterns?: Array<{ pattern: string; reason: string }>;
   enforcement?: EnforcementConfig;
   /** Experimental, opt-in features. Off by default. */
   experimental?: { verifiedDelegateTool?: boolean };

@@ -57,6 +57,7 @@ const NON_RETRYABLE_PATTERNS: ReadonlyArray<NonRetryablePattern> = [
   // like "unauthoritative" being silently dropped in a future tightening.
   { pattern: /\bunauthor\w*\b/i, reason: "auth or permission denied" },
   { pattern: /forbidden/i, reason: "auth or permission denied" },
+  { pattern: /invalid\s*token/i, reason: "auth or permission denied" },
   { pattern: /permission.{0,5}denied/i, reason: "auth or permission denied" },
   { pattern: /invalid.{0,10}model/i, reason: "invalid model or provider configuration" },
   { pattern: /invalid.{0,10}provider/i, reason: "invalid model or provider configuration" },
