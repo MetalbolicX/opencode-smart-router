@@ -2,6 +2,7 @@ import { defineConfig } from "rolldown";
 
 const sharedExternal = [
   "@opencode-ai/plugin",
+  "@opencode/plugin",
   "node:fs",
   "node:fs/promises",
   "node:os",
@@ -14,7 +15,7 @@ const sharedExternal = [
 
 export default defineConfig([
   {
-    input: "src/index.ts",
+    input: "src/v2/index.ts",
     output: {
       file: "dist/plugin.mjs",
       format: "esm",
