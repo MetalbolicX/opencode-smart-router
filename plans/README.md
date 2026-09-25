@@ -96,6 +96,102 @@ cycle-6 plans introduced these failures. Future plans at this commit
 should phrase done criteria as "no NEW failures versus baseline" rather
 than "exits 0".
 
+### Audit cycle 7 — new plans (2026-09-25, commit `c780bf7`)
+
+Deep audit (8 category subagents, orchestrator-vetted; engram obs #7003).
+User selected: **all HIGH-confidence findings** plus **three direction
+spikes** (cost read surface, delegate graduation, fanout productization).
+All behavior-change plans are **strict TDD** (RED→GREEN→REFACTOR, RED
+commits kept separate — precedent: plans 021/045). One embedded decision,
+operator-approved 2026-09-25: plan 058 aligns the tier-ladder default to
+the documented **5-tier filtered** contract (not the 3-tier hardcode).
+
+| Plan | Title | Priority | Effort | Risk | Depends on | Status |
+|------|-------|----------|--------|------|------------|--------|
+| 046  | Restore the verification baseline (29 red → documented green) | P1 | S–M | LOW | — | DONE |
+| 047  | Fanout correctness: admission-abort slot leak, batch-timeout semantics, error classification | P1 | S–M | MED | 046 | TODO |
+| 048  | Acceptance-gate provenance: allowlist hardening, argv exec, fence neutralization, truthful protocol docs | P1 | M | MED | 046 | TODO |
+| 049  | Route system-prompt transform through the TTL cache (cycle-2 finding, precondition met) | P1 | S | LOW–MED | 046 | TODO |
+| 050  | Raise Node engines floor to >=22.6 + toolchain audit refresh | P2 | S | LOW | — | DONE |
+| 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | TODO |
+| 052  | CI gate + lint in publish path (cycle-6 exclusion formally re-raised) | P2 | S–M | LOW | 046, 050 | TODO |
+| 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | TODO |
+| 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | TODO |
+| 055  | TrajectoryStore eviction (clear() + teardown wiring + LRU) | P2 | S | LOW | 046, 047 | TODO |
+| 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | TODO |
+| 057  | Config validation throws RouterConfigError (91 sites, messages byte-stable) | P3 | S–M | LOW–MED | 046 | TODO |
+| 058  | tier-ladder default: implement documented 5-tier filtered contract | P3 | S | MED | 046 | TODO |
+| 059  | CHANGELOG rebuild 1.4.0→1.11.0 | P3 | M | LOW | 053 | TODO |
+| 060  | SPIKE: cost/health/pass-rate read surface (`osr status --report`) | P2 | M | LOW | 046 | TODO |
+| 061  | SPIKE: delegate graduation vs ADR 0002 authoritative end-state | P2 | S–M | LOW | — | TODO |
+| 062  | SPIKE: fanout productization (gate wiring, telemetry, presets) | P2 | M | LOW | 046, 047, 048 | TODO |
+
+**Dependency / ordering:**
+
+- **046 FIRST, unconditionally** — the suite is RED (29 failures; 18 are
+  goldens invalidated by `c780bf7`'s own model rotation) and every
+  cycle-7 plan's done criteria say "no NEW failures vs the post-046
+  baseline".
+- **047 → 056 both edit `delegate.ts` + `fanout.ts`** — strictly
+  sequential on one branch-line; 055 lands between them (its fanout
+  wiring rides 047's refactor; 056 then absorbs the trajectory clear into
+  the shared module).
+- **052 requires 046 + 050** (green baseline + known floor); first remote
+  run is operator-assisted (plans do not push).
+- **ADR numbering is coordinated**: 054 → `0003`, 060 → `0004`,
+  061 → `0005`, 062 → `0006`. Spikes 060/061/062 write decision docs
+  ONLY — no production code; their follow-up build plans get new numbers
+  (063+).
+- File-disjoint otherwise: 048 (verify/), 049 (hooks), 051 (config-store),
+  057 (config-validate), 058 (tier-ladder), 059 (docs) — any order.
+
+**Verifier notes (cycle 7):**
+
+- At planning time the working tree carried **uncommitted devDep bumps**
+  (`vitest ^5.0.1`, `@opencode-ai/plugin 1.18.32`, `biome ^2.5.14`,
+  `rolldown ^1.2.10`, `@types/node ^26.6.2`) — plan 050 adopts them as
+  Step 1; executors of other plans should be aware the lockfile may move.
+- The stale baseline docs (openspec archive "1 pre-existing failure",
+  cycle-6 "14-failure baseline") are superseded by 046's
+  `docs/qa/verification-baseline.md` (landed on branch
+  `advisor/046-verification-baseline`; final state: 83/83 files,
+  2656/2656 tests green, all coverage thresholds met — **no NEW failures
+  versus that document** is the binding phrasing for every remaining
+  cycle-7 plan).
+- **pnpm audit residuals after 050's bumps (recorded verbatim; all
+  dev/test-chain only, none reachable from the build path):**
+  - `toml` <4.2.0 (GHSA-82x6-q7mm-w9cf) and <4.1.2 (GHSA-v5mp-jgw5-2x6j)
+    via `.>@opencode-ai/plugin>effect>toml` — **upstream-blocked (lever is
+    OpenCode SDK)**; do NOT add `pnpm.overrides` without operator
+    instruction.
+  - `nanoid` <3.3.16 (GHSA-28wg-ghj8-5hjv), <3.3.18 (GHSA-2v37-7h3g-55p8),
+    `postcss` ≤8.5.17 (GHSA-r28c-9q8g-f849) + moderate ≤8.5.22
+    (GHSA-fxqj-rqcc-2cmp), `esbuild` low ≥0.27.3 <0.28.1
+    (GHSA-g7r4-m6w7-qqqr) via `.>vitest|@vitest/coverage-v8>vite>…` —
+    **resolution-blocked at the pinned `packageManager: pnpm@11.12.0`**:
+    patched versions ARE in-range (fresh pnpm 12.5.1 resolves postcss
+    8.5.28 / nanoid 3.3.19 — verified in a sandbox) but the pinned pnpm's
+    resolution cache will not emit them. Lever = lockfile refresh under a
+    newer pnpm or a `packageManager` bump — a scoped follow-up, out of
+    050's declared bump list.
+- **046/050 execution findings (2026-09-25)**, see
+  `docs/qa/verification-baseline.md` for full detail:
+  - The 11 integration failures were **not** dist-dependent: the tests
+    import `src/` directly and were poisoned by `XDG_CONFIG_HOME` leaking
+    the operator's global `tiers.json` (`verify.require: "never"`) into
+    the merged config — fixed by sandboxing XDG per test.
+  - `config/tiers/*.json` part files are the build's source of truth for
+    `tiers.json`; rotations must update the parts or the next
+    `pnpm run build` silently reverts (fixed; build is byte-idempotent
+    again).
+  - vitest 5 renamed `--repeat` → `--repeats`; its text coverage table
+    omits fully-covered files (escalate/telemetry/index.ts are measured,
+    100%, and count toward thresholds).
+- Index reconciliation executed by **054**: 015 → DONE (adaptive V2
+  shipped), 030 → DONE (test:gate live), 025 → CLOSED (ReScript gone),
+  009 → annotated, 022 residue re-confirmed at `checker.ts:61` +
+  `sessions.ts:134` (058 fixes the resolver site only).
+
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale).
 
 > **Plan 034** (added 2026-08-09 against `7064e0d`): single feature plan via the
@@ -376,6 +472,38 @@ spike, not a bug), incomplete secret scrubbing (no proven exfiltration sink).
   a compat-matrix check against the 1.0.0 exports.
 - **`TIERS_OUTPUT_PATH` absolute-path escape + `buildSpecifier`
   unvalidated input**: S-effort defensive hardening, LOW real-world risk.
+
+### Audit cycle 7 (2026-09-25, commit `c780bf7`) — considered, rejected, or routed
+
+- **Fanout results bypass the acceptance gate** (audit SEC-04, MED
+  confidence): NOT planned as a direct fix — routed to **spike 062** for a
+  design-intent ruling first (per-item vs aggregate vs config-gated
+  verification); a blind fix could miswire ADR 0002's contract for depth-2
+  workers.
+- **`hooks/chat.ts` zero test references** (TEST-05, MED confidence —
+  needs import-graph confirmation): rides with 046's triage; not separately
+  planned.
+- **Flaky `config-store` refresh test** (TEST-06, observed 1/3 runs):
+  fixed inside 046 Step 5 (`--sequence.shuffle --repeat 20` protocol).
+- **Coverage gate unrunable while red** (TEST-04): consequence of the red
+  suite; folded into 046 Step 6.
+- **Missing structured log in delegate outer catch** (CORRECT-05): folded
+  into 056 (same file, same refactor).
+- **Split config-validate.ts (854 LOC, 27 exports)** (ARCH-03): deferred —
+  057 rewrites the file's 91 throw sites this cycle; re-evaluate the
+  section-banner split AFTER 057 lands on a green baseline.
+- **verify→plugin whole-context import** (ARCH-06, MED): deferred — the
+  `verify/types` seam exists; needs a field-enumeration pass
+  (`DispatchContext`) to scope honestly. Re-raise next cycle.
+- **Trajectory logs in shared tmpdir, default perms, no rotation**
+  (SEC-05): DEFERRED, not rejected — recorded inside 060's ADR as a
+  prerequisite/companion hardening (the read-surface design decides the
+  final log location, so fixing perms twice would be waste). Re-raise as a
+  standalone S-plan if 060 stalls.
+- Prior-cycle rejections reaffirmed: perf micro-opts (tierRank Map, combined
+  regex, memoized schema shape, keyword pre-normalization) — noise-level;
+  router↔plugin import cycle — deferred; PluginContext god object /
+  delegate decomposition / command-registry — settled rejections stand.
 
 ### Out-of-cycle plans (2026-08-31, commit `0ea3822` — improve `plan` variant)
 
