@@ -18,7 +18,20 @@
         "costRatio": 2,
         "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Simple edits and small fixes within one file",
           "Config tweaks and parameter changes",
@@ -32,7 +45,19 @@
         "costRatio": 5,
         "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
-        "reasoningControl": { "channel": "variant", "levels": ["baseline", "max"], "profileMap": { "light": "baseline", "standard": "baseline", "deep": "max" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "baseline",
+            "max"
+          ],
+          "profileMap": {
+            "light": "baseline",
+            "standard": "baseline",
+            "deep": "max"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Feature implementation (multi-file allowed)",
           "Refactoring",
@@ -48,7 +73,19 @@
         "costRatio": 10,
         "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
-        "reasoningControl": { "channel": "variant", "levels": ["baseline", "max"], "profileMap": { "light": "baseline", "standard": "baseline", "deep": "max" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "baseline",
+            "max"
+          ],
+          "profileMap": {
+            "light": "baseline",
+            "standard": "baseline",
+            "deep": "max"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Deep single-system debugging",
           "Complex bug isolation in one module/package",
@@ -62,7 +99,19 @@
         "costRatio": 20,
         "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
-        "reasoningControl": { "channel": "variant", "levels": ["baseline", "max"], "profileMap": { "light": "baseline", "standard": "baseline", "deep": "max" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "baseline",
+            "max"
+          ],
+          "profileMap": {
+            "light": "baseline",
+            "standard": "baseline",
+            "deep": "max"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Architecture decisions",
           "Complex debugging after ≥2 prior failures",
@@ -91,7 +140,20 @@
         "costRatio": 2,
         "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Simple edits and small fixes within one file",
           "Config tweaks and parameter changes",
@@ -105,7 +167,20 @@
         "costRatio": 5,
         "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Feature implementation (multi-file allowed)",
           "Refactoring",
@@ -121,7 +196,20 @@
         "costRatio": 10,
         "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Deep single-system debugging",
           "Complex bug isolation in one module/package",
@@ -135,7 +223,21 @@
         "costRatio": 20,
         "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high", "xhigh"], "profileMap": { "light": "low", "standard": "medium", "deep": "xhigh" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "xhigh"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Architecture decisions",
           "Complex debugging after ≥2 prior failures",
@@ -203,7 +305,19 @@
         "costRatio": 20,
         "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
-        "reasoningControl": { "channel": "variant", "levels": ["baseline", "thinking"], "profileMap": { "light": "baseline", "standard": "baseline", "deep": "thinking" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "baseline",
+            "thinking"
+          ],
+          "profileMap": {
+            "light": "baseline",
+            "standard": "baseline",
+            "deep": "thinking"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Architecture decisions",
           "Complex debugging after ≥2 prior failures",
@@ -311,7 +425,20 @@
         "costRatio": 5,
         "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Feature implementation (multi-file allowed)",
           "Refactoring",
@@ -327,7 +454,20 @@
         "costRatio": 10,
         "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
-        "reasoningControl": { "channel": "variant", "levels": ["low", "medium", "high"], "profileMap": { "light": "low", "standard": "medium", "deep": "high" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "high"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Deep single-system debugging",
           "Complex bug isolation in one module/package",
@@ -341,7 +481,19 @@
         "costRatio": 20,
         "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
-        "reasoningControl": { "channel": "variant", "levels": ["baseline", "max"], "profileMap": { "light": "baseline", "standard": "baseline", "deep": "max" }, "maxBumps": 0 },
+        "reasoningControl": {
+          "channel": "variant",
+          "levels": [
+            "baseline",
+            "max"
+          ],
+          "profileMap": {
+            "light": "baseline",
+            "standard": "baseline",
+            "deep": "max"
+          },
+          "maxBumps": 0
+        },
         "whenToUse": [
           "Architecture decisions",
           "Complex debugging after ≥2 prior failures",
@@ -354,17 +506,10 @@
     },
     "multi-provider": {
       "fast": {
-        "model": "opencode-go/qwen-3.8-flash",
+        "model": "opencode/mimo-v2.6-flash-free",
         "costRatio": 1,
         "description": "Scout: read-only codebase reconnaissance. Parallel search, grep, glob, file reads, quick lookups. Never modifies files; routes edits back.",
         "steps": 30,
-        "reasoning": { "effort": "medium" },
-        "reasoningControl": {
-          "channel": "reasoning.effort",
-          "levels": ["low", "medium", "xhigh"],
-          "profileMap": { "light": "low", "standard": "medium", "deep": "xhigh" },
-          "maxBumps": 1
-        },
         "whenToUse": [
           "Codebase exploration and parallel search",
           "Locating files and code patterns (grep/glob/ast-grep)",
@@ -373,16 +518,26 @@
         ]
       },
       "light": {
-        "model": "openai/gpt-5.6-luna",
+        "model": "zai-coding-plan/glm-5.3-flash",
         "costRatio": 2,
         "description": "Patcher: surgical single-file edits from a complete spec. Simple fixes, config tweaks, localized refactoring. Escalates on cross-file scope growth.",
         "steps": 40,
-        "reasoning": { "effort": "medium" },
+        "reasoning": {
+          "effort": "low"
+        },
         "reasoningControl": {
           "channel": "reasoning.effort",
-          "levels": ["low", "medium", "high", "xhigh", "max"],
-          "profileMap": { "light": "low", "standard": "medium", "deep": "max" },
-          "maxBumps": 2
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "low",
+            "deep": "high"
+          },
+          "maxBumps": 0
         },
         "whenToUse": [
           "Simple edits and small fixes within one file",
@@ -392,10 +547,29 @@
         ]
       },
       "medium": {
-        "model": "minimax-coding-plan/MiniMax-M2.7",
+        "model": "openai/gpt-6-luna",
         "costRatio": 5,
         "description": "Builder: standard implementation. Features, refactoring, tests, code review, build-fixes. Matches existing patterns; runs targeted verification only.",
         "steps": 50,
+        "reasoning": {
+          "effort": "medium"
+        },
+        "reasoningControl": {
+          "channel": "reasoning.effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "medium",
+            "deep": "xhigh"
+          },
+          "maxBumps": 1
+        },
         "whenToUse": [
           "Feature implementation (multi-file allowed)",
           "Refactoring",
@@ -406,15 +580,25 @@
         ]
       },
       "focused": {
-        "model": "minimax-coding-plan/MiniMax-M3",
-        "variant": "none",
+        "model": "zai-coding-plan/glm-5.3",
         "costRatio": 10,
         "description": "Lead Investigator: deep single-system forensics, advisory. Root-cause isolation, performance profiling, one-module review. Advises; spans systems to @heavy.",
         "steps": 80,
+        "reasoning": {
+          "effort": "high"
+        },
         "reasoningControl": {
-          "channel": "variant",
-          "levels": ["none", "thinking"],
-          "profileMap": { "light": "none", "standard": "none", "deep": "thinking" },
+          "channel": "reasoning.effort",
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "high",
+            "deep": "max"
+          },
           "maxBumps": 1
         },
         "whenToUse": [
@@ -425,7 +609,7 @@
         ]
       },
       "heavy": {
-        "model": "openai/gpt-5.6-terra",
+        "model": "openai/gpt-6-sol",
         "costRatio": 20,
         "description": "Staff Architect: senior advisory. Architecture, security review, multi-system tradeoffs, migration strategy, RCA after ≥2 prior failures. No self-recon.",
         "steps": 120,
@@ -435,9 +619,19 @@
         },
         "reasoningControl": {
           "channel": "reasoning.effort",
-          "levels": ["low", "medium", "high", "xhigh", "max"],
-          "profileMap": { "light": "low", "standard": "high", "deep": "max" },
-          "maxBumps": 2
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "profileMap": {
+            "light": "low",
+            "standard": "high",
+            "deep": "max"
+          },
+          "maxBumps": 1
         },
         "whenToUse": [
           "Architecture decisions",

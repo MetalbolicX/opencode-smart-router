@@ -117,6 +117,16 @@
         "openai",
         "google",
         "github-copilot"
+      ],
+      "zai-coding-plan": [
+        "openai",
+        "google",
+        "github-copilot"
+      ],
+      "opencode": [
+        "zai-coding-plan",
+        "openai",
+        "google"
       ]
     }
   },
