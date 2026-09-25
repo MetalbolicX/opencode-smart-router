@@ -52,14 +52,22 @@ describe("Layer-2 wiring", () => {
   let dir: string;
   let savedHome: string | undefined;
   let savedUserProfile: string | undefined;
+  let savedXdgConfigHome: string | undefined;
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "ml2-"));
     savedHome = process.env.HOME;
     savedUserProfile = process.env.USERPROFILE;
+    savedXdgConfigHome = process.env.XDG_CONFIG_HOME;
     // Redirect homedir so loadConfig never reads the real user state file.
     process.env.HOME = dir;
     process.env.USERPROFILE = dir;
+    // Sandbox the XDG config layer too: globalConfigPath() honours
+    // $XDG_CONFIG_HOME before $HOME/.config, so an operator's real
+    // ~/.config/opencode-smart-router/tiers.json (e.g. one carrying
+    // enforcement.verify.require="never") would otherwise leak into the
+    // merged config and silently disable verification in these tests.
+    process.env.XDG_CONFIG_HOME = path.join(dir, ".xdg-config");
     // Ensure MODEL_ROUTER_ENFORCE is clean (tests that need it set it themselves).
     delete process.env.MODEL_ROUTER_ENFORCE;
     process.env.MODEL_ROUTER_VERIFIED_DELEGATE = "1";
@@ -76,6 +84,11 @@ describe("Layer-2 wiring", () => {
       process.env.USERPROFILE = savedUserProfile;
     } else {
       delete process.env.USERPROFILE;
+    }
+    if (savedXdgConfigHome !== undefined) {
+      process.env.XDG_CONFIG_HOME = savedXdgConfigHome;
+    } else {
+      delete process.env.XDG_CONFIG_HOME;
     }
     // Clean up enforcement override.
     delete process.env.MODEL_ROUTER_ENFORCE;
