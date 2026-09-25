@@ -62,13 +62,13 @@
     "@opencode-ai/plugin": ">=1.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.7",
-    "@opencode-ai/plugin": "1.18.15",
-    "@types/node": "^26.2.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@biomejs/biome": "^2.5.14",
+    "@opencode-ai/plugin": "1.18.32",
+    "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "^5.0.1",
     "cross-env": "^10.1.0",
-    "rolldown": "^1.2.3",
+    "rolldown": "^1.2.10",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.1"
   }
 }
