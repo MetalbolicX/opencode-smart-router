@@ -47,7 +47,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -100,7 +100,7 @@ R: @fast→search/grep/read/git-info/ls/lookup-docs/types/count/exists-check/ren
 ### Compact rules
 1.default→@fast unless edits/complex-reasoning needed 2.@medium ONLY: multi-file-edit/refactor/test-suite/build-fix 3.@heavy ONLY: user-requested OR ≥2 @medium failures 4.trivial(grep/read/glob)→direct,no-delegate 5.batch related searches→single @fast 6.uncertain @fast vs @medium→@fast,escalate on fail 7.dispatch caps (tighter): always include CAP:5 when dispatching @fast, CAP:2 for @medium, CAP:2 for @heavy 8.orchestrator self-cap: ≤1 direct read-only call per turn; 2nd need → dispatch @fast
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -153,7 +153,7 @@ R: @fast→search/grep/read/git-info/ls/lookup-docs/types/count/exists-check/ren
 ### Compact rules
 1.default→@medium for implementation and multi-file changes 2.@heavy for architecture/debug/security/tradeoff-analysis by default 3.allow long heavy runs before fallback; avoid premature downshift 4.trivial(grep/read/glob)→direct,no-delegate 5.if task is composite: explore@fast then execute@heavy 6.dispatch caps: CAP:none for @heavy only; @fast=CAP:8 and @medium=CAP:5 baselines apply 7.subagents still run redundancy check; CAP:none only lifts the numeric cap
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -208,7 +208,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -261,7 +261,7 @@ R: @fast→search/grep/read/git-info/ls/lookup-docs/types/count/exists-check/ren
 ### Compact rules
 1.default→@focused incl single-system analysis when deep-context matters 2.@heavy: arch/debug/security/multi-system-coord 3.@medium: standard implementation and multi-file changes 4.@fast ONLY: trivial single-tool ops (1 grep/1 read) 5.prefer thoroughness over speed 6.dispatch caps: always include CAP:none in dispatch prompts — subagents may explore as needed for deep context 7.subagents still run redundancy check; CAP:none only lifts the numeric cap, not the stop-on-redundancy rule
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→google→github-copilot | github-copilot→openai→google | google→openai→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -316,7 +316,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google | openai→anthropic→google | github-copilot→anthropic→openai→google | google→openai→anthropic | opencode-go→openai→google
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google | openai→anthropic→google | github-copilot→anthropic→openai→google | google→openai→anthropic | opencode-go→openai→google | zai-coding-plan→openai→google | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -371,7 +371,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→github-copilot | openai→anthropic→github-copilot | github-copilot→anthropic→openai | google→openai→anthropic→github-copilot | opencode-go→openai→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→github-copilot | openai→anthropic→github-copilot | github-copilot→anthropic→openai | google→openai→anthropic→github-copilot | opencode-go→openai→github-copilot | zai-coding-plan→openai→github-copilot | opencode→openai
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -426,7 +426,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→openai→google | google→openai→anthropic→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→openai→google | google→openai→anthropic→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -439,7 +439,7 @@ exports[`protocol golden > protocol-multi-provider > protocol-multi-provider 1`]
 
 You are the orchestrator. Information-gathering is NOT orchestration — it IS execution. Execution belongs to subagents, not to you.
 
-Preset: multi-provider. Tiers: @fast=qwen-3.8-flash(1x) @light=gpt-5.6-luna(2x) @medium=MiniMax-M2.7(5x) @focused=MiniMax-M3/none(10x) @heavy=gpt-5.6-terra(20x).
+Preset: multi-provider. Tiers: @fast=mimo-v2.6-flash-free(1x) @light=glm-5.3-flash(2x) @medium=gpt-6-luna(5x) @focused=glm-5.3(10x) @heavy=gpt-6-sol(20x).
 
 ### HARD ROUTING (non-negotiable)
 - **Read-only work** (grep, glob, read, ls, lookup, count, git-info, doc-lookup, type-check, exists-check) → default to \`Task(subagent_type="fast", ...)\`. Self-cap (TARGET): ≤2 direct read-only calls per user turn; on the 3rd read-only need, dispatch @fast instead. You may exceed with a 1-line \`reason:\` note when dispatching feels clearly wrong. Rationale: every tool-result token is billed at your tier rate — a grep via @fast costs ~20x less than the same grep here.
@@ -481,7 +481,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→openai→google | google→openai→anthropic→github-copilot | opencode-go→openai→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→openai→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→openai→google | google→openai→anthropic→github-copilot | opencode-go→openai→google→github-copilot | zai-coding-plan→openai→google→github-copilot | opencode→openai→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
@@ -536,7 +536,7 @@ Multi-phase: prefer explore(@fast)→execute(@light) when phases are separable. 
 ### Compact rules
 1.[tier:X] tag in plan → delegate to X 2.plan:fast/cheap→@fast | plan:light→@light | plan:medium→@medium | plan:focused→@focused | plan:heavy→@heavy 3.default preference: read-only work → @fast; localized/simple implementation → @light; standard implementation → @medium; deep single-system → @focused; architecture/multi-system → @heavy 4.orchestrate=self, execute=subagent (info-gathering IS execution, not orchestration) 5.trivial (≤1 tool call, no expected follow-up) → direct, skip-delegate 6.orchestrator self-cap (TARGET): ≤2 direct read-only calls per turn; 3rd need → dispatch @fast (exceed only with 1-line reason) 7.dispatch caps baseline: @fast=CAP:8, @light=CAP:7, @medium=CAP:5, @focused=CAP:4, @heavy=CAP:3 (omit directive = baseline; include CAP:N to override; CAP:none disables) 8.before dispatching @heavy: gather context first (usually via @fast); if context is already sufficient, dispatch directly 9.if self is opus: skip-@heavy (do locally); still prefer routing broader read-only exploration to @fast 10.min(cost, adequate-tier)
 
-Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot | opencode-go→google→github-copilot
+Err→retry-alt-tier→fail→direct. Chain: anthropic→google→github-copilot | openai→anthropic→google→github-copilot | github-copilot→anthropic→google | google→anthropic→github-copilot | opencode-go→google→github-copilot | zai-coding-plan→google→github-copilot | opencode→google
 
 Delegate with \`Task(subagent_type="fast"|"light"|"medium"|"focused"|"heavy", prompt="...")\`. Keep orchestration and final synthesis here.
 
