@@ -203,16 +203,16 @@ describe("Layer-3 escalation ladder wiring", () => {
     expect(result).toContain("[router status: unmet]");
     expect(result).toContain("attempt(s)");
     expect(result).not.toContain("[router ✓ accepted:");
-    // D-3 with multi-provider preset (fast/light: bump-enabled, medium: bump-enabled, focused: bump-enabled):
-    // fast ×2 (1 initial + 1 bump → bumpExhausted@top → escalate),
-    // light ×3 (1 initial + 2 bumps → bumpExhausted@top → escalate),
-    // medium ×3 (1 initial + 2 bumps → bumpExhausted@top → escalate),
-    // focused ×2 (1 initial + 1 bump → bumpExhausted@top → give_up),
-    // give_up fires at maxTotalAttempts=10.
+    // D-3 with the post-rotation multi-provider preset (c780bf7):
+    // fast has NO reasoningControl → policy fallback (maxAttemptsPerTier=2
+    // retries → 3 calls), light has reasoningControl maxBumps=0 → also rides
+    // the retry branch (3 calls), medium maxBumps=1 → 1 bump then
+    // bumpExhausted@top → escalate (2 calls), focused maxBumps=1 → 1 bump,
+    // give_up fires at maxTotalAttempts=10 (2 calls).
     expect(producerCalls.length).toBe(10);
-    expect(producerCalls.slice(0, 2).every((c) => c.tier === "fast")).toBe(true);
-    expect(producerCalls.slice(2, 5).every((c) => c.tier === "light")).toBe(true);
-    expect(producerCalls.slice(5, 8).every((c) => c.tier === "medium")).toBe(true);
+    expect(producerCalls.slice(0, 3).every((c) => c.tier === "fast")).toBe(true);
+    expect(producerCalls.slice(3, 6).every((c) => c.tier === "light")).toBe(true);
+    expect(producerCalls.slice(6, 8).every((c) => c.tier === "medium")).toBe(true);
     expect(producerCalls.slice(8, 10).every((c) => c.tier === "focused")).toBe(true);
   });
 });
