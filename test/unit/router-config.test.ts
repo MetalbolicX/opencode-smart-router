@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,7 +7,6 @@ import {
   globalConfigPath,
   localConfigPath,
   readState,
-  configPath as realConfigPath,
   saveActiveMode,
   saveActivePreset,
   saveEnforcementMode,
@@ -426,17 +425,21 @@ describe("Layered config — error cases", () => {
   });
 
   it("throws when bundled layer is unreadable", async () => {
-    // Temporarily move the bundled tiers.json out of the way so the bundled
-    // read fails with ENOENT. The bundled file is restored in the finally
-    // block even if the assertion throws, so other tests stay green.
-    const bundledPath = realConfigPath();
-    const backupPath = `${bundledPath}.bak-test`;
-    renameSync(bundledPath, backupPath);
-    try {
-      await expect(readMergedConfig({ cwd: process.cwd() })).rejects.toThrow(/bundled/);
-    } finally {
-      renameSync(backupPath, bundledPath);
-    }
+    // Exercise the required-layer ENOENT branch directly against a
+    // nonexistent path instead of renaming the real repo tiers.json:
+    // the old renameSync-away approach raced with OTHER test files
+    // (parallel vitest workers read the bundled config) and intermittently
+    // failed them with ENOENT (observed on plugin-shutdown.test.ts during
+    // a coverage run). readConfigLayer is exported for exactly this kind
+    // of unit probing; the assertion below is unchanged.
+    const { readConfigLayer } = await import("../../src/router/config-loader");
+    await expect(
+      readConfigLayer({
+        kind: "bundled",
+        path: join(tmpHome, "absent-bundled-tiers.json"),
+        required: true,
+      }),
+    ).rejects.toThrow(/bundled/);
   });
 });
 
