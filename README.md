@@ -9,7 +9,7 @@ The plugin registers five tiers — `@fast`, `@light`, `@medium`, `@focused`, `@
 <p align="center">
   <a href="https://github.com/MetalbolicX/opencode-smart-router/releases"><img alt="version" src="https://img.shields.io/github/v/release/MetalbolicX/opencode-smart-router?style=flat-square&logo=github" /></a>
   <a href="https://github.com/MetalbolicX/opencode-smart-router/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/github/license/MetalbolicX/opencode-smart-router?style=flat-square&logo=github" /></a>
-  <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" />
+  <img alt="node" src="https://img.shields.io/badge/node-%3E%3D22.6-339933?style=flat-square&logo=node.js&logoColor=white" />
   <img alt="platform" src="https://img.shields.io/badge/opencode-%3E%3D1.0-1f6feb?style=flat-square" />
 </p>
 
@@ -985,7 +985,7 @@ The exact overhead has tracked release-over-release; for the current value, see 
 ## Requirements
 
 - [OpenCode](https://opencode.ai) v1.0 or later (`>=1.0.0` peer)
-- Node.js 20+
+- Node.js 22.6+
 - Provider API keys configured in OpenCode
 
 ## License
