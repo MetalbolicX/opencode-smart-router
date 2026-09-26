@@ -71,7 +71,13 @@ export const readMergedConfig = async (opts: { cwd: string }): Promise<RouterCon
   const local = await readConfigLayer(localLayer);
 
   const mergedManual = deepMergeConfig(deepMergeConfig(bundled, global), local);
-  const cfg = validateConfig(mergedManual);
+  let cfg: RouterConfig;
+  try {
+    cfg = validateConfig(mergedManual);
+  } catch (err) {
+    if (err instanceof RouterConfigError) throw err;
+    throw new RouterConfigError("invalid", "tiers.json", err);
+  }
 
   // Runtime state overlays only its owned fields and never mutates tiers.json.
   const state = await readState();

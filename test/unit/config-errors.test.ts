@@ -7,7 +7,12 @@ import {
   RouterConfigError,
   RouterStateError,
 } from "../../src/router/config-errors";
-import { readConfigLayer } from "../../src/router/config-loader";
+import { readConfigLayer, readMergedConfig } from "../../src/router/config-loader";
+import {
+  validateConfig,
+  validatePreset,
+  validateRootFields,
+} from "../../src/router/config-validate";
 
 // ---------------------------------------------------------------------------
 // Error taxonomy unit tests.
@@ -76,6 +81,58 @@ describe("RouterConfigError", () => {
     const err = new RouterConfigError("malformed", "/tmp/foo.json", new Error("bad json"));
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe("RouterConfigError");
+  });
+});
+
+describe("config validation errors", () => {
+  it("throws RouterConfigError(kind='invalid') for an invalid root", () => {
+    try {
+      validateConfig({});
+      throw new Error("expected validation to fail");
+    } catch (err) {
+      expect(err).toBeInstanceOf(RouterConfigError);
+      expect(err).toMatchObject({ kind: "invalid", path: "tiers.json" });
+    }
+  });
+
+  it("preserves historical messages byte-for-byte", () => {
+    expect(() => validateConfig(null)).toThrowError("tiers.json: expected a JSON object at root");
+    expect(() => validateRootFields({ activePreset: "" })).toThrowError(
+      "tiers.json: 'activePreset' must be a non-empty string",
+    );
+    expect(() => validatePreset("custom", null)).toThrowError(
+      "tiers.json: preset 'custom' must be an object",
+    );
+  });
+
+  it("surfaces invalid merged configuration as RouterConfigError", async () => {
+    const cwd = join(tmpdir(), `osr-invalid-config-${process.pid}-${Date.now()}`);
+    const configDir = join(cwd, ".opencode");
+    const previous = {
+      HOME: process.env.HOME,
+      USERPROFILE: process.env.USERPROFILE,
+      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+    };
+    mkdirSync(configDir, { recursive: true });
+    process.env.HOME = cwd;
+    process.env.USERPROFILE = cwd;
+    process.env.XDG_CONFIG_HOME = join(cwd, "xdg");
+    writeFileSync(join(configDir, "tiers.json"), JSON.stringify({ activePreset: "" }));
+    try {
+      await expect(readMergedConfig({ cwd })).rejects.toMatchObject({
+        name: "RouterConfigError",
+        kind: "invalid",
+        path: "tiers.json",
+      });
+    } finally {
+      if (previous.HOME === undefined) delete process.env.HOME;
+      else process.env.HOME = previous.HOME;
+      if (previous.USERPROFILE === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = previous.USERPROFILE;
+      if (previous.XDG_CONFIG_HOME === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = previous.XDG_CONFIG_HOME;
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
 

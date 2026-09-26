@@ -14,6 +14,8 @@ import type { CliFs } from "../../src/cli/config";
 import { PLUGIN_NAME } from "../../src/cli/config";
 import { runInstall } from "../../src/cli/install";
 import { runMain } from "../../src/cli/main";
+import * as statusModule from "../../src/cli/status";
+import { RouterConfigError } from "../../src/router/config-errors";
 
 // ---------------------------------------------------------------------------
 // Mock node:fs so runUpdate can be tested without touching disk.
@@ -830,6 +832,21 @@ describe("runMain — status and doctor dispatch", () => {
     const result = await runMain(["node", "cli.mjs", "doctor"]);
     expect(result.command).toBe("doctor");
     expect(result.exitCode).toBe(0);
+  });
+
+  it("renders RouterConfigError kind and path in user-facing output", async () => {
+    const error = new RouterConfigError("invalid", "tiers.json", new Error("bad field"));
+    const errorOutput = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(statusModule, "runStatus").mockRejectedValueOnce(error);
+    try {
+      const result = await runMain(["node", "cli.mjs", "status"]);
+      expect(result.exitCode).toBe(1);
+      expect(errorOutput).toHaveBeenCalledWith(
+        "osr: config error [invalid] tiers.json: config file at tiers.json (kind=invalid): bad field",
+      );
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
 
