@@ -789,7 +789,7 @@ describe("executeFanout — batch expiry", () => {
 });
 
 describe("executeFanout — caller cancellation (signal abort)", () => {
-  it("signal fires mid-batch: in-flight workers receive cancelled status, abort called", async () => {
+  it("signal fires mid-batch: returns silently without waiting for workers", async () => {
     const { ctx, abortSpy } = makeCtx({
       callerTier: "heavy",
       callerDepth: 1,
@@ -819,10 +819,7 @@ describe("executeFanout — caller cancellation (signal abort)", () => {
       ac.signal,
     );
 
-    // When signal fires mid-batch, in-flight workers get cancelled status
-    // (the "" return path is only for already-aborted signal at executeFanout entry)
-    expect(out).toContain("cancelled");
-    // Workers received abort calls
+    expect(out).toBe("");
     expect(abortSpy).toHaveBeenCalled();
   });
 });
