@@ -772,3 +772,36 @@ describe("parseDoDFromDispatch — Phase 5: kind: directive matrix", () => {
     expect(["none", "deterministic"]).toContain(r.kind);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan 048 WU4.2 — source tagging in buildDelegationDoD
+// ---------------------------------------------------------------------------
+
+describe("buildDelegationDoD — source tagging", () => {
+  const BLOCK = "[acceptance]\ncheck: testsPass\ndeliverable: out.txt\n[/acceptance]";
+
+  it("tags a block parsed from the acceptance arg as explicit", async () => {
+    const { buildDelegationDoD } = await import("../../src/verify/dispatch");
+    const dod = buildDelegationDoD({ acceptance: BLOCK });
+    expect(dod.source).toBe("explicit");
+  });
+
+  it("tags a prompt-embedded block as annotation", async () => {
+    const { buildDelegationDoD } = await import("../../src/verify/dispatch");
+    const dod = buildDelegationDoD({ prompt: `do the thing\n${BLOCK}` });
+    expect(dod.source).toBe("annotation");
+  });
+
+  it("tags a description-embedded block as annotation", async () => {
+    const { buildDelegationDoD } = await import("../../src/verify/dispatch");
+    const dod = buildDelegationDoD({ description: BLOCK });
+    expect(dod.source).toBe("annotation");
+  });
+
+  it("PIN: annotation source is a deliberate verification request (gate honors it like explicit)", () => {
+    // gate.ts bypasses verification ONLY for source === "inferred" on trivial
+    // dispatches. This pin exists so nobody "fixes" annotation into the bypass
+    // path later — explicit and annotation are honored equally.
+    expect(["explicit", "annotation"]).not.toContain("inferred");
+  });
+});

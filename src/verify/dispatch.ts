@@ -32,7 +32,8 @@ import { logEvent } from "../utils/observability";
 import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
-import type { DoD, InferHints } from "./dod";
+import { DEFAULT_ALLOWLIST } from "./deterministic";
+import type { DoD, DoDSource, InferHints } from "./dod";
 import { inferDoD, parseDoDFromDispatch } from "./dod";
 import type { GateDeps, GateResult } from "./gate";
 import { accept } from "./gate";
@@ -147,8 +148,13 @@ export const buildDelegationDoD = (
   args: { prompt?: string; description?: string; acceptance?: string },
   hints: InferHints = {},
 ): DoD => {
+  // Provenance: an explicit `acceptance` arg is the author's direct request
+  // ("explicit"); a block parsed out of prompt/description text is an
+  // embedded annotation ("annotation"). The gate honors both equally — only
+  // auto-inferred DoDs on trivial dispatches are bypassed.
   const blockSource = args.acceptance ?? args.prompt ?? args.description ?? "";
-  const explicit = parseDoDFromDispatch(blockSource);
+  const source: DoDSource = args.acceptance !== undefined ? "explicit" : "annotation";
+  const explicit = parseDoDFromDispatch(blockSource, source);
   if (explicit) return explicit;
   const dispatch = args.prompt ?? args.description ?? "";
   return inferDoD(dispatch, "", hints);
@@ -303,6 +309,7 @@ export const buildGateDeps = async (
       fs: ctx.seams.fs,
       cwd: ctx.plugin.directory,
       mutex: ctx.verifyMutex,
+      allowlist: [...DEFAULT_ALLOWLIST, ...(cfg.enforcement?.verify?.allowlist ?? [])],
     },
     checker: {
       dispatchGrader: (req) => dispatchGrader(ctx, req, parentSessionID),

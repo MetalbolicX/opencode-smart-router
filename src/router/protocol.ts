@@ -295,7 +295,7 @@ export const buildDoDProtocolSection = (cfg: RouterConfig): string => {
     "check: testsPass",
     "check: buildPasses",
     "check: fileExists path=src/foo.ts",
-    'check: run command="node -e ..." expect=OK',
+    'check: run command="vitest run test/foo.test.ts" expect="passed"',
     "criteria: <plain-language success condition>",
     "deliverable: <path or short description>",
     "[/acceptance]",

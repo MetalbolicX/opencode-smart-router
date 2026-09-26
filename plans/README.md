@@ -110,7 +110,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 |------|-------|----------|--------|------|------------|--------|
 | 046  | Restore the verification baseline (29 red → documented green) | P1 | S–M | LOW | — | DONE |
 | 047  | Fanout correctness: admission-abort slot leak, batch-timeout semantics, error classification | P1 | S–M | MED | 046 | DONE |
-| 048  | Acceptance-gate provenance: allowlist hardening, argv exec, fence neutralization, truthful protocol docs | P1 | M | MED | 046 | TODO |
+| 048  | Acceptance-gate provenance: allowlist hardening, argv exec, fence neutralization, truthful protocol docs | P1 | M | MED | 046 | DONE |
 | 049  | Route system-prompt transform through the TTL cache (cycle-2 finding, precondition met) | P1 | S | LOW–MED | 046 | TODO |
 | 050  | Raise Node engines floor to >=22.6 + toolchain audit refresh | P2 | S | LOW | — | DONE |
 | 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | TODO |

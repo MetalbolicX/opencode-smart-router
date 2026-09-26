@@ -222,7 +222,33 @@ describe("isCommandAllowed + allowlist gate", () => {
   });
 
   it("accepts path-prefixed binary (basename extraction)", () => {
-    expect(isCommandAllowed("/usr/local/bin/npx tsc", DEFAULT_ALLOWLIST)).toBe(true);
+    expect(isCommandAllowed("/usr/local/bin/tsc --noEmit", DEFAULT_ALLOWLIST)).toBe(true);
+  });
+
+  it("rejects package runners and interpreters by default", () => {
+    for (const command of [
+      "npx some-pkg",
+      "yarn add x",
+      "bun x",
+      "tsx script.ts",
+      "node script.js",
+      "node -r ./preload.js index.js",
+      "node --import ./x.mjs index.js",
+    ]) {
+      expect(isCommandAllowed(command, DEFAULT_ALLOWLIST), command).toBe(false);
+    }
+  });
+
+  it("keeps approved default tools available", () => {
+    for (const command of [
+      "npm test",
+      "pnpm run build",
+      "vitest run test/a.test.ts",
+      "tsc --noEmit",
+      "eslint .",
+    ]) {
+      expect(isCommandAllowed(command, DEFAULT_ALLOWLIST), command).toBe(true);
+    }
   });
 
   it("run check: non-allowlisted command => fail, exec NEVER called", async () => {
@@ -277,8 +303,10 @@ describe("isCommandAllowed + allowlist gate", () => {
     expect(isCommandAllowed("tsx -e x", DEFAULT_ALLOWLIST)).toBe(false);
   });
 
-  it("allows node script.js (no eval flag)", () => {
-    expect(isCommandAllowed("node script.js", DEFAULT_ALLOWLIST)).toBe(true);
+  it("rejects node script.js by default (interpreter requires allowlist opt-in)", () => {
+    // Plan 048: node/npx/tsx/etc. were dropped from DEFAULT_ALLOWLIST —
+    // arbitrary-code runners need an explicit enforcement.verify.allowlist entry.
+    expect(isCommandAllowed("node script.js", DEFAULT_ALLOWLIST)).toBe(false);
   });
 
   it("allows tsc -p tsconfig.json (tsc is not an interpreter)", () => {
@@ -361,8 +389,8 @@ describe("runDeterministic — repo-command defaults", () => {
         return { code: 0, stdout: "", stderr: "" };
       },
     });
-    await runDeterministic(makeDoD([{ kind: "testsPass", command: "npx vitest run" }]), deps);
-    expect(capturedCmd).toBe("npx vitest run");
+    await runDeterministic(makeDoD([{ kind: "testsPass", command: "vitest run" }]), deps);
+    expect(capturedCmd).toBe("vitest run");
   });
 
   it("testsPass: timedOut => fail with 'timed out' in reason", async () => {
@@ -827,5 +855,45 @@ describe("shapeMismatch — Phase 5: array length + element matrix", () => {
 
   it("PASS: nested object inside array — same element type", () => {
     expect(shapeMismatch([{ x: 1 }, { x: 2 }], [{ x: 10 }, { x: 20 }])).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 048 WU2 — tokenizeCommand + argv (no-shell) exec seam
+// ---------------------------------------------------------------------------
+
+describe("tokenizeCommand + argv seam", () => {
+  it("splits respecting quotes and rejects unterminated quotes", async () => {
+    const { tokenizeCommand } = await import("../../src/utils/shell");
+    expect(tokenizeCommand("npm test")).toEqual({ file: "npm", args: ["test"] });
+    expect(tokenizeCommand('vitest run "a b.test.ts"')).toEqual({
+      file: "vitest",
+      args: ["run", "a b.test.ts"],
+    });
+    expect(tokenizeCommand("vitest run 'x y'")).toEqual({
+      file: "vitest",
+      args: ["run", "x y"],
+    });
+    expect(tokenizeCommand('vitest run "unterminated')).toBeNull();
+    expect(tokenizeCommand("   ")).toBeNull();
+  });
+
+  it("live seam executes via argv (no shell splitting, no glob expansion)", async () => {
+    const { createExecSeam } = await import("../../src/utils/shell");
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "seam-argv-"));
+    try {
+      writeFileSync(join(dir, "a.txt"), "x");
+      writeFileSync(join(dir, "b.txt"), "y");
+      const seam = createExecSeam({ directory: dir });
+      // Under shell exec, the glob expands (argv length 3); under execFile argv
+      // the pattern reaches the child literally (argv length 2).
+      const r = await seam('node -e "console.log(process.argv.length)" *.txt', { cwd: dir });
+      expect(r.stdout.trim()).toBe("2");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

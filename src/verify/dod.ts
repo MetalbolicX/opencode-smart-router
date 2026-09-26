@@ -218,8 +218,11 @@ export const parseAcceptanceBlock = (text: string, source: DoDSource = "explicit
 // parseDoDFromDispatch / parseDoDFromAnnotation
 // ---------------------------------------------------------------------------
 
-export const parseDoDFromDispatch = (dispatchText: string): DoD | null => {
-  return parseAcceptanceBlock(dispatchText, "explicit");
+export const parseDoDFromDispatch = (
+  dispatchText: string,
+  source: DoDSource = "explicit",
+): DoD | null => {
+  return parseAcceptanceBlock(dispatchText, source);
 };
 
 export const parseDoDFromAnnotation = (annotationText: string): DoD | null => {

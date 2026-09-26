@@ -36,20 +36,7 @@ export const createMutexRegistry = (): MutexRegistry => {
 // Command validation
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_ALLOWLIST = [
-  "npm",
-  "npx",
-  "pnpm",
-  "yarn",
-  "bun",
-  "node",
-  "tsc",
-  "tsx",
-  "vitest",
-  "jest",
-  "eslint",
-  "prettier",
-];
+export const DEFAULT_ALLOWLIST = ["npm", "pnpm", "tsc", "vitest", "jest", "eslint", "prettier"];
 
 // Any shell-chaining / redirection / substitution metacharacter.
 // eslint-disable-next-line no-useless-escape
@@ -68,21 +55,60 @@ const INTERPRETERS = new Set([
   "ruby",
   "perl",
 ]);
-// Inline-eval / inline-print flags: -e, -c, -p, --eval, --print (with optional =value).
-const EVAL_FLAG_RE = /^-(e|c|p)$|^--(eval|print)(=|$)/i;
+// Inline-eval / code-loading flags: -e, -c, -p, -r, --eval, --print, --require,
+// --import (with optional =value). Code-loading flags matter because an
+// allowlisted interpreter must not be turned into an arbitrary-code loader
+// (e.g. `node -r ./preload.js index.js`).
+const EVAL_FLAG_RE = /^-(e|c|p|r)$|^--(eval|print|require|import)(=|$)/i;
+
+/**
+ * Split a command string into { file, args } respecting double/single quotes.
+ * Returns null for unterminated quotes or an empty command — callers must
+ * fail closed. ONE parser, two consumers: isCommandAllowed (basename) and the
+ * live exec seam (execFile argv) so validation and execution never drift.
+ */
+export const tokenizeCommand = (command: string): { file: string; args: string[] } | null => {
+  const tokens: string[] = [];
+  let cur = "";
+  let started = false;
+  let quote: '"' | "'" | null = null;
+  for (const ch of command.trim()) {
+    if (quote !== null) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      started = true;
+    } else if (/\s/.test(ch)) {
+      if (started) tokens.push(cur);
+      cur = "";
+      started = false;
+    } else {
+      cur += ch;
+      started = true;
+    }
+  }
+  if (quote !== null) return null;
+  if (started) tokens.push(cur);
+  if (tokens.length === 0) return null;
+  return { file: tokens[0] as string, args: tokens.slice(1) };
+};
 
 export const isCommandAllowed = (command: string, allowlist: string[]): boolean => {
   const trimmed = command.trim();
   if (!trimmed || FORBIDDEN_SHELL.test(command)) return false;
-  const tokens = trimmed.split(/\s+/);
-  const firstToken = tokens[0];
-  const parts = firstToken.split(/[/\\]/);
-  const basename = parts[parts.length - 1];
+  const parsed = tokenizeCommand(trimmed);
+  if (parsed === null) return false;
+  const parts = parsed.file.split(/[/\\]/);
+  const basename = parts[parts.length - 1] ?? "";
   if (!allowlist.includes(basename)) return false;
   // Strip a Windows executable suffix before the interpreter check.
   const interpreterBase = basename.replace(/\.(exe|cmd|bat)$/i, "");
   if (INTERPRETERS.has(interpreterBase)) {
-    for (const t of tokens.slice(1)) {
+    for (const t of parsed.args) {
       if (EVAL_FLAG_RE.test(t)) return false;
     }
   }
