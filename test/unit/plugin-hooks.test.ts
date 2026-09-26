@@ -677,6 +677,30 @@ describe("handleSessionIdle — scorecard + trajectory dump", () => {
 });
 
 describe("handleSystemTransform — bypass and subagent short-circuits", () => {
+  it("skips config reads for tracked subagent sessions", async () => {
+    const h = makeHarness();
+    const getConfig = vi.spyOn(h.ctx, "getConfig");
+    const getFreshConfig = vi.spyOn(h.ctx, "getFreshConfig");
+
+    await handleSystemTransform(h.ctx, { sessionID: "sid-A1" }, { system: [] });
+
+    expect(getConfig).not.toHaveBeenCalled();
+    expect(getFreshConfig).not.toHaveBeenCalled();
+  });
+
+  it("uses the TTL-cached config for orchestrator sessions", async () => {
+    const h = makeHarness();
+    const getConfig = vi.spyOn(h.ctx, "getConfig");
+    const getFreshConfig = vi.spyOn(h.ctx, "getFreshConfig");
+    const out = { system: [] as string[] };
+
+    await handleSystemTransform(h.ctx, { sessionID: "sid-NEW" }, out);
+
+    expect(getConfig).toHaveBeenCalledTimes(1);
+    expect(getFreshConfig).not.toHaveBeenCalled();
+    expect(out.system.length).toBeGreaterThan(0);
+  });
+
   it("injects the delegation prompt for the primary orchestrator", async () => {
     const h = makeHarness();
     const out = { system: [] as string[] };

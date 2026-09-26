@@ -30,14 +30,14 @@ export const handleSystemTransform = async (
   output: HookPayload,
 ): Promise<void> => {
   if (ctx.state.bypassed) return;
-  // getFreshConfig() returns the refreshed config and falls back to the
-  // cached value if the file read fails.
-  const cfg = await ctx.getFreshConfig();
-
   // Skip injection for child (subagent) sessions.
   // Child sessions are detected via session.created events with a parentID.
   const sessionID = _input?.sessionID as string | undefined;
   if (sessionID && ctx.sessionStore.isSubagent(sessionID)) return;
+
+  // Config comes from the TTL cache (≤5 min staleness for hand-edits);
+  // command-driven changes replace the cache immediately.
+  const cfg = await ctx.getConfig();
 
   // For Claude-backed orchestrators, prepend an adversarial opener that
   // revokes the cached "Claude Code explorer" priming for the routing
