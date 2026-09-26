@@ -8,7 +8,11 @@ import {
   RouterStateError,
 } from "../../src/router/config-errors";
 import { readConfigLayer, readMergedConfig } from "../../src/router/config-loader";
-import { validateConfig, validatePreset, validateRootFields } from "../../src/router/config-validate";
+import {
+  validateConfig,
+  validatePreset,
+  validateRootFields,
+} from "../../src/router/config-validate";
 
 // ---------------------------------------------------------------------------
 // Error taxonomy unit tests.
@@ -92,9 +96,7 @@ describe("config validation errors", () => {
   });
 
   it("preserves historical messages byte-for-byte", () => {
-    expect(() => validateConfig(null)).toThrowError(
-      "tiers.json: expected a JSON object at root",
-    );
+    expect(() => validateConfig(null)).toThrowError("tiers.json: expected a JSON object at root");
     expect(() => validateRootFields({ activePreset: "" })).toThrowError(
       "tiers.json: 'activePreset' must be a non-empty string",
     );
