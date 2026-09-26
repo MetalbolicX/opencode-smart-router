@@ -34,6 +34,7 @@ import {
   type RouterConfig,
 } from "./config.types";
 import { ENFORCEMENT_MODES, GRADER_POLICIES, VERIFY_REQUIRE_MODES } from "./config-resolve";
+import { RouterConfigError } from "./config-errors";
 
 const ENFORCEMENT_MODES_LIST = ENFORCEMENT_MODES.join("|");
 const VERIFY_REQUIRE_MODES_LIST = VERIFY_REQUIRE_MODES.join("|");
@@ -50,13 +51,19 @@ const MATCH_MODES = ["word", "stem", "substring", "regex"] as const;
 
 const isConfiguredLevel = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
+/** Throw a typed validation error while preserving the historical message. */
+const fail = (detail: string): never => {
+  const reason = detail.startsWith("tiers.json: ") ? detail.slice("tiers.json: ".length) : detail;
+  throw new RouterConfigError("invalid", "tiers.json", new Error(reason), "tiers.json");
+};
+
 // ---------------------------------------------------------------------------
 // validateConfig — orchestrator
 // ---------------------------------------------------------------------------
 
 export const validateConfig = (raw: unknown): RouterConfig => {
   if (!isPlainObject(raw)) {
-    throw new Error("tiers.json: expected a JSON object at root");
+    return fail("expected a JSON object at root");
   }
   validateRootFields(raw);
   const policy = isPlainObject(raw.reasoningPolicy) ? raw.reasoningPolicy : undefined;
@@ -78,16 +85,16 @@ export const validateConfig = (raw: unknown): RouterConfig => {
 
 export const validateRootFields = (obj: Record<string, unknown>): void => {
   if (typeof obj.activePreset !== "string" || !obj.activePreset) {
-    throw new Error("tiers.json: 'activePreset' must be a non-empty string");
+    return fail("'activePreset' must be a non-empty string");
   }
 };
 
 export const validateRulesAndDefaultTier = (obj: Record<string, unknown>): void => {
   if (!Array.isArray(obj.rules)) {
-    throw new Error("tiers.json: 'rules' must be an array of strings");
+    return fail("'rules' must be an array of strings");
   }
   if (typeof obj.defaultTier !== "string") {
-    throw new Error("tiers.json: 'defaultTier' must be a string");
+    return fail("'defaultTier' must be a string");
   }
 };
 
@@ -97,10 +104,10 @@ export const validateRulesAndDefaultTier = (obj: Record<string, unknown>): void 
 
 export const validatePresets = (obj: Record<string, unknown>, profiles?: unknown[]): void => {
   if (!isPlainObject(obj.presets) || Array.isArray(obj.presets)) {
-    throw new Error("tiers.json: 'presets' must be a non-null object");
+    return fail("'presets' must be a non-null object");
   }
   if (Object.keys(obj.presets).length === 0) {
-    throw new Error("tiers.json: 'presets' must have at least one preset");
+    return fail("'presets' must have at least one preset");
   }
   for (const [presetName, preset] of Object.entries(obj.presets)) {
     validatePreset(presetName, preset, profiles);
@@ -109,7 +116,7 @@ export const validatePresets = (obj: Record<string, unknown>, profiles?: unknown
 
 export const validatePreset = (presetName: string, preset: unknown, profiles?: unknown[]): void => {
   if (!isPlainObject(preset) || Array.isArray(preset)) {
-    throw new Error(`tiers.json: preset '${presetName}' must be an object`);
+    return fail(`preset '${presetName}' must be an object`);
   }
   for (const [tierName, tier] of Object.entries(preset)) {
     validateTier(presetName, tierName, tier, profiles);
@@ -123,14 +130,13 @@ export const validateTier = (
   profiles?: unknown[],
 ): void => {
   if (!isPlainObject(tier)) {
-    throw new Error(`tiers.json: tier '${presetName}.${tierName}' must be an object`);
+    return fail(`tier '${presetName}.${tierName}' must be an object`);
   }
   if (typeof tier.model !== "string" || !tier.model) {
-    throw new Error(`tiers.json: '${presetName}.${tierName}.model' must be a non-empty string`);
+    return fail(`'${presetName}.${tierName}.model' must be a non-empty string`);
   }
   if ("capability" in tier) {
-    throw new Error(
-      `tiers.json: '${presetName}.${tierName}.capability' is removed; migrate to 'reasoningControl' in docs/CONFIG_REFERENCE.md`,
+    return fail(`'${presetName}.${tierName}.capability' is removed; migrate to 'reasoningControl' in docs/CONFIG_REFERENCE.md`,
     );
   }
   // provider/model slash predicate (PR 1 of fix-task-model-fallback-cleanup).
@@ -140,15 +146,14 @@ export const validateTier = (
   // length - 1` covers missing-or-trailing slash.
   const slash = tier.model.indexOf("/");
   if (slash <= 0 || slash >= tier.model.length - 1) {
-    throw new Error(
-      `tiers.json: '${presetName}.${tierName}.model' must be provider/model (got ${JSON.stringify(tier.model)})`,
+    return fail(`'${presetName}.${tierName}.model' must be provider/model (got ${JSON.stringify(tier.model)})`,
     );
   }
   if (typeof tier.description !== "string") {
-    throw new Error(`tiers.json: '${presetName}.${tierName}.description' must be a string`);
+    return fail(`'${presetName}.${tierName}.description' must be a string`);
   }
   if (!Array.isArray(tier.whenToUse)) {
-    throw new Error(`tiers.json: '${presetName}.${tierName}.whenToUse' must be an array`);
+    return fail(`'${presetName}.${tierName}.whenToUse' must be an array`);
   }
   validateReasoningControl(presetName, tierName, tier.reasoningControl, profiles);
 };
@@ -162,14 +167,14 @@ const validateReasoningControl = (
   if (control === undefined) return;
   const prefix = `tiers.json: '${presetName}.${tierName}.reasoningControl'`;
   if (!isPlainObject(control) || Array.isArray(control)) {
-    throw new Error(`${prefix} must be an object`);
+    return fail(`${prefix} must be an object`);
   }
   const channels = ["variant", "reasoning.effort", "thinking.budgetTokens"];
   if (typeof control.channel !== "string" || !channels.includes(control.channel)) {
-    throw new Error(`${prefix}.channel must be one of ${channels.join("|")}`);
+    return fail(`${prefix}.channel must be one of ${channels.join("|")}`);
   }
   if (!Array.isArray(control.levels) || control.levels.length === 0) {
-    throw new Error(`${prefix}.levels must be a non-empty array`);
+    return fail(`${prefix}.levels must be a non-empty array`);
   }
   const levels = control.levels as unknown[];
   const numeric = control.channel === "thinking.budgetTokens";
@@ -180,12 +185,12 @@ const validateReasoningControl = (
         (!numeric && typeof level === "string" && level.length > 0),
     )
   ) {
-    throw new Error(
+    return fail(
       `${prefix}.levels must contain valid ${numeric ? "non-negative numbers" : "non-empty strings"}`,
     );
   }
   if (new Set(levels).size !== levels.length) {
-    throw new Error(`${prefix}.levels must contain unique values`);
+    return fail(`${prefix}.levels must contain unique values`);
   }
   if (
     numeric &&
@@ -194,15 +199,15 @@ const validateReasoningControl = (
         i > 0 && typeof level === "number" && level <= (levels[i - 1] as number),
     )
   ) {
-    throw new Error(`${prefix}.levels must be strictly ascending`);
+    return fail(`${prefix}.levels must be strictly ascending`);
   }
   if (!isPlainObject(control.profileMap) || Array.isArray(control.profileMap)) {
-    throw new Error(`${prefix}.profileMap must be an object`);
+    return fail(`${prefix}.profileMap must be an object`);
   }
   for (const [profile, native] of Object.entries(control.profileMap)) {
-    if (!profile.trim()) throw new Error(`${prefix}.profileMap keys must be non-empty strings`);
+    if (!profile.trim()) return fail(`${prefix}.profileMap keys must be non-empty strings`);
     if (!levels.includes(native)) {
-      throw new Error(`${prefix}.profileMap.${profile} must reference a value in levels`);
+      return fail(`${prefix}.profileMap.${profile} must reference a value in levels`);
     }
   }
   if (profiles !== undefined) {
@@ -210,14 +215,14 @@ const validateReasoningControl = (
     const missing = profiles.filter((profile) => !mapKeys.includes(String(profile)));
     const extra = mapKeys.filter((profile) => !profiles.includes(profile));
     if (missing.length > 0 || extra.length > 0) {
-      throw new Error(
+      return fail(
         `${prefix}.profileMap keys must exactly match reasoningPolicy.profiles (missing: ${missing.join(", ") || "none"}; extra: ${extra.join(", ") || "none"})`,
       );
     }
   }
   const maxBumps = typeof control.maxBumps === "number" ? control.maxBumps : Number.NaN;
   if (!Number.isInteger(maxBumps) || maxBumps < 0 || maxBumps > levels.length - 1) {
-    throw new Error(`${prefix}.maxBumps must be an integer from 0 to ${levels.length - 1}`);
+    return fail(`${prefix}.maxBumps must be an integer from 0 to ${levels.length - 1}`);
   }
 };
 
@@ -228,7 +233,7 @@ const validateReasoningControl = (
 export const validateModes = (obj: Record<string, unknown>): void => {
   if (obj.modes === undefined) return;
   if (!isPlainObject(obj.modes) || Array.isArray(obj.modes)) {
-    throw new Error("tiers.json: 'modes' must be an object");
+    return fail("'modes' must be an object");
   }
   for (const [modeName, mode] of Object.entries(obj.modes)) {
     validateMode(modeName, mode);
@@ -237,13 +242,13 @@ export const validateModes = (obj: Record<string, unknown>): void => {
 
 export const validateMode = (modeName: string, mode: unknown): void => {
   if (!isPlainObject(mode)) {
-    throw new Error(`tiers.json: mode '${modeName}' must be an object`);
+    return fail(`mode '${modeName}' must be an object`);
   }
   if (typeof mode.defaultTier !== "string") {
-    throw new Error(`tiers.json: mode '${modeName}.defaultTier' must be a string`);
+    return fail(`mode '${modeName}.defaultTier' must be a string`);
   }
   if (typeof mode.description !== "string") {
-    throw new Error(`tiers.json: mode '${modeName}.description' must be a string`);
+    return fail(`mode '${modeName}.description' must be a string`);
   }
 };
 
@@ -254,11 +259,11 @@ export const validateMode = (modeName: string, mode: unknown): void => {
 export const validateTierCaps = (obj: Record<string, unknown>): void => {
   if (obj.tierCaps === undefined) return;
   if (!isPlainObject(obj.tierCaps) || Array.isArray(obj.tierCaps)) {
-    throw new Error("tiers.json: 'tierCaps' must be an object");
+    return fail("'tierCaps' must be an object");
   }
   for (const [tierName, cap] of Object.entries(obj.tierCaps)) {
     if (typeof cap !== "number" || !Number.isFinite(cap) || cap < 1) {
-      throw new Error(`tiers.json: tierCaps.'${tierName}' must be a positive integer`);
+      return fail(`tierCaps.'${tierName}' must be a positive integer`);
     }
   }
 };
@@ -266,11 +271,11 @@ export const validateTierCaps = (obj: Record<string, unknown>): void => {
 export const validateTierPrompts = (obj: Record<string, unknown>): void => {
   if (obj.tierPrompts === undefined) return;
   if (!isPlainObject(obj.tierPrompts) || Array.isArray(obj.tierPrompts)) {
-    throw new Error("tiers.json: 'tierPrompts' must be an object");
+    return fail("'tierPrompts' must be an object");
   }
   for (const [tierName, prompt] of Object.entries(obj.tierPrompts)) {
     if (typeof prompt !== "string") {
-      throw new Error(`tiers.json: tierPrompts.'${tierName}' must be a string`);
+      return fail(`tierPrompts.'${tierName}' must be a string`);
     }
   }
 };
@@ -278,11 +283,11 @@ export const validateTierPrompts = (obj: Record<string, unknown>): void => {
 export const validateTaskPatterns = (obj: Record<string, unknown>): void => {
   if (obj.taskPatterns === undefined) return;
   if (!isPlainObject(obj.taskPatterns) || Array.isArray(obj.taskPatterns)) {
-    throw new Error("tiers.json: 'taskPatterns' must be an object");
+    return fail("'taskPatterns' must be an object");
   }
   for (const [tierName, patterns] of Object.entries(obj.taskPatterns)) {
     if (!Array.isArray(patterns)) {
-      throw new Error(`tiers.json: taskPatterns.'${tierName}' must be an array of strings`);
+      return fail(`taskPatterns.'${tierName}' must be an array of strings`);
     }
   }
 };
@@ -294,7 +299,7 @@ export const validateTaskPatterns = (obj: Record<string, unknown>): void => {
 export const validateEnforcement = (obj: Record<string, unknown>): void => {
   if (obj.enforcement === undefined) return;
   if (!isPlainObject(obj.enforcement) || Array.isArray(obj.enforcement)) {
-    throw new Error("tiers.json: enforcement must be an object");
+    return fail("enforcement must be an object");
   }
   const enf = obj.enforcement;
   validateEnforcementMode(enf);
@@ -310,7 +315,7 @@ export const validateEnforcementMode = (enf: Record<string, unknown>): void => {
     typeof enf.mode !== "string" ||
     !(ENFORCEMENT_MODES as readonly string[]).includes(enf.mode)
   ) {
-    throw new Error(`tiers.json: enforcement.mode must be one of ${ENFORCEMENT_MODES_LIST}`);
+    return fail(`enforcement.mode must be one of ${ENFORCEMENT_MODES_LIST}`);
   }
 };
 
@@ -323,8 +328,7 @@ export const validateEnforcementVerify = (enf: Record<string, unknown>): void =>
     verify.graderPolicy !== undefined &&
     !(GRADER_POLICIES as readonly string[]).includes(verify.graderPolicy as string)
   ) {
-    throw new Error(
-      `tiers.json: enforcement.verify.graderPolicy must be "${EXPECTED_GRADER_POLICY}"`,
+    return fail(`enforcement.verify.graderPolicy must be "${EXPECTED_GRADER_POLICY}"`,
     );
   }
   if (verify.require !== undefined) {
@@ -332,8 +336,7 @@ export const validateEnforcementVerify = (enf: Record<string, unknown>): void =>
       typeof verify.require !== "string" ||
       !(VERIFY_REQUIRE_MODES as readonly string[]).includes(verify.require)
     ) {
-      throw new Error(
-        `tiers.json: enforcement.verify.require must be one of ${VERIFY_REQUIRE_MODES_LIST} (got ${JSON.stringify(verify.require)})`,
+      return fail(`enforcement.verify.require must be one of ${VERIFY_REQUIRE_MODES_LIST} (got ${JSON.stringify(verify.require)})`,
       );
     }
   }
@@ -346,8 +349,7 @@ export const validateEnforcementEscalate = (enf: Record<string, unknown>): void 
   const escalate = enf.escalate;
   const legacyEscalationKey = "reasoning" + "Escalation";
   if (legacyEscalationKey in escalate) {
-    throw new Error(
-      `tiers.json: enforcement.escalate.${legacyEscalationKey} is removed; migrate to per-tier reasoningControl.maxBumps in docs/CONFIG_REFERENCE.md`,
+    return fail(`enforcement.escalate.${legacyEscalationKey} is removed; migrate to per-tier reasoningControl.maxBumps in docs/CONFIG_REFERENCE.md`,
     );
   }
   validateEscalateCostCeiling(escalate);
@@ -356,7 +358,7 @@ export const validateEnforcementEscalate = (enf: Record<string, unknown>): void 
       !Array.isArray(escalate.ladder) ||
       !escalate.ladder.every((s: unknown) => typeof s === "string")
     ) {
-      throw new Error("tiers.json: enforcement.escalate.ladder must be an array of strings");
+      return fail("enforcement.escalate.ladder must be an array of strings");
     }
   }
   if (escalate.maxAttemptsPerTier !== undefined) {
@@ -365,8 +367,7 @@ export const validateEnforcementEscalate = (enf: Record<string, unknown>): void 
       !Number.isInteger(escalate.maxAttemptsPerTier) ||
       escalate.maxAttemptsPerTier < 0
     ) {
-      throw new Error(
-        "tiers.json: enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
+      return fail("enforcement.escalate.maxAttemptsPerTier must be an integer >= 0",
       );
     }
   }
@@ -376,7 +377,7 @@ export const validateEnforcementEscalate = (enf: Record<string, unknown>): void 
       !Number.isInteger(escalate.maxTotalAttempts) ||
       escalate.maxTotalAttempts < 1
     ) {
-      throw new Error("tiers.json: enforcement.escalate.maxTotalAttempts must be an integer >= 1");
+      return fail("enforcement.escalate.maxTotalAttempts must be an integer >= 1");
     }
   }
   if (
@@ -384,7 +385,7 @@ export const validateEnforcementEscalate = (enf: Record<string, unknown>): void 
     escalate.floorTier !== null &&
     typeof escalate.floorTier !== "string"
   ) {
-    throw new Error("tiers.json: enforcement.escalate.floorTier must be a string or null");
+    return fail("enforcement.escalate.floorTier must be a string or null");
   }
 };
 
@@ -395,7 +396,7 @@ export const validateEscalateCostCeiling = (escalate: Record<string, unknown>): 
   const costCeiling = escalate.costCeiling;
   if (costCeiling.multiple !== undefined) {
     if (typeof costCeiling.multiple !== "number" || costCeiling.multiple <= 0) {
-      throw new Error("tiers.json: enforcement.escalate.costCeiling.multiple must be a number > 0");
+      return fail("enforcement.escalate.costCeiling.multiple must be a number > 0");
     }
   }
 };
@@ -409,8 +410,7 @@ export const validateEnforcementPerTier = (enf: Record<string, unknown>): void =
       typeof tierMode !== "string" ||
       !(ENFORCEMENT_MODES as readonly string[]).includes(tierMode)
     ) {
-      throw new Error(
-        `tiers.json: enforcement.perTier.${tierName} must be one of ${ENFORCEMENT_MODES_LIST}`,
+      return fail(`enforcement.perTier.${tierName} must be one of ${ENFORCEMENT_MODES_LIST}`,
       );
     }
   }
@@ -478,7 +478,7 @@ const MATCH_MODES_LIST = MATCH_MODES.join("|");
 export const validateReasoningPolicy = (obj: Record<string, unknown>): void => {
   if (obj.reasoningPolicy === undefined) return;
   if (!isPlainObject(obj.reasoningPolicy) || Array.isArray(obj.reasoningPolicy)) {
-    throw new Error("tiers.json: 'reasoningPolicy' must be an object");
+    return fail("'reasoningPolicy' must be an object");
   }
   const policy = obj.reasoningPolicy;
   validateReasoningPolicyMode(policy);
@@ -491,7 +491,7 @@ export const validateReasoningPolicy = (obj: Record<string, unknown>): void => {
 
 const validateReasoningPolicyV2 = (policy: Record<string, unknown>): void => {
   if (!Array.isArray(policy.profiles) || policy.profiles.length === 0) {
-    throw new Error("tiers.json: reasoningPolicy.profiles must be a non-empty array of strings");
+    return fail("reasoningPolicy.profiles must be a non-empty array of strings");
   }
   if (
     !policy.profiles.every(
@@ -499,24 +499,24 @@ const validateReasoningPolicyV2 = (policy: Record<string, unknown>): void => {
     ) ||
     new Set(policy.profiles).size !== policy.profiles.length
   ) {
-    throw new Error("tiers.json: reasoningPolicy.profiles must contain unique non-empty strings");
+    return fail("reasoningPolicy.profiles must contain unique non-empty strings");
   }
   if (
     policy.mode !== "static" &&
     policy.mode !== undefined &&
     (typeof policy.defaultProfile !== "string" || !policy.profiles.includes(policy.defaultProfile))
   ) {
-    throw new Error("tiers.json: reasoningPolicy.defaultProfile must be a registered profile");
+    return fail("reasoningPolicy.defaultProfile must be a registered profile");
   }
   if (policy.defaultProfile !== undefined && !policy.profiles.includes(policy.defaultProfile)) {
-    throw new Error("tiers.json: reasoningPolicy.defaultProfile must be a registered profile");
+    return fail("reasoningPolicy.defaultProfile must be a registered profile");
   }
   if (policy.surfaceLimits !== undefined && typeof policy.surfaceLimits !== "boolean") {
-    throw new Error("tiers.json: reasoningPolicy.surfaceLimits must be a boolean");
+    return fail("reasoningPolicy.surfaceLimits must be a boolean");
   }
   if (policy.adaptive === undefined) return;
   if (!isPlainObject(policy.adaptive) || Array.isArray(policy.adaptive)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive must be an object");
+    return fail("reasoningPolicy.adaptive must be an object");
   }
   const adaptive = policy.adaptive;
   validateProfileOrNull(
@@ -532,19 +532,18 @@ const validateReasoningPolicyV2 = (policy: Record<string, unknown>): void => {
 const validateProfileOrNull = (value: unknown, path: string, profiles: unknown[]): void => {
   if (value === undefined || value === null) return;
   if (typeof value !== "string" || !profiles.includes(value)) {
-    throw new Error(`tiers.json: ${path} must be a registered profile or null`);
+    return fail(`${path} must be a registered profile or null`);
   }
 };
 
 const validateProfileDefaults = (value: unknown, profiles: unknown[]): void => {
   if (value === undefined) return;
   if (!isPlainObject(value) || Array.isArray(value)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive.tierProfileDefaults must be an object");
+    return fail("reasoningPolicy.adaptive.tierProfileDefaults must be an object");
   }
   for (const [tier, profile] of Object.entries(value)) {
     if (typeof profile !== "string" || !profiles.includes(profile)) {
-      throw new Error(
-        `tiers.json: reasoningPolicy.adaptive.tierProfileDefaults.${tier} must be a registered profile`,
+      return fail(`reasoningPolicy.adaptive.tierProfileDefaults.${tier} must be a registered profile`,
       );
     }
   }
@@ -553,35 +552,35 @@ const validateProfileDefaults = (value: unknown, profiles: unknown[]): void => {
 const validateProfileRules = (value: unknown, profiles: unknown[]): void => {
   if (value === undefined) return;
   if (!Array.isArray(value)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive.rules must be an array");
+    return fail("reasoningPolicy.adaptive.rules must be an array");
   }
   for (const [index, rule] of value.entries()) {
     const prefix = `reasoningPolicy.adaptive.rules[${index}]`;
     if (!isPlainObject(rule) || Array.isArray(rule)) {
-      throw new Error(`tiers.json: ${prefix} must be an object`);
+      return fail(`${prefix} must be an object`);
     }
     if (
       !Array.isArray(rule.keywords) ||
       rule.keywords.length === 0 ||
       !rule.keywords.every((k: unknown) => typeof k === "string")
     ) {
-      throw new Error(`tiers.json: ${prefix}.keywords must be a non-empty array of strings`);
+      return fail(`${prefix}.keywords must be a non-empty array of strings`);
     }
     if (typeof rule.profile !== "string" || !profiles.includes(rule.profile)) {
-      throw new Error(`tiers.json: ${prefix}.profile must be a registered profile`);
+      return fail(`${prefix}.profile must be a registered profile`);
     }
     if (
       rule.match !== undefined &&
       (typeof rule.match !== "string" || !(MATCH_MODES as readonly string[]).includes(rule.match))
     ) {
-      throw new Error(`tiers.json: ${prefix}.match must be one of ${MATCH_MODES_LIST}`);
+      return fail(`${prefix}.match must be one of ${MATCH_MODES_LIST}`);
     }
     if (
       rule.excludeKeywords !== undefined &&
       (!Array.isArray(rule.excludeKeywords) ||
         !rule.excludeKeywords.every((k: unknown) => typeof k === "string"))
     ) {
-      throw new Error(`tiers.json: ${prefix}.excludeKeywords must be an array of strings`);
+      return fail(`${prefix}.excludeKeywords must be an array of strings`);
     }
   }
 };
@@ -592,8 +591,7 @@ export const validateReasoningPolicyMode = (policy: Record<string, unknown>): vo
     typeof policy.mode !== "string" ||
     !(REASONING_MODES as readonly string[]).includes(policy.mode)
   ) {
-    throw new Error(
-      `tiers.json: reasoningPolicy.mode must be one of ${REASONING_MODES_LIST} (got ${JSON.stringify(policy.mode)})`,
+    return fail(`reasoningPolicy.mode must be one of ${REASONING_MODES_LIST} (got ${JSON.stringify(policy.mode)})`,
     );
   }
 };
@@ -601,7 +599,7 @@ export const validateReasoningPolicyMode = (policy: Record<string, unknown>): vo
 export const validateAdaptivePolicy = (policy: Record<string, unknown>): void => {
   if (policy.adaptive === undefined) return;
   if (!isPlainObject(policy.adaptive) || Array.isArray(policy.adaptive)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive must be an object");
+    return fail("reasoningPolicy.adaptive must be an object");
   }
   const adaptive = policy.adaptive;
   validateLevelOrNull(adaptive.trivialLevel, "reasoningPolicy.adaptive.trivialLevel");
@@ -619,8 +617,7 @@ export const validateAdaptivePolicy = (policy: Record<string, unknown>): void =>
 const validateLevelOrNull = (value: unknown, path: string): void => {
   if (value === undefined || value === null) return;
   if (!isConfiguredLevel(value)) {
-    throw new Error(
-      `tiers.json: ${path} must be a non-empty configured profile or null (got ${JSON.stringify(value)})`,
+    return fail(`${path} must be a non-empty configured profile or null (got ${JSON.stringify(value)})`,
     );
   }
 };
@@ -628,7 +625,7 @@ const validateLevelOrNull = (value: unknown, path: string): void => {
 export const validateKeywordRules = (rules: unknown): void => {
   if (rules === undefined) return;
   if (!Array.isArray(rules)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive.keywordRules must be an array");
+    return fail("reasoningPolicy.adaptive.keywordRules must be an array");
   }
   for (const [index, rule] of rules.entries()) {
     validateKeywordRule(rule, index);
@@ -638,22 +635,21 @@ export const validateKeywordRules = (rules: unknown): void => {
 export const validateKeywordRule = (rule: unknown, index: number): void => {
   const prefix = `reasoningPolicy.adaptive.keywordRules[${index}]`;
   if (!isPlainObject(rule) || Array.isArray(rule)) {
-    throw new Error(`tiers.json: ${prefix} must be an object`);
+    return fail(`${prefix} must be an object`);
   }
   // keywords: REQUIRED, non-empty array of strings
   if (!Array.isArray(rule.keywords)) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
+    return fail(`${prefix}.keywords must be an array of strings`);
   }
   if (rule.keywords.length === 0) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be a non-empty array of strings`);
+    return fail(`${prefix}.keywords must be a non-empty array of strings`);
   }
   if (!rule.keywords.every((k: unknown) => typeof k === "string")) {
-    throw new Error(`tiers.json: ${prefix}.keywords must be an array of strings`);
+    return fail(`${prefix}.keywords must be an array of strings`);
   }
   // level: REQUIRED, must be in the level set
   if (!isConfiguredLevel(rule.level)) {
-    throw new Error(
-      `tiers.json: ${prefix}.level must be a non-empty configured profile (got ${JSON.stringify(rule.level)})`,
+    return fail(`${prefix}.level must be a non-empty configured profile (got ${JSON.stringify(rule.level)})`,
     );
   }
   // match: OPTIONAL; must be one of the four mode literals
@@ -662,8 +658,7 @@ export const validateKeywordRule = (rule: unknown, index: number): void => {
       typeof rule.match !== "string" ||
       !(MATCH_MODES as readonly string[]).includes(rule.match as MatchMode)
     ) {
-      throw new Error(
-        `tiers.json: ${prefix}.match must be one of ${MATCH_MODES_LIST} (got ${JSON.stringify(rule.match)})`,
+      return fail(`${prefix}.match must be one of ${MATCH_MODES_LIST} (got ${JSON.stringify(rule.match)})`,
       );
     }
   }
@@ -673,7 +668,7 @@ export const validateKeywordRule = (rule: unknown, index: number): void => {
       !Array.isArray(rule.excludeKeywords) ||
       !rule.excludeKeywords.every((k: unknown) => typeof k === "string")
     ) {
-      throw new Error(`tiers.json: ${prefix}.excludeKeywords must be an array of strings`);
+      return fail(`${prefix}.excludeKeywords must be an array of strings`);
     }
   }
   // regex fail-fast: any keyword that does not compile under `new RegExp`
@@ -684,8 +679,7 @@ export const validateKeywordRule = (rule: unknown, index: number): void => {
       try {
         new RegExp(kw);
       } catch (err) {
-        throw new Error(
-          `tiers.json: ${prefix} has invalid regex '${kw}': ${(err as Error).message}`,
+        return fail(`${prefix} has invalid regex '${kw}': ${(err as Error).message}`,
         );
       }
     }
@@ -695,12 +689,11 @@ export const validateKeywordRule = (rule: unknown, index: number): void => {
 export const validateAdaptiveTierDefaults = (td: unknown): void => {
   if (td === undefined) return;
   if (!isPlainObject(td) || Array.isArray(td)) {
-    throw new Error("tiers.json: reasoningPolicy.adaptive.tierDefaults must be an object");
+    return fail("reasoningPolicy.adaptive.tierDefaults must be an object");
   }
   for (const [tierName, level] of Object.entries(td)) {
     if (!isConfiguredLevel(level)) {
-      throw new Error(
-        `tiers.json: reasoningPolicy.adaptive.tierDefaults.${tierName} must be a non-empty configured profile (got ${JSON.stringify(level)})`,
+      return fail(`reasoningPolicy.adaptive.tierDefaults.${tierName} must be a non-empty configured profile (got ${JSON.stringify(level)})`,
       );
     }
   }
@@ -709,8 +702,7 @@ export const validateAdaptiveTierDefaults = (td: unknown): void => {
 const validateAdaptiveSurfaceDecision = (value: unknown): void => {
   if (value === undefined) return;
   if (typeof value !== "boolean") {
-    throw new Error(
-      `tiers.json: reasoningPolicy.adaptive.surfaceDecision must be a boolean (got ${JSON.stringify(value)})`,
+    return fail(`reasoningPolicy.adaptive.surfaceDecision must be a boolean (got ${JSON.stringify(value)})`,
     );
   }
 };
@@ -731,12 +723,12 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
   const fanout = raw.fanout;
   if (fanout === undefined) return;
   if (!isPlainObject(fanout)) {
-    throw new Error("tiers.json: 'fanout' must be an object");
+    return fail("'fanout' must be an object");
   }
 
   // enabled: boolean
   if (fanout.enabled !== undefined && typeof fanout.enabled !== "boolean") {
-    throw new Error("tiers.json: fanout.enabled must be a boolean");
+    return fail("fanout.enabled must be a boolean");
   }
 
   // maxWorkersPerBatch: positive integer
@@ -747,7 +739,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
       !Number.isInteger(fanout.maxWorkersPerBatch) ||
       fanout.maxWorkersPerBatch < 1
     ) {
-      throw new Error("tiers.json: fanout.maxWorkersPerBatch must be a positive integer");
+      return fail("fanout.maxWorkersPerBatch must be a positive integer");
     }
   }
 
@@ -759,7 +751,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
       !Number.isInteger(fanout.maxConcurrentGlobal) ||
       fanout.maxConcurrentGlobal < 1
     ) {
-      throw new Error("tiers.json: fanout.maxConcurrentGlobal must be a positive integer");
+      return fail("fanout.maxConcurrentGlobal must be a positive integer");
     }
   }
 
@@ -771,7 +763,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
       !Number.isInteger(fanout.workerTimeoutMs) ||
       fanout.workerTimeoutMs < 1
     ) {
-      throw new Error("tiers.json: fanout.workerTimeoutMs must be a positive integer");
+      return fail("fanout.workerTimeoutMs must be a positive integer");
     }
   }
 
@@ -783,7 +775,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
       !Number.isInteger(fanout.batchTimeoutMs) ||
       fanout.batchTimeoutMs < 1
     ) {
-      throw new Error("tiers.json: fanout.batchTimeoutMs must be a positive integer");
+      return fail("fanout.batchTimeoutMs must be a positive integer");
     }
   }
 
@@ -791,15 +783,14 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
   const workerTimeout = fanout.workerTimeoutMs ?? DEFAULT_FANOUT_CONFIG.workerTimeoutMs;
   const batchTimeout = fanout.batchTimeoutMs ?? DEFAULT_FANOUT_CONFIG.batchTimeoutMs;
   if (batchTimeout < workerTimeout) {
-    throw new Error(
-      `tiers.json: fanout.batchTimeoutMs (${batchTimeout}) must be >= fanout.workerTimeoutMs (${workerTimeout})`,
+    return fail(`fanout.batchTimeoutMs (${batchTimeout}) must be >= fanout.workerTimeoutMs (${workerTimeout})`,
     );
   }
 
   // maxConcurrentPerTier: validate keys against active preset
   if (fanout.maxConcurrentPerTier !== undefined) {
     if (!isPlainObject(fanout.maxConcurrentPerTier)) {
-      throw new Error("tiers.json: fanout.maxConcurrentPerTier must be an object");
+      return fail("fanout.maxConcurrentPerTier must be an object");
     }
     // Determine which tiers are in the active preset
     const activePreset = raw.activePreset as string | undefined;
@@ -811,14 +802,12 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
     const validKeys = new Set(presetTiers.filter((t) => fanoutDomain.has(t)));
     for (const key of Object.keys(fanout.maxConcurrentPerTier)) {
       if (!validKeys.has(key)) {
-        throw new Error(
-          `tiers.json: fanout.maxConcurrentPerTier contains unknown tier key '${key}'`,
+        return fail(`fanout.maxConcurrentPerTier contains unknown tier key '${key}'`,
         );
       }
       const val = (fanout.maxConcurrentPerTier as Record<string, unknown>)[key];
       if (typeof val !== "number" || !Number.isFinite(val) || !Number.isInteger(val) || val < 1) {
-        throw new Error(
-          `tiers.json: fanout.maxConcurrentPerTier.${key} must be a positive integer`,
+        return fail(`fanout.maxConcurrentPerTier.${key} must be a positive integer`,
         );
       }
     }
@@ -827,7 +816,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
   // breaker: object with positive integer failureThreshold and cooldownMs
   if (fanout.breaker !== undefined) {
     if (!isPlainObject(fanout.breaker)) {
-      throw new Error("tiers.json: fanout.breaker must be an object");
+      return fail("fanout.breaker must be an object");
     }
     const breaker = fanout.breaker as Record<string, unknown>;
     if (breaker.failureThreshold !== undefined) {
@@ -837,7 +826,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
         !Number.isInteger(breaker.failureThreshold) ||
         breaker.failureThreshold < 1
       ) {
-        throw new Error("tiers.json: fanout.breaker.failureThreshold must be a positive integer");
+        return fail("fanout.breaker.failureThreshold must be a positive integer");
       }
     }
     if (breaker.cooldownMs !== undefined) {
@@ -847,7 +836,7 @@ export const validateFanout = (raw: Record<string, unknown>): void => {
         !Number.isInteger(breaker.cooldownMs) ||
         breaker.cooldownMs < 1
       ) {
-        throw new Error("tiers.json: fanout.breaker.cooldownMs must be a positive integer");
+        return fail("fanout.breaker.cooldownMs must be a positive integer");
       }
     }
   }
