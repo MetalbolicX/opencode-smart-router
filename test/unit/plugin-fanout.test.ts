@@ -789,6 +789,34 @@ describe("executeFanout — batch expiry", () => {
 });
 
 describe("executeFanout — caller cancellation (signal abort)", () => {
+  it("releases acquired admission slots when the caller is already aborted", async () => {
+    const { ctx } = makeCtx({
+      callerTier: "heavy",
+      callerDepth: 1,
+      parentSid: "root-sid",
+      // Global cap of 1: a single leaked admission slot must block the
+      // follow-up batch, so the second call succeeding proves the first
+      // call released its slot back to zero.
+      cfg: { fanout: { ...BASE_CONFIG.fanout, maxConcurrentGlobal: 1 } },
+    });
+    const store = createFanoutStore();
+    ctx.fanoutStore = {
+      ...store,
+      configure: (config) => store.configure(config),
+      tryAcquire: (tier) => store.tryAcquire(tier),
+      release: (tier) => store.release(tier),
+      breakerState: () => store.breakerState(),
+      recordOutcome: (kind) => store.recordOutcome(kind),
+    };
+    const { executeFanout } = await import("../../src/plugin/fanout");
+    const aborted = new AbortController();
+    aborted.abort();
+    const args = { items: [{ tier: "fast", prompt: "first" }] };
+
+    expect(await executeFanout(ctx, args, "caller-sid", aborted.signal)).toBe("");
+    expect(await executeFanout(ctx, args, "caller-sid", undefined)).toContain("status=completed");
+  });
+
   it("signal fires mid-batch: returns silently without waiting for workers", async () => {
     const { ctx, abortSpy } = makeCtx({
       callerTier: "heavy",
