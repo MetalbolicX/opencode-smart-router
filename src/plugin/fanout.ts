@@ -241,6 +241,10 @@ export const executeFanout = async (
     );
   }
 
+  // Admission abort: bail BEFORE acquiring any slot so a pre-aborted caller
+  // cannot leak capacity that only per-worker finally blocks would release.
+  if (signal?.aborted) return "";
+
   // --- Per-item policy + slot acquisition ---
   // Policy check is per-item: invalid tier edges get per-item rejection; other items proceed.
   // Empty prompt is also per-item rejection. Slot acquisition failure is per-item;
@@ -301,6 +305,11 @@ export const executeFanout = async (
   // Mirrors delegate.ts cancellation contract: signal firing mid-batch means the caller
   // cancelled, so we abort in-flight workers and return "" without an aggregate.
   if (signal?.aborted) {
+    // Belt-and-braces: if the signal raced us between the hoisted admission
+    // check and here, release everything this batch acquired before returning.
+    for (const result of itemResults) {
+      if (result.slotAcquired) releaseFanoutSlot(ctx, result.item.tier);
+    }
     return "";
   }
 
