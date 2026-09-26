@@ -120,6 +120,41 @@ describe("resolveLadder — costRatio sort fallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveLadder — default filtered to present tiers", () => {
+  it("returns all canonical tiers when no presets are available", () => {
+    const cfg = makeCfg({}, { presets: {}, activePreset: "missing" });
+    expect(resolveLadder(cfg)).toEqual(["fast", "light", "medium", "focused", "heavy"]);
+  });
+
+  it("filters canonical tiers using the union of all presets", () => {
+    const cfg = makeCfg({}, {
+      activePreset: "empty",
+      presets: {
+        empty: {},
+        other: {
+          medium: { model: "a/m", description: "m", whenToUse: [] },
+          fast: { model: "a/f", description: "f", whenToUse: [] },
+        },
+      },
+    });
+    expect(resolveLadder(cfg)).toEqual(["fast", "medium"]);
+  });
+
+  it("uses canonical order when the active preset is absent", () => {
+    const cfg = makeCfg({}, {
+      activePreset: "missing",
+      presets: {
+        other: {
+          heavy: { model: "a/h", description: "h", whenToUse: [] },
+          focused: { model: "a/fc", description: "fc", whenToUse: [] },
+          medium: { model: "a/m", description: "m", whenToUse: [] },
+          light: { model: "a/l", description: "l", whenToUse: [] },
+          fast: { model: "a/f", description: "f", whenToUse: [] },
+        },
+      },
+    });
+    expect(resolveLadder(cfg)).toEqual(["fast", "light", "medium", "focused", "heavy"]);
+  });
+
   it("three-tier preset returns exactly three rungs", () => {
     const cfg = makeCfg({
       fast: { model: "a/f", description: "f", whenToUse: [], costRatio: 1 },
