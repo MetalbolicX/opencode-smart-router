@@ -75,9 +75,17 @@ export const handleSessionIdle = async (
     // best-effort: a scorecard must never crash a real session
   }
 
-  // Opt-in full trajectory dump (unchanged gating).
-  if (process.env.MODEL_ROUTER_TRAJECTORY_DEBUG !== "1") return;
-  const dump = ctx.trajectoryStore.dump(sid);
-  if (!dump) return;
-  writeTrajectoryLog(sid, dump);
+  // Opt-in full trajectory dump (unchanged gating); dump before clearing.
+  try {
+    if (process.env.MODEL_ROUTER_TRAJECTORY_DEBUG === "1") {
+      const dump = ctx.trajectoryStore.dump(sid);
+      if (dump) writeTrajectoryLog(sid, dump);
+    }
+  } finally {
+    try {
+      ctx.trajectoryStore.clear(sid);
+    } catch {
+      // best-effort: trajectory cleanup must never crash a real session
+    }
+  }
 };
