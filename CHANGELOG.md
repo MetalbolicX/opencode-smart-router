@@ -5,6 +5,131 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] — 2026-09-14
+
+### Changed
+
+- Rotated the fast, medium, and heavy tier models to a multi-provider lineup.
+- Raised the minimum supported Node.js version to 22.6.0.
+
+### Fixed
+
+- Fixed package dry-run handling for npm 12 JSON output.
+
+## [1.10.0] — 2026-08-31
+
+### Added
+
+- Added adaptive reasoning profiles and atomic reasoning controls, including per-tier reasoning bump jumps.
+- Added child-initiated fanout with configurable admission limits, containment, timeouts, and breaker behavior.
+- Added fanout usage guidance and configuration documentation.
+
+### Changed
+
+- Fanout workers run as depth-2 children of the original caller.
+
+## [1.9.2] — 2026-08-16
+
+### Fixed
+
+- Corrected reasoning escalation behavior and profile/config validation.
+
+## [1.9.1] — 2026-08-10
+
+### Fixed
+
+- Corrected adaptive reasoning profile selection and config validation.
+
+## [1.9.0] — 2026-08-10
+
+### Added
+
+- Added reasoning-level escalation on retry before falling back to the next tier.
+
+## [1.8.0] — 2026-08-09
+
+### Added
+
+- Added runtime reasoning mode switching and per-session reasoning control.
+
+## [1.7.0] — 2026-07-15
+
+### Added
+
+- Added the five-tier routing configuration, including light and focused tiers.
+
+## [1.5.10] — 2026-07-13
+
+### Fixed
+
+- Corrected tier and reasoning configuration behavior.
+
+## [1.5.9] — 2026-07-12
+
+### Fixed
+
+- Fixed routing and configuration edge cases.
+
+## [1.5.7] — 2026-07-12
+
+### Changed
+
+- Updated tier routing and preset behavior.
+
+## [1.5.4] — 2026-07-10
+
+### Added
+
+- Added adaptive reasoning configuration and provider-agnostic reasoning controls.
+
+## [1.5.3] — 2026-07-08
+
+### Fixed
+
+- Fixed configuration and routing behavior.
+
+## [1.5.2] — 2026-07-07
+
+### Changed
+
+- Improved model selection and tier configuration.
+
+## [1.5.1] — 2026-07-07
+
+### Fixed
+
+- Fixed release packaging and configuration handling.
+
+## [1.5.0] — 2026-07-06
+
+### Added
+
+- Added additional routing tiers and tier-specific presets.
+
+## [1.4.3] — 2026-07-06
+
+### Fixed
+
+- Fixed routing behavior and configuration validation.
+
+## [1.4.2] — 2026-07-06
+
+### Fixed
+
+- Fixed tier configuration and routing edge cases.
+
+## [1.4.1] — 2026-07-02
+
+### Fixed
+
+- Fixed issues in the 1.4.0 release.
+
+## [1.4.0] — 2026-07-02
+
+### Added
+
+- Added the initial 1.4 release features for tiered routing and configuration.
+
 ## [1.3.0]
 
 ### Changed — advisory enforcement is now the default
