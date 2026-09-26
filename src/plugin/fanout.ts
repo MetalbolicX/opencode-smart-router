@@ -356,15 +356,23 @@ export const executeFanout = async (
         );
         workerSid = created?.data?.id ?? "";
       } catch (err) {
-        if (
-          err instanceof DOMException ||
-          (err !== null && typeof err === "object" && "name" in err && err.name === "AbortError")
-        ) {
+        if (isAbortLikeError(err)) {
           return {
             index: idx,
             tier: item.tier,
             status: "cancelled",
             reason: "session.create aborted",
+          };
+        }
+        // Create-path timeout (withTimeout throws Error("... timed out after Nms")).
+        // Qualifying failure: a systemic create hang must open the breaker,
+        // not reset its streak as a generic failure would.
+        if (err instanceof Error && err.message.includes("timed out")) {
+          return {
+            index: idx,
+            tier: item.tier,
+            status: "timed_out",
+            reason: "session.create timed out",
           };
         }
         return {
@@ -437,10 +445,7 @@ export const executeFanout = async (
           log.info({ event: "fanout.worker_completed", sid: workerSid, tier: item.tier });
           return { index: idx, tier: item.tier, status: "completed", text };
         } catch (err) {
-          if (
-            err instanceof DOMException ||
-            (err !== null && typeof err === "object" && "name" in err && err.name === "AbortError")
-          ) {
+          if (isAbortLikeError(err)) {
             return {
               index: idx,
               tier: item.tier,
