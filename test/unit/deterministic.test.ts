@@ -225,6 +225,32 @@ describe("isCommandAllowed + allowlist gate", () => {
     expect(isCommandAllowed("/usr/local/bin/npx tsc", DEFAULT_ALLOWLIST)).toBe(true);
   });
 
+  it("rejects package runners and interpreters by default", () => {
+    for (const command of [
+      "npx some-pkg",
+      "yarn add x",
+      "bun x",
+      "tsx script.ts",
+      "node script.js",
+      "node -r ./preload.js index.js",
+      "node --import ./x.mjs index.js",
+    ]) {
+      expect(isCommandAllowed(command, DEFAULT_ALLOWLIST), command).toBe(false);
+    }
+  });
+
+  it("keeps approved default tools available", () => {
+    for (const command of [
+      "npm test",
+      "pnpm run build",
+      "vitest run test/a.test.ts",
+      "tsc --noEmit",
+      "eslint .",
+    ]) {
+      expect(isCommandAllowed(command, DEFAULT_ALLOWLIST), command).toBe(true);
+    }
+  });
+
   it("run check: non-allowlisted command => fail, exec NEVER called", async () => {
     let execCalled = false;
     const deps = makeDeps({

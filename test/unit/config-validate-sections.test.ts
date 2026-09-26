@@ -327,6 +327,18 @@ describe("validateEnforcementVerify", () => {
       expect(() => validateEnforcementVerify({ verify: { require: r } })).not.toThrow();
     }
   });
+  it("accepts a valid allowlist of bare command basenames", () => {
+    expect(() =>
+      validateEnforcementVerify({ verify: { allowlist: ["npx", "node", "tsx"] } }),
+    ).not.toThrow();
+  });
+  it("rejects allowlist entries that are not bare basenames", () => {
+    for (const bad of [["/usr/bin/node"], ["a\\b"], ["two words"], [""], [42], "npx"]) {
+      expect(() => validateEnforcementVerify({ verify: { allowlist: bad } })).toThrow(
+        /enforcement\.verify\.allowlist/,
+      );
+    }
+  });
   it("error message includes the JSON-serialized actual value", () => {
     expect(() => validateEnforcementVerify({ verify: { require: 42 } })).toThrow(/got 42/);
   });
