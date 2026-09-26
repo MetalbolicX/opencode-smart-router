@@ -84,6 +84,16 @@ const cleanupWorkerSession = async (
       error: err instanceof Error ? err.message : String(err),
     });
   }
+  try {
+    ctx.trajectoryStore.clear(workerSid);
+  } catch (err) {
+    log.warn({
+      event: "fanout.worker_cleanup_failed",
+      store: "trajectoryStore.clear",
+      sid: workerSid,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
   // SDK teardown — fail-soft, null-safe, independent timeouts.
   // session.delete is NEVER called (binding rule from plan 044).
   // session.abort is conditional: only called on non-success paths.
