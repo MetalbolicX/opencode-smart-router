@@ -113,7 +113,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 048  | Acceptance-gate provenance: allowlist hardening, argv exec, fence neutralization, truthful protocol docs | P1 | M | MED | 046 | TODO |
 | 049  | Route system-prompt transform through the TTL cache (cycle-2 finding, precondition met) | P1 | S | LOW–MED | 046 | TODO |
 | 050  | Raise Node engines floor to >=22.6 + toolchain audit refresh | P2 | S | LOW | — | DONE |
-| 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | TODO |
+| 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | DONE |
 | 052  | CI gate + lint in publish path (cycle-6 exclusion formally re-raised) | P2 | S–M | LOW | 046, 050 | TODO |
 | 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | TODO |
 | 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | TODO |
