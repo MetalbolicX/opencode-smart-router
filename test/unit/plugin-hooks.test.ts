@@ -115,6 +115,7 @@ interface HookHarness {
   recordToolEventCalls: any[];
   changedFileRecordCalls: any[];
   trajectoryEnsureCalls: any[];
+  trajectoryClearCalls: string[];
   trajectoryDumpCalls: string[];
   guardStoreGetCalls: string[];
   graderSessions: Set<string>;
@@ -155,6 +156,7 @@ const makeHarness = (opts?: {
     recordToolEventCalls: [],
     changedFileRecordCalls: [],
     trajectoryEnsureCalls: [],
+    trajectoryClearCalls: [],
     trajectoryDumpCalls: [],
     guardStoreGetCalls: [],
     graderSessions: new Set<string>(),
@@ -194,6 +196,9 @@ const makeHarness = (opts?: {
     dump: (sid: string) => {
       harness.trajectoryDumpCalls.push(sid);
       return null;
+    },
+    clear: (sid: string) => {
+      harness.trajectoryClearCalls.push(sid);
     },
   };
 
@@ -310,6 +315,15 @@ describe("hook handlers — fail-soft on bad input", () => {
     await expect(
       handleSessionIdle(ctx, undefined as unknown as HookEventPayload),
     ).resolves.toBeUndefined();
+  });
+
+  it("handleSessionIdle clears trajectory state for the idle session", async () => {
+    const harness = makeHarness();
+    await handleSessionIdle(harness.ctx, {
+      event: { type: "session.idle", properties: { sessionID: "sid-idle" } },
+    });
+
+    expect(harness.trajectoryClearCalls).toEqual(["sid-idle"]);
   });
 
   it("handleSystemTransform does not throw on partial/empty input that includes a system array", async () => {
