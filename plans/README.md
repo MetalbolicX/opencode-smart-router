@@ -17,6 +17,8 @@ Execute in the order below unless dependencies say otherwise. Each executor:
 read the plan fully before starting, honor its STOP conditions, and update
 your row when done.
 
+Repository execution guidance: see [AGENTS.md](../AGENTS.md).
+
 ## Execution order & status
 
 | Plan | Title | Priority | Effort | Risk | Depends on | Status |
@@ -35,10 +37,10 @@ your row when done.
 | 012  | Make manual reasoning overrides actually patch task dispatch | P1 | S | MED | 011 | DONE |
 | 013  | Add an automated CI gate for typecheck, lint, tests, and build | P1 | S | LOW | 011 | DONE |
 | 014  | Make reasoning control production-ready with runtime mode switching | P1 | M | MED | — | DONE (PR 1 + PR 2 + PR 3 + PR 4 on stacked branch `feature/reasoning-mode-switch`) |
-| 015  | Ship an adaptive reasoning engine as a deterministic, config-driven selector | P1 | L | MED | 010, 014 | TODO |
+| 015  | Ship an adaptive reasoning engine as a deterministic, config-driven selector | P1 | L | MED | 010, 014 | DONE (adaptive V2 shipped: adaptive.ts selectAdaptiveLevelV2 + tool-guards wiring; stale policy.ts comment refreshed by plan 054) |
 | 023  | Restore Guard self-script hard-block (regression from %raw / compiler-warning cleanup) | P1 | S | LOW | — | CLOSED — defects removed by revert `eac39cf` + `f86da65`; no work remains |
 | 024  | Restore ConfigMerge scalar-override (regression from JSON migration cleanup) | P1 | S | LOW | — | CLOSED — defects removed by revert `eac39cf` + `f86da65`; no work remains |
-| 025  | Add VerifyDoD_test.res + VerifyDispatch_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | TODO |
+| 025  | Add VerifyDoD_test.res + VerifyDispatch_test.res parity fixtures (REQ-CORE-104 strict) | P2 | M | LOW | 023 (test-hygiene only) | CLOSED — obsolete: ReScript toolchain fully removed; parity fixtures in .res cannot exist. Do not re-plan. |
 | 026  | Unify Protocol ABI naming — alias `tierConfig` to `RouterConfig` | P3 | S | LOW | — | DONE |
 | 027  | Document test commands in README | P3 | S | LOW | — | DONE |
 | 028  | Eliminate all 162 ReScript compiler warnings via mechanical migration to @rescript/core | P2 | M | LOW | — | DONE |
@@ -50,7 +52,7 @@ See "### Audit cycle 4" below for the reconciliation notes.
 |------|-------|----------|--------|------|------------|--------|
 | 022  | Add Light and Focused Routing Tiers (REFRESHED — residue only) | P1 | M | MED | — | TODO (config DONE; residue = checker.ts + sessions.ts) |
 | 029  | Fail closed on enforced-mode guard errors | P1 | S | MED | — | TODO |
-| 030  | Make coverage a real verification gate (separate `test:gate` script) | P2 | S | LOW | — | TODO |
+| 030  | Make coverage a real verification gate (separate `test:gate` script) | P2 | S | LOW | — | DONE (test:gate script + vitest thresholds live; verified cycle 7) |
 | 031  | Pass only the configured env-gate variable into guard evaluation | P2 | S | LOW–MED | 029 (same-file sequencing) | TODO |
 | 032  | Align Guard Resolver envGate Access Path With the Typed Config | P1 | S | LOW | 031 | DONE (SDD cycle, obs #4084–4090) |
 | 033  | Restore 1:1 TypeScript Parity in the ReScript Guard Engine | P1 | M | LOW–MED | — | DONE |
@@ -116,7 +118,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | TODO |
 | 052  | CI gate + lint in publish path (cycle-6 exclusion formally re-raised) | P2 | S–M | LOW | 046, 050 | TODO |
 | 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | TODO |
-| 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | TODO |
+| 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | DONE |
 | 055  | TrajectoryStore eviction (clear() + teardown wiring + LRU) | P2 | S | LOW | 046, 047 | TODO |
 | 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | TODO |
 | 057  | Config validation throws RouterConfigError (91 sites, messages byte-stable) | P3 | S–M | LOW–MED | 046 | TODO |
