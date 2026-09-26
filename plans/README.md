@@ -123,9 +123,9 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | DONE |
 | 057  | Config validation throws RouterConfigError (91 sites, messages byte-stable) | P3 | S–M | LOW–MED | 046 | DONE |
 | 058  | tier-ladder default: implement documented 5-tier filtered contract | P3 | S | MED | 046 | DONE |
-| 059  | CHANGELOG rebuild 1.4.0→1.11.0 | P3 | M | LOW | 053 | TODO |
+| 059  | CHANGELOG rebuild 1.4.0→1.11.0 | P3 | M | LOW | 053 | DONE |
 | 060  | SPIKE: cost/health/pass-rate read surface (`osr status --report`) | P2 | M | LOW | 046 | DONE |
-| 061  | SPIKE: delegate graduation vs ADR 0002 authoritative end-state | P2 | S–M | LOW | — | TODO |
+| 061  | SPIKE: delegate graduation vs ADR 0002 authoritative end-state | P2 | S–M | LOW | — | DONE |
 | 062  | SPIKE: fanout productization (gate wiring, telemetry, presets) | P2 | M | LOW | 046, 047, 048 | DONE (ADR 0006; SEC-04 resolved-by-decision; 047/048 landed-on-branch, merge pending) |
 
 **Dependency / ordering:**
