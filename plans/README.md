@@ -124,7 +124,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 059  | CHANGELOG rebuild 1.4.0→1.11.0 | P3 | M | LOW | 053 | TODO |
 | 060  | SPIKE: cost/health/pass-rate read surface (`osr status --report`) | P2 | M | LOW | 046 | TODO |
 | 061  | SPIKE: delegate graduation vs ADR 0002 authoritative end-state | P2 | S–M | LOW | — | TODO |
-| 062  | SPIKE: fanout productization (gate wiring, telemetry, presets) | P2 | M | LOW | 046, 047, 048 | TODO |
+| 062  | SPIKE: fanout productization (gate wiring, telemetry, presets) | P2 | M | LOW | 046, 047, 048 | DONE (ADR 0006; SEC-04 resolved-by-decision; 047/048 landed-on-branch, merge pending) |
 
 **Dependency / ordering:**
 
@@ -476,10 +476,10 @@ spike, not a bug), incomplete secret scrubbing (no proven exfiltration sink).
 ### Audit cycle 7 (2026-09-25, commit `c780bf7`) — considered, rejected, or routed
 
 - **Fanout results bypass the acceptance gate** (audit SEC-04, MED
-  confidence): NOT planned as a direct fix — routed to **spike 062** for a
-  design-intent ruling first (per-item vs aggregate vs config-gated
-  verification); a blind fix could miswire ADR 0002's contract for depth-2
-  workers.
+  confidence): resolved-by-decision in **ADR 0006** (Plan 062): per-item
+  verification is recommended by default, with explicit `aggregate` and
+  `off` modes. This is a design ruling, NOT a shipped runtime fix; follow-up
+  implementation plans remain required.
 - **`hooks/chat.ts` zero test references** (TEST-05, MED confidence —
   needs import-graph confirmation): rides with 046's triage; not separately
   planned.
