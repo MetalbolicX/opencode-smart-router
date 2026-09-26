@@ -222,7 +222,7 @@ describe("isCommandAllowed + allowlist gate", () => {
   });
 
   it("accepts path-prefixed binary (basename extraction)", () => {
-    expect(isCommandAllowed("/usr/local/bin/npx tsc", DEFAULT_ALLOWLIST)).toBe(true);
+    expect(isCommandAllowed("/usr/local/bin/tsc --noEmit", DEFAULT_ALLOWLIST)).toBe(true);
   });
 
   it("rejects package runners and interpreters by default", () => {
@@ -303,8 +303,10 @@ describe("isCommandAllowed + allowlist gate", () => {
     expect(isCommandAllowed("tsx -e x", DEFAULT_ALLOWLIST)).toBe(false);
   });
 
-  it("allows node script.js (no eval flag)", () => {
-    expect(isCommandAllowed("node script.js", DEFAULT_ALLOWLIST)).toBe(true);
+  it("rejects node script.js by default (interpreter requires allowlist opt-in)", () => {
+    // Plan 048: node/npx/tsx/etc. were dropped from DEFAULT_ALLOWLIST —
+    // arbitrary-code runners need an explicit enforcement.verify.allowlist entry.
+    expect(isCommandAllowed("node script.js", DEFAULT_ALLOWLIST)).toBe(false);
   });
 
   it("allows tsc -p tsconfig.json (tsc is not an interpreter)", () => {
@@ -387,8 +389,8 @@ describe("runDeterministic — repo-command defaults", () => {
         return { code: 0, stdout: "", stderr: "" };
       },
     });
-    await runDeterministic(makeDoD([{ kind: "testsPass", command: "npx vitest run" }]), deps);
-    expect(capturedCmd).toBe("npx vitest run");
+    await runDeterministic(makeDoD([{ kind: "testsPass", command: "vitest run" }]), deps);
+    expect(capturedCmd).toBe("vitest run");
   });
 
   it("testsPass: timedOut => fail with 'timed out' in reason", async () => {

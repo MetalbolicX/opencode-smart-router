@@ -36,20 +36,7 @@ export const createMutexRegistry = (): MutexRegistry => {
 // Command validation
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_ALLOWLIST = [
-  "npm",
-  "npx",
-  "pnpm",
-  "yarn",
-  "bun",
-  "node",
-  "tsc",
-  "tsx",
-  "vitest",
-  "jest",
-  "eslint",
-  "prettier",
-];
+export const DEFAULT_ALLOWLIST = ["npm", "pnpm", "tsc", "vitest", "jest", "eslint", "prettier"];
 
 // Any shell-chaining / redirection / substitution metacharacter.
 // eslint-disable-next-line no-useless-escape
@@ -68,8 +55,11 @@ const INTERPRETERS = new Set([
   "ruby",
   "perl",
 ]);
-// Inline-eval / inline-print flags: -e, -c, -p, --eval, --print (with optional =value).
-const EVAL_FLAG_RE = /^-(e|c|p)$|^--(eval|print)(=|$)/i;
+// Inline-eval / code-loading flags: -e, -c, -p, -r, --eval, --print, --require,
+// --import (with optional =value). Code-loading flags matter because an
+// allowlisted interpreter must not be turned into an arbitrary-code loader
+// (e.g. `node -r ./preload.js index.js`).
+const EVAL_FLAG_RE = /^-(e|c|p|r)$|^--(eval|print|require|import)(=|$)/i;
 
 export const isCommandAllowed = (command: string, allowlist: string[]): boolean => {
   const trimmed = command.trim();

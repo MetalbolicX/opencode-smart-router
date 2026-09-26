@@ -73,6 +73,12 @@ export interface EnforcementConfig {
     skipTiers?: string[];
     /** Timeout in ms for the after-hook grader call. Defaults to 30000. */
     hookTimeoutMs?: number;
+    /**
+     * EXTRA command basenames appended to the deterministic-gate base allowlist
+     * (npm, pnpm, tsc, vitest, jest, eslint, prettier). Operators re-enabling
+     * package runners or interpreters (npx, node, ...) opt in explicitly here.
+     */
+    allowlist?: string[];
   };
   escalate?: {
     floorTier?: string | null;

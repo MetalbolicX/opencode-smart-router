@@ -32,6 +32,7 @@ import { logEvent } from "../utils/observability";
 import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { withTimeout } from "../utils/timeout";
 import { showRouterToast } from "../utils/toast";
+import { DEFAULT_ALLOWLIST } from "./deterministic";
 import type { DoD, InferHints } from "./dod";
 import { inferDoD, parseDoDFromDispatch } from "./dod";
 import type { GateDeps, GateResult } from "./gate";
@@ -303,6 +304,7 @@ export const buildGateDeps = async (
       fs: ctx.seams.fs,
       cwd: ctx.plugin.directory,
       mutex: ctx.verifyMutex,
+      allowlist: [...DEFAULT_ALLOWLIST, ...(cfg.enforcement?.verify?.allowlist ?? [])],
     },
     checker: {
       dispatchGrader: (req) => dispatchGrader(ctx, req, parentSessionID),

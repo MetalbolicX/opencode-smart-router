@@ -337,6 +337,16 @@ export const validateEnforcementVerify = (enf: Record<string, unknown>): void =>
       );
     }
   }
+  if (verify.allowlist !== undefined) {
+    const allowlist = verify.allowlist;
+    const isValidEntry = (s: unknown): s is string =>
+      typeof s === "string" && s.length > 0 && !/[\s/\\]/.test(s);
+    if (!Array.isArray(allowlist) || !allowlist.every(isValidEntry)) {
+      throw new Error(
+        "tiers.json: enforcement.verify.allowlist entries must be bare command basenames (no paths, backslashes, or whitespace)",
+      );
+    }
+  }
 };
 
 export const validateEnforcementEscalate = (enf: Record<string, unknown>): void => {
