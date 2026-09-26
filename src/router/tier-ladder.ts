@@ -45,6 +45,12 @@ export const resolveLadder = (cfg: RouterConfig): string[] => {
   }
 
   // 3. Default filtered to present tier names (when preset is empty or absent)
-  // An absent/empty preset falls back to the 3-tier default (fast, medium, heavy).
-  return ["fast", "medium", "heavy"];
+  // "Present" = union of tier names across all presets; with no presets at
+  // all, the full canonical five is the only sensible non-empty default.
+  const knownNames = new Set<string>();
+  for (const preset of Object.values(cfg.presets ?? {})) {
+    for (const tierName of Object.keys(preset ?? {})) knownNames.add(tierName);
+  }
+  if (knownNames.size === 0) return [...DEFAULT_TIER_NAMES];
+  return DEFAULT_TIER_NAMES.filter((name) => knownNames.has(name));
 };

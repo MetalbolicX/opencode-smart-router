@@ -703,7 +703,8 @@ describe("buildEscalatePolicy", () => {
 
   it("all defaults when enforcement is absent", () => {
     const p = buildEscalatePolicy(makeCfg());
-    expect(p.ladder).toEqual(["fast", "medium", "heavy"]);
+    // No usable active preset means resolveLadder applies the documented canonical five-tier default.
+    expect(p.ladder).toEqual(["fast", "light", "medium", "focused", "heavy"]);
     expect(p.floorTier).toBeNull();
     expect(p.maxAttemptsPerTier).toBe(1);
     expect(p.maxTotalAttempts).toBe(4);
@@ -733,7 +734,8 @@ describe("buildEscalatePolicy", () => {
   it("enforcement present but escalate absent => defaults", () => {
     const cfg = makeCfg({ enforcement: { mode: "enforced" } });
     const p = buildEscalatePolicy(cfg);
-    expect(p.ladder).toEqual(["fast", "medium", "heavy"]);
+    // Missing escalate config still delegates to resolveLadder's canonical five-tier default.
+    expect(p.ladder).toEqual(["fast", "light", "medium", "focused", "heavy"]);
     expect(p.maxTotalAttempts).toBe(4);
   });
 
@@ -743,7 +745,8 @@ describe("buildEscalatePolicy", () => {
     });
     const p = buildEscalatePolicy(cfg);
     expect(p.maxTotalAttempts).toBe(6);
-    expect(p.ladder).toEqual(["fast", "medium", "heavy"]);
+    // Partial escalate config leaves the ladder unset, so the documented five-tier default applies.
+    expect(p.ladder).toEqual(["fast", "light", "medium", "focused", "heavy"]);
     expect(p.maxAttemptsPerTier).toBe(1);
     expect(p.costMultiple).toBe(4);
   });
