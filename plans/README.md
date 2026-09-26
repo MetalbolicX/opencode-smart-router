@@ -118,7 +118,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | TODO |
 | 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | TODO |
 | 055  | TrajectoryStore eviction (clear() + teardown wiring + LRU) | P2 | S | LOW | 046, 047 | DONE |
-| 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | TODO |
+| 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | DONE |
 | 057  | Config validation throws RouterConfigError (91 sites, messages byte-stable) | P3 | S–M | LOW–MED | 046 | TODO |
 | 058  | tier-ladder default: implement documented 5-tier filtered contract | P3 | S | MED | 046 | TODO |
 | 059  | CHANGELOG rebuild 1.4.0→1.11.0 | P3 | M | LOW | 053 | TODO |
