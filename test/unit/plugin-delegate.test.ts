@@ -9,6 +9,7 @@ import { createReasoningStore } from "../../src/reasoning/store";
 import * as agentsModule from "../../src/router/agents";
 import type { RouterConfig } from "../../src/router/config";
 import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
+import { log } from "../../src/utils/observability";
 
 // ---------------------------------------------------------------------------
 // Delegate-execution parity tests.
@@ -251,6 +252,22 @@ const makeCtx = (opts: {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("executeDelegate — unexpected outer error", () => {
+  it("logs the unexpected error and preserves the fail-closed response", async () => {
+    const { ctx } = makeCtx({});
+    vi.spyOn(ctx, "getConfig").mockRejectedValue(new Error("unexpected boom"));
+    const error = vi.spyOn(log, "error").mockImplementation(() => {});
+
+    await expect(executeDelegate(ctx, { task: "say hi" })).resolves.toBe(
+      "[router] delegate failed (fail-closed): the delegation or verification could not complete (unexpected boom).",
+    );
+    expect(error).toHaveBeenCalledWith(expect.objectContaining({
+      event: "delegate.unexpected_error",
+      error: "unexpected boom",
+    }));
+  });
+});
 
 describe("executeDelegate — happy path", () => {
   it("returns the producer text + deterministic-accepted suffix on first-try PASS", async () => {
