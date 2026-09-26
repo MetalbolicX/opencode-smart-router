@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
 import { createFanoutStore } from "../../src/plugin/fanout-store";
+import { createTrajectoryStore } from "../../src/telemetry/trajectory";
 import { createReasoningStore } from "../../src/reasoning/store";
 import type { RouterConfig } from "../../src/router/config";
 
@@ -98,6 +99,7 @@ const makeCtx = (opts: {
     parentMap.set(callerSid, parentSid);
   }
   const fanoutStore = createFanoutStore();
+  const trajectoryStore = createTrajectoryStore();
   if (opts.breakerState === "open") {
     fanoutStore.recordOutcome("timed_out");
     fanoutStore.recordOutcome("timed_out");
@@ -139,11 +141,7 @@ const makeCtx = (opts: {
       isFanoutWorker: (sid: string) => (opts.isFanoutWorker ? sid === callerSid : false),
       isProducerSession: (sid: string) => (opts.isProducer ? sid === callerSid : false),
     } as any,
-    trajectoryStore: {
-      ensure: () => undefined,
-      recordToolEvent: () => undefined,
-      dump: () => null,
-    } as any,
+    trajectoryStore,
     guardStore: { get: () => null, clear: () => undefined } as any,
     changedFileStore: { get: () => [], clear: () => undefined, record: () => undefined } as any,
     reasoningStore: createReasoningStore(),
@@ -547,12 +545,13 @@ describe("executeFanout — successful aggregation", () => {
 });
 
 describe("executeFanout — cleanup on success", () => {
-  it("no session.abort called, no session.delete called", async () => {
+  it("clears worker trajectory state without aborting or deleting the session", async () => {
     const { ctx, abortSpy, deleteSpy } = makeCtx({
       callerTier: "heavy",
       callerDepth: 1,
       parentSid: "root-sid",
     });
+    ctx.trajectoryStore.ensure("sess_1");
     const { executeFanout } = await import("../../src/plugin/fanout");
     await executeFanout(
       ctx,
@@ -560,6 +559,7 @@ describe("executeFanout — cleanup on success", () => {
       "caller-sid",
       undefined as any,
     );
+    expect(ctx.trajectoryStore.get("sess_1")).toBeUndefined();
     expect(abortSpy).not.toHaveBeenCalled();
     expect(deleteSpy).not.toHaveBeenCalled();
   });
