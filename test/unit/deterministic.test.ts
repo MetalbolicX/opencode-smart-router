@@ -857,3 +857,43 @@ describe("shapeMismatch — Phase 5: array length + element matrix", () => {
     expect(shapeMismatch([{ x: 1 }, { x: 2 }], [{ x: 10 }, { x: 20 }])).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan 048 WU2 — tokenizeCommand + argv (no-shell) exec seam
+// ---------------------------------------------------------------------------
+
+describe("tokenizeCommand + argv seam", () => {
+  it("splits respecting quotes and rejects unterminated quotes", async () => {
+    const { tokenizeCommand } = await import("../../src/utils/shell");
+    expect(tokenizeCommand("npm test")).toEqual({ file: "npm", args: ["test"] });
+    expect(tokenizeCommand('vitest run "a b.test.ts"')).toEqual({
+      file: "vitest",
+      args: ["run", "a b.test.ts"],
+    });
+    expect(tokenizeCommand("vitest run 'x y'")).toEqual({
+      file: "vitest",
+      args: ["run", "x y"],
+    });
+    expect(tokenizeCommand('vitest run "unterminated')).toBeNull();
+    expect(tokenizeCommand("   ")).toBeNull();
+  });
+
+  it("live seam executes via argv (no shell splitting, no glob expansion)", async () => {
+    const { createExecSeam } = await import("../../src/utils/shell");
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "seam-argv-"));
+    try {
+      writeFileSync(join(dir, "a.txt"), "x");
+      writeFileSync(join(dir, "b.txt"), "y");
+      const seam = createExecSeam({ directory: dir });
+      // Under shell exec, the glob expands (argv length 3); under execFile argv
+      // the pattern reaches the child literally (argv length 2).
+      const r = await seam('node -e "console.log(process.argv.length)" *.txt', { cwd: dir });
+      expect(r.stdout.trim()).toBe("2");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
