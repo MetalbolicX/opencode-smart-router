@@ -1,7 +1,8 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RouterConfig } from "../../src/router/config.types";
 import { readMergedConfig } from "../../src/router/config-loader";
 import { createConfigStore } from "../../src/router/config-store";
 
@@ -230,6 +231,44 @@ describe("createConfigStore — two-instance / two-cwd isolation", () => {
 // ---------------------------------------------------------------------------
 
 describe("createConfigStore — direct pure-store coverage", () => {
+  it("deduplicates concurrent forced loads", async () => {
+    let resolveLoad: (value: RouterConfig) => void = () => {};
+    const loadImpl = vi.fn(
+      () =>
+        new Promise<RouterConfig>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+    const store = createConfigStore({ cwd: tmpCwd, loadImpl });
+    const first = store.refresh("a");
+    const second = store.getFresh();
+    const value = await readMergedConfig({ cwd: tmpCwd });
+    resolveLoad(value);
+
+    const [firstValue, secondValue] = await Promise.all([first, second]);
+    expect(loadImpl).toHaveBeenCalledTimes(1);
+    expect(firstValue).toBe(value);
+    expect(secondValue).toBe(value);
+  });
+
+  it("does not cache a load invalidated while in flight", async () => {
+    let resolveLoad: (value: RouterConfig) => void = () => {};
+    const loadImpl = vi.fn(
+      () =>
+        new Promise<RouterConfig>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+    const store = createConfigStore({ cwd: tmpCwd, loadImpl });
+    const pending = store.refresh();
+    store.invalidate();
+    resolveLoad(await readMergedConfig({ cwd: tmpCwd }));
+    await pending;
+
+    expect(store.loadedAtMs()).toBeNull();
+    expect(store.isStale()).toBe(true);
+  });
+
   it("refresh() returns a value with the same activePreset when the disk state is unchanged", async () => {
     const store = createConfigStore({ cwd: tmpCwd });
     const a = await store.refresh();
