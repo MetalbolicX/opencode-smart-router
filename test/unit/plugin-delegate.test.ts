@@ -8,8 +8,8 @@ import { createFanoutStore } from "../../src/plugin/fanout-store";
 import { createReasoningStore } from "../../src/reasoning/store";
 import * as agentsModule from "../../src/router/agents";
 import type { RouterConfig } from "../../src/router/config";
-import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
 import { log } from "../../src/utils/observability";
+import { resolveTierModelGuard } from "../../src/utils/tier-model-guard";
 
 // ---------------------------------------------------------------------------
 // Delegate-execution parity tests.
@@ -262,10 +262,12 @@ describe("executeDelegate — unexpected outer error", () => {
     await expect(executeDelegate(ctx, { task: "say hi" })).resolves.toBe(
       "[router] delegate failed (fail-closed): the delegation or verification could not complete (unexpected boom).",
     );
-    expect(error).toHaveBeenCalledWith(expect.objectContaining({
-      event: "delegate.unexpected_error",
-      error: "unexpected boom",
-    }));
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "delegate.unexpected_error",
+        error: "unexpected boom",
+      }),
+    );
   });
 });
 

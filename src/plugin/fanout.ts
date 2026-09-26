@@ -54,57 +54,14 @@ const cleanupWorkerSession = async (
   workerSucceeded: boolean,
   abortFailedWorkers: Set<string>,
 ): Promise<void> => {
-  try {
-    ctx.changedFileStore.clear(workerSid);
-  } catch (err) {
-    log.warn({
-      event: "fanout.worker_cleanup_failed",
-      store: "changedFileStore.clear",
-      sid: workerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    ctx.sessionStore.unregister(workerSid);
-  } catch (err) {
-    log.warn({
-      event: "fanout.worker_cleanup_failed",
-      store: "sessionStore.unregister",
-      sid: workerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    ctx.guardStore.clear(workerSid);
-  } catch (err) {
-    log.warn({
-      event: "fanout.worker_cleanup_failed",
-      store: "guardStore.clear",
-      sid: workerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    ctx.trajectoryStore.clear(workerSid);
-  } catch (err) {
-    log.warn({
-      event: "fanout.worker_cleanup_failed",
-      store: "trajectoryStore.clear",
-      sid: workerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  await clearSessionStores(ctx, workerSid, "fanout.worker_cleanup_failed");
   // SDK teardown — fail-soft, null-safe, independent timeouts.
   // session.delete is NEVER called (binding rule from plan 044).
   // session.abort is conditional: only called on non-success paths.
   if (!workerSucceeded && workerSid) {
     log.info({ event: "fanout.worker_aborted", sid: workerSid });
     try {
-      await withTimeout(
-        ctx.plugin.client.session.abort({ path: { id: workerSid } }),
-        10_000,
-        "fanout session.abort",
-      );
+      await abortSessionWithTimeout(ctx, workerSid, "fanout session.abort");
     } catch (err) {
       // 10s abort timeout exceeded — cleanup abort failure.
       // This is a qualifying failure: trips the breaker.
@@ -632,3 +589,5 @@ export const executeFanout = async (
   const lines = items.map(formatItemResult);
   return lines.join("\n\n");
 };
+
+import { abortSessionWithTimeout, clearSessionStores } from "./session-teardown";

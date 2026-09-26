@@ -43,6 +43,7 @@ import {
 } from "../verify/dispatch";
 import { accept } from "../verify/gate";
 import type { PluginContext } from "./context";
+import { abortSessionWithTimeout, clearSessionStores, isAbortLikeError } from "./session-teardown";
 import type { DelegateArgs, SessionCreateResult, SessionPromptResult } from "./types";
 import { extractPromptText, extractSessionId } from "./types";
 
@@ -64,36 +65,7 @@ const cleanupProducerSession = async (
   producerSid: string,
   shouldAbort = true,
 ): Promise<void> => {
-  try {
-    ctx.changedFileStore.clear(producerSid);
-  } catch (err) {
-    log.warn({
-      event: "delegate.cleanup_failed",
-      store: "changedFileStore.clear",
-      sid: producerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    ctx.sessionStore.unregister(producerSid);
-  } catch (err) {
-    log.warn({
-      event: "delegate.cleanup_failed",
-      store: "sessionStore.unregister",
-      sid: producerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    ctx.guardStore.clear(producerSid);
-  } catch (err) {
-    log.warn({
-      event: "delegate.cleanup_failed",
-      store: "guardStore.clear",
-      sid: producerSid,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  await clearSessionStores(ctx, producerSid, "delegate.cleanup_failed");
   // SDK teardown — fail-soft, null-safe, independent timeouts.
   // SDD fix-session-ghost-tui-jump: session.delete is NEVER called.
   // session.abort is conditional (shouldAbort parameter) — only called on
@@ -101,11 +73,7 @@ const cleanupProducerSession = async (
   // sessions for developer review.
   if (shouldAbort && producerSid) {
     try {
-      await withTimeout(
-        ctx.plugin.client.session.abort({ path: { id: producerSid } }),
-        10_000,
-        "delegate session.abort",
-      );
+      await abortSessionWithTimeout(ctx, producerSid, "delegate session.abort");
     } catch (err) {
       log.warn({
         event: "delegate.cleanup_failed",
@@ -297,10 +265,7 @@ export const executeDelegate = async (
           // AbortError during session.create: bail silently. We never
           // produced a producer sid, so no per-attempt cleanup is needed
           // — the outer while-loop will exit on the next top-of-loop check.
-          if (
-            (err instanceof DOMException && err.name === "AbortError") ||
-            (err !== null && typeof err === "object" && "name" in err && err.name === "AbortError")
-          ) {
+          if (isAbortLikeError(err)) {
             return "";
           }
           throw err;
@@ -681,6 +646,11 @@ export const executeDelegate = async (
     }
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
+    log.error({
+      event: "delegate.unexpected_error",
+      error: reason,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return `[router] delegate failed (fail-closed): the delegation or verification could not complete (${reason}).`;
   }
 };

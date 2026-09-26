@@ -1,18 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { log } from "../../src/utils/observability";
 import { abortSessionWithTimeout, clearSessionStores } from "../../src/plugin/session-teardown";
-import type { PluginContext } from "../../src/plugin/context";
+import { log } from "../../src/utils/observability";
 
-const makeContext = (abort: () => Promise<unknown>): PluginContext => {
+interface TeardownContext {
+  changedFileStore: { clear(sid: string): void };
+  sessionStore: { unregister(sid: string): void };
+  guardStore: { clear(sid: string): void };
+  trajectoryStore: { clear(sid: string): void };
+  plugin: { client: { session: { abort(input: { path: { id: string } }): Promise<unknown> } } };
+}
+
+const makeContext = (abort: () => Promise<unknown>) => {
   const clear = vi.fn();
   const unregister = vi.fn();
-  return {
+  const context = {
     changedFileStore: { clear },
     sessionStore: { unregister },
     guardStore: { clear: vi.fn() },
     trajectoryStore: { clear: vi.fn() },
     plugin: { client: { session: { abort } } },
-  } as PluginContext;
+  };
+  return context satisfies TeardownContext;
 };
 
 describe("shared session teardown", () => {
@@ -30,13 +38,16 @@ describe("shared session teardown", () => {
 
     expect(ctx.sessionStore.unregister).toHaveBeenCalledWith("sid");
     expect(ctx.guardStore.clear).toHaveBeenCalledWith("sid");
+    expect(ctx.trajectoryStore.clear).toHaveBeenCalledTimes(1);
     expect(ctx.trajectoryStore.clear).toHaveBeenCalledWith("sid");
-    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
-      event: "delegate.cleanup_failed",
-      store: "changedFileStore.clear",
-      sid: "sid",
-      error: "clear failed",
-    }));
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "delegate.cleanup_failed",
+        store: "changedFileStore.clear",
+        sid: "sid",
+        error: "clear failed",
+      }),
+    );
   });
 
   it("preserves the fanout cleanup event name", async () => {
@@ -48,12 +59,14 @@ describe("shared session teardown", () => {
 
     await clearSessionStores(ctx, "worker", "fanout.worker_cleanup_failed");
 
-    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
-      event: "fanout.worker_cleanup_failed",
-      store: "guardStore.clear",
-      sid: "worker",
-      error: "guard failed",
-    }));
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "fanout.worker_cleanup_failed",
+        store: "guardStore.clear",
+        sid: "worker",
+        error: "guard failed",
+      }),
+    );
   });
 
   it("resolves when abort succeeds and rejects when abort times out", async () => {
@@ -61,6 +74,8 @@ describe("shared session teardown", () => {
     await expect(abortSessionWithTimeout(success, "sid", "test abort")).resolves.toBeUndefined();
 
     const pending = makeContext(() => new Promise(() => {}));
-    await expect(abortSessionWithTimeout(pending, "sid", "test abort", 1)).rejects.toThrow("test abort");
+    await expect(abortSessionWithTimeout(pending, "sid", "test abort", 1)).rejects.toThrow(
+      "test abort",
+    );
   });
 });
