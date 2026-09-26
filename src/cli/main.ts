@@ -18,6 +18,7 @@
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { RouterConfigError } from "../router/config-errors";
 import { runInstall } from "./install";
 import { runDoctor, runStatus } from "./status";
 import { runConfigInit, runConfigPaths } from "./tiers-config";
@@ -226,7 +227,11 @@ export const runMain = async (argv: readonly string[] = process.argv): Promise<M
         return { command, exitCode: 2 };
     }
   } catch (err) {
-    console.error(`osr: ${(err as Error).message}`);
+    if (err instanceof RouterConfigError) {
+      console.error(`osr: config error [${err.kind}] ${err.path}: ${err.message}`);
+    } else {
+      console.error(`osr: ${(err as Error).message}`);
+    }
     setExit(1);
     return { command, exitCode: 1 };
   }
