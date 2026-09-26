@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../src/plugin/context";
 import { createFanoutStore } from "../../src/plugin/fanout-store";
-import { createTrajectoryStore } from "../../src/telemetry/trajectory";
 import { createReasoningStore } from "../../src/reasoning/store";
 import type { RouterConfig } from "../../src/router/config";
+import { createTrajectoryStore } from "../../src/telemetry/trajectory";
 
 const BASE_CONFIG: RouterConfig = {
   activePreset: "default",
