@@ -981,6 +981,53 @@ describe("executeFanout — non-retryable prompt error does NOT trip the breaker
 });
 
 describe("executeFanout — breaker open via timeout streak", () => {
+  it("create timeout qualifies and opens the breaker; non-abort DOMExceptions are failures", async () => {
+    const { ctx } = makeCtx({ callerTier: "heavy", callerDepth: 1, parentSid: "root-sid" });
+    ctx.plugin.client.session.create = async () => {
+      throw new Error("fanout session.create timed out after 30000ms");
+    };
+    const { executeFanout } = await import("../../src/plugin/fanout");
+    for (let i = 0; i < 3; i++) {
+      const out = await executeFanout(
+        ctx,
+        { items: [{ tier: "fast", prompt: "work" }] },
+        "caller-sid",
+        undefined,
+      );
+      expect(out).toContain("status=timed_out");
+    }
+    expect(ctx.fanoutStore.breakerState()).toBe("open");
+  });
+
+  it("does not classify non-abort DOMExceptions as cancellation", async () => {
+    const { ctx } = makeCtx({ callerTier: "heavy", callerDepth: 1, parentSid: "root-sid" });
+    ctx.plugin.client.session.create = async () => {
+      throw new DOMException("not aborted", "TimeoutError");
+    };
+    const { executeFanout } = await import("../../src/plugin/fanout");
+    expect(
+      await executeFanout(
+        ctx,
+        { items: [{ tier: "fast", prompt: "work" }] },
+        "caller-sid",
+        undefined,
+      ),
+    ).toContain("status=failed");
+
+    ctx.plugin.client.session.create = async () => ({ data: { id: "sess_prompt_error" } }) as any;
+    ctx.plugin.client.session.prompt = async () => {
+      throw new DOMException("not an abort", "TypeError");
+    };
+    expect(
+      await executeFanout(
+        ctx,
+        { items: [{ tier: "fast", prompt: "work" }] },
+        "caller-sid",
+        undefined,
+      ),
+    ).toContain("status=failed");
+  });
+
   it("after 3 consecutive timed-out batches, fourth batch rejected as circuit_open", async () => {
     const { ctx, createSpy } = makeCtx({
       callerTier: "heavy",
