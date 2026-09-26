@@ -749,6 +749,41 @@ describe("executeFanout — worker timeout", () => {
 });
 
 describe("executeFanout — batch expiry", () => {
+  it("returns completed partials at the deadline without awaiting a hung worker", async () => {
+    const { ctx } = makeCtx({
+      callerTier: "heavy",
+      callerDepth: 1,
+      parentSid: "root-sid",
+      cfg: { fanout: { ...BASE_CONFIG.fanout, batchTimeoutMs: 30, workerTimeoutMs: 60_000 } },
+    });
+    let rejectHung: (reason?: unknown) => void = () => {};
+    ctx.plugin.client.session.prompt = async ({ body }) => {
+      const first = body?.parts[0];
+      if (first?.type === "text" && first.text === "hang") {
+        return new Promise((_, reject) => {
+          rejectHung = reject;
+        }) as any;
+      }
+      return { data: { parts: [{ type: "text", text: "settled" }] } } as any;
+    };
+    const { executeFanout } = await import("../../src/plugin/fanout");
+    const pending = executeFanout(
+      ctx,
+      {
+        items: [
+          { tier: "fast", prompt: "done" },
+          { tier: "medium", prompt: "hang" },
+        ],
+      },
+      "caller-sid",
+      undefined,
+    );
+    const out = await pending;
+    expect(out).toContain("\nsettled");
+    expect(out).toContain("status=timed_out");
+    rejectHung(new Error("settled after deadline"));
+  });
+
   it("all workers timed out: aggregate returns by batchTimeoutMs, abort called per worker", async () => {
     vi.useFakeTimers();
     try {

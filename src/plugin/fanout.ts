@@ -3,6 +3,7 @@
 // enabled, breaker closed, non-empty items, items.length <= maxWorkersPerBatch.
 
 import { DEFAULT_FANOUT_CONFIG } from "../router/config.types";
+import { isAbortLikeError } from "../utils/error-classify";
 import { log } from "../utils/observability";
 import { resolveTierModelGuard } from "../utils/tier-model-guard";
 import { withTimeout } from "../utils/timeout";
@@ -492,23 +493,52 @@ export const executeFanout = async (
   }
 
   // --- Race all workers against batchTimeoutMs ---
-  let batchTimedOut = false;
+  // Record settlements as they happen so a batch deadline can aggregate
+  // settled-so-far instead of blocking on every worker.
   const batchPromise = Promise.allSettled(workerPromises);
+  // Dense array (every index explicitly undefined): Array#map skips holes in
+  // sparse arrays, so a `new Array(n)` here would silently drop the timed_out
+  // fill below for every worker still unsettled at the deadline.
+  const settled: Array<PromiseSettledResult<FanoutItemResult> | undefined> = new Array(
+    workerPromises.length,
+  ).fill(undefined);
+  workerPromises.forEach((promise, index) => {
+    void promise.then(
+      (value) => {
+        settled[index] = { status: "fulfilled", value };
+      },
+      (reason: unknown) => {
+        settled[index] = { status: "rejected", reason };
+      },
+    );
+  });
 
+  let batchDeadlineExceeded = false;
   try {
     await withTimeout(batchPromise, effectiveCfg.batchTimeoutMs, "fanout batch", signal);
-  } catch {
-    batchTimedOut = true;
-  }
-
-  if (batchTimedOut) {
-    // On batch timeout, we return what we have. In-flight workers will
-    // self-cleanup via their finally blocks when their prompts time out.
-    void workerPromises;
+  } catch (err) {
+    // Caller cancelled — silent "" is the documented contract (see doc
+    // comment above). In-flight workers self-release slots via their own
+    // finally blocks; we never wait for stragglers here.
+    if (isAbortLikeError(err)) return "";
+    batchDeadlineExceeded = true;
   }
 
   // --- Aggregate ---
-  const rawResults = await batchPromise;
+  const rawResults: Array<PromiseSettledResult<FanoutItemResult>> = batchDeadlineExceeded
+    ? settled.map(
+        (result, idx) =>
+          result ?? {
+            status: "fulfilled" as const,
+            value: {
+              index: idx,
+              tier: args.items[idx]?.tier ?? "unknown",
+              status: "timed_out" as const,
+              reason: "batch deadline exceeded",
+            },
+          },
+      )
+    : ((await batchPromise) as Array<PromiseSettledResult<FanoutItemResult>>);
   const items: FanoutItemResult[] = rawResults.map((result, idx) => {
     if (result.status === "fulfilled") {
       return result.value;
