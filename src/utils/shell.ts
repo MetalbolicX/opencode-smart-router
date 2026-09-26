@@ -12,8 +12,13 @@
 // behaviour stays byte-identical.
 // ---------------------------------------------------------------------------
 
-import { type ExecException, exec as nodeExec } from "node:child_process";
+import { type ExecFileException, execFile } from "node:child_process";
+import { tokenizeCommand } from "../verify/deterministic";
 import type { ExecResult, ExecSeam } from "../verify/types";
+
+// Re-exported so consumers of the shell seam share the SAME tokenizer that
+// validation (isCommandAllowed) uses — one parse, two consumers, no drift.
+export { tokenizeCommand };
 
 /** Per-call options accepted by the exec seam. */
 export interface ExecSeamOptions {
@@ -44,25 +49,39 @@ const failClosed = (): ExecResult => {
 };
 
 /**
- * Create a live exec seam bound to the given directory. The returned function
- * resolves (never rejects) for any underlying error, mirroring the original
- * inline closure: shell errors and timeouts resolve to an ExecResult with
- * `code` set, stdout/stderr captured, and `timedOut` flagged when the child
- * was killed by SIGTERM. Synchronous throws resolve to the fail-closed shape.
+ * Create a live exec seam bound to the given directory. The command string is
+ * tokenized (quote-aware) and executed via execFile — NO shell — so quoted
+ * arguments stay one argv element and metacharacters are never interpreted.
+ * The returned function resolves (never rejects) for any underlying error,
+ * mirroring the original inline closure: spawn errors and timeouts resolve to
+ * an ExecResult with `code` set, stdout/stderr captured, and `timedOut`
+ * flagged when the child was killed by SIGTERM. Synchronous throws, missing
+ * binaries, and unterminated quotes resolve to the fail-closed shape.
  */
 export const createExecSeam = (ctx: ExecSeamContext): ExecSeam => {
   return (command, opts) =>
     new Promise<ExecResult>((resolve) => {
+      let parsed: { file: string; args: string[] } | null = null;
       try {
-        nodeExec(
-          command,
+        parsed = tokenizeCommand(command);
+      } catch {
+        parsed = null;
+      }
+      if (parsed === null) {
+        resolve(failClosed());
+        return;
+      }
+      try {
+        execFile(
+          parsed.file,
+          parsed.args,
           {
             cwd: opts?.cwd ?? ctx.directory,
             timeout: opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
             maxBuffer: MAX_BUFFER_BYTES,
             windowsHide: true,
           },
-          (err: ExecException | null, stdout: string, stderr: string) => {
+          (err: ExecFileException | null, stdout: string, stderr: string) => {
             const timedOut = !!(err?.killed && err.signal === "SIGTERM");
             const code = err && typeof err.code === "number" ? err.code : err ? 1 : 0;
             resolve({
