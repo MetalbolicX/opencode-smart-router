@@ -115,7 +115,7 @@ the documented **5-tier filtered** contract (not the 3-tier hardcode).
 | 050  | Raise Node engines floor to >=22.6 + toolchain audit refresh | P2 | S | LOW | — | DONE |
 | 051  | Serialize config-store loads (in-flight dedup + generation guard) | P2 | S | LOW | 046 | TODO |
 | 052  | CI gate + lint in publish path (cycle-6 exclusion formally re-raised) | P2 | S–M | LOW | 046, 050 | TODO |
-| 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | TODO |
+| 053  | Root AGENTS.md for LLM executors | P2 | M | LOW | 046, 050 | DONE |
 | 054  | Reconcile plans index (015/030 DONE, 025 CLOSED) + repo-hygiene strays | P2 | S | LOW | 053 (link only) | TODO |
 | 055  | TrajectoryStore eviction (clear() + teardown wiring + LRU) | P2 | S | LOW | 046, 047 | TODO |
 | 056  | Shared session-teardown helpers + delegate unexpected-error logging | P3 | M | MED | 046, 047 (055 ideally first) | TODO |
