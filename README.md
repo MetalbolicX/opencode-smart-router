@@ -296,8 +296,10 @@ Add to `~/.config/opencode/opencode.json`:
 ```bash
 git clone https://github.com/MetalbolicX/opencode-smart-router
 cd opencode-smart-router
-npm install
+pnpm install
 ```
+
+This repo uses pnpm (or run `corepack enable` first).
 
 In `~/.config/opencode/opencode.json`:
 
@@ -991,7 +993,6 @@ The exact overhead has tracked release-over-release; for the current value, see 
 ## License
 
 GPL-3.0 — see [LICENSE](./LICENSE).
-# Plan 041 migration
 
 Reasoning configuration uses v2 `reasoningControl` objects. Migrate legacy
 `capability` tier fields and the global `reasoningEscalation` block to ordered
