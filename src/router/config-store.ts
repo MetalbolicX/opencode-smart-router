@@ -95,21 +95,41 @@ export interface ConfigStore {
  * negative value disables staleness-based auto-refresh — `read()` will
  * then only load on an empty cache (i.e., behaves like the pre-TTL store).
  */
-export const createConfigStore = (opts: { cwd: string; ttlMs?: number }): ConfigStore => {
+export const createConfigStore = (opts: {
+  cwd: string;
+  ttlMs?: number;
+  /** Internal test seam; production callers should use readMergedConfig. */
+  loadImpl?: (opts: { cwd: string }) => Promise<RouterConfig>;
+}): ConfigStore => {
   const ttlMs = opts.ttlMs ?? DEFAULT_CONFIG_TTL_MS;
   let cached: CachedConfig | null = null;
+  let inflight: Promise<CachedConfig> | null = null;
+  let generation = 0;
 
   const load = async (reason?: string): Promise<CachedConfig> => {
-    const value = await readMergedConfig({ cwd: opts.cwd });
-    cached = { value, loadedAt: Date.now() };
-    logConfigRefresh({
-      outcome: "ok",
-      reason: reason ?? "manual",
-      loadedAt: cached.loadedAt,
-      ttlMs,
-      activePreset: value.activePreset,
-    });
-    return cached;
+    if (inflight) return inflight;
+    const myGeneration = generation;
+    // Piggybacking callers inherit the reason of the load that started first.
+    const pending = (async (): Promise<CachedConfig> => {
+      const value = await (opts.loadImpl ?? readMergedConfig)({ cwd: opts.cwd });
+      if (myGeneration === generation) {
+        cached = { value, loadedAt: Date.now() };
+        logConfigRefresh({
+          outcome: "ok",
+          reason: reason ?? "manual",
+          loadedAt: cached.loadedAt,
+          ttlMs,
+          activePreset: value.activePreset,
+        });
+      }
+      return cached ?? { value, loadedAt: Date.now() };
+    })();
+    inflight = pending;
+    try {
+      return await pending;
+    } finally {
+      if (inflight === pending) inflight = null;
+    }
   };
 
   /**
@@ -160,7 +180,9 @@ export const createConfigStore = (opts: { cwd: string; ttlMs?: number }): Config
       return fresh.value;
     },
     invalidate(): void {
+      generation += 1;
       cached = null;
+      inflight = null;
     },
     isStale(): boolean {
       if (!cached) return true;
