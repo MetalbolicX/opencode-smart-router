@@ -43,8 +43,17 @@ Top-level `tiers.json` fields. All blocks are optional and additive; omitting a 
 | `graderPolicy` | `"atLeastProducerTier"` | `"atLeastProducerTier"` | **Only valid value.** Grader tier = `max(producerTier, minGraderTier)` along the ladder; never below the producer. A deterministic check uses no grader. |
 | `graderTemperature` | `number` | `0` | Applied via the `chat.params` hook to grader sessions only. |
 | `minGraderTier` | `string` | _(none)_ | Optional floor for the grader tier, independent of producer. |
+| `allowlist` | `string[]` | `["npm","pnpm","tsc","vitest","jest","eslint","prettier"]` | EXTRA command basenames the deterministic `run` checks may execute, appended to the base list. Entries must be bare command basenames (no paths, backslashes, or whitespace). |
 
 > **Note:** `graderPolicy: "atLeastProducerTier"` ensures a cheap producer is never graded by an even cheaper model. A deterministic DoD check (shell command, test run, lint) skips the grader entirely.
+
+> **Migration (breaking, plan 048):** `npx`, `yarn`, `bun`, `node`, and `tsx` were removed from the default `run`-check allowlist — they are arbitrary-code runners by design. Existing configs using them in `check: run command="…"` now fail closed until you opt back in explicitly:
+>
+> ```json
+> "verify": { "allowlist": ["npx", "node"] }
+> ```
+>
+> Interpreter flags that load code (`-r/--require/--import`, plus `-e/--eval`) are rejected even for allowlisted interpreters.
 
 ---
 
