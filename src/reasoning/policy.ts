@@ -42,8 +42,8 @@ import { type AdaptiveSignals, selectAdaptiveLevelV2 } from "./adaptive.js";
  *
  * The `signals` argument is required — it feeds `selectAdaptiveLevel` in
  * adaptive mode. Hooks that haven't yet threaded real task text (today:
- * `src/plugin/hooks.ts` — wired in a later PR of Plan 015) pass an empty
- * `{ prompt: "", description: "", tierName, isTrivial }` placeholder; the
+ * `src/plugin/hooks/tool-guards.ts` thread real dispatch signals through the
+ * adaptive V2 wiring; the
  * selector's keyword step is a substring match against an empty haystack so
  * non-trivial calls fall through to `tierDefaults` / `defaultLevel` safely.
  *
