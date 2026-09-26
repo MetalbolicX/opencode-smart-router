@@ -124,6 +124,8 @@ export const dumpTrajectory = (state: TrajectoryState): string => {
   return `[trajectory ${state.sessionID}] ${JSON.stringify(trajectoryMetrics(state))}`;
 };
 
+export const MAX_SESSIONS = 256;
+
 // ---------------------------------------------------------------------------
 // Per-instance store factory — mirrors src/router/sessions.ts pattern
 // ---------------------------------------------------------------------------
@@ -136,6 +138,17 @@ export const createTrajectoryStore = () => {
     if (!s) {
       s = createTrajectory(sessionID, tier);
       store.set(sessionID, s);
+      while (store.size > MAX_SESSIONS) {
+        const oldestSessionID = store.keys().next().value;
+        if (oldestSessionID === undefined) break;
+        if (oldestSessionID === sessionID) {
+          const nextSessionID = store.keys().next().value;
+          if (nextSessionID === undefined) break;
+          store.delete(nextSessionID);
+        } else {
+          store.delete(oldestSessionID);
+        }
+      }
     }
     return s;
   };
@@ -147,6 +160,14 @@ export const createTrajectoryStore = () => {
 
     get(sessionID: string): TrajectoryState | undefined {
       return store.get(sessionID);
+    },
+
+    clear(sessionID: string): void {
+      store.delete(sessionID);
+    },
+
+    size(): number {
+      return store.size;
     },
 
     recordToolEvent(sessionID: string, event: TrajectoryToolEvent): void {
