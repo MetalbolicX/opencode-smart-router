@@ -166,11 +166,14 @@ describe("parseTaskResult", () => {
 });
 
 describe("buildDelegationDoD", () => {
-  it("an explicit [acceptance] block in the prompt wins (source=explicit)", () => {
+  it("a prompt-embedded [acceptance] block is tagged annotation (plan 048 provenance)", () => {
+    // Plan 048: only the explicit `acceptance` arg is source "explicit"; a
+    // block parsed out of prompt/description text is an embedded annotation.
+    // The gate honors both equally — this tag is provenance, not privilege.
     const dod = buildDelegationDoD({
       prompt: "do it\n[acceptance]\ncriteria: it works\n[/acceptance]",
     });
-    expect(dod.source).toBe("explicit");
+    expect(dod.source).toBe("annotation");
     expect(dod.criteria).toContain("it works");
   });
   it("the acceptance arg is parsed before the prompt", () => {
