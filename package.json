@@ -3,7 +3,10 @@
   "version": "1.11.0",
   "description": "OpenCode plugin that routes tasks to tiered subagents (fast/medium/heavy) based on complexity",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/plugin.mjs",
+  "exports": {
+    ".": "./dist/plugin.mjs"
+  },
   "scripts": {
     "build": "rm -rf dist && npm run build:tiers && npx tsc --project tsconfig.build.json && pnpm exec -- rolldown --config rolldown.config.js build",
     "build:tiers": "node --experimental-strip-types scripts/build-tiers-config.ts",
@@ -57,9 +60,10 @@
     "README.md"
   ],
   "peerDependencies": {
-    "@opencode-ai/plugin": ">=1.0.0"
+    "@opencode/plugin": ">=2.0.14"
   },
   "devDependencies": {
+    "@opencode/plugin": "2.0.14",
     "@biomejs/biome": "^2.5.14",
     "@opencode-ai/plugin": "1.18.32",
     "@types/node": "^26.6.2",

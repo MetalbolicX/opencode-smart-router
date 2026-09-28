@@ -284,10 +284,10 @@ npm install opencode-smart-router
 
 Add to `~/.config/opencode/opencode.json`:
 
-```json
+```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-smart-router"]
+  "plugins": ["opencode-smart-router"]
 }
 ```
 
@@ -303,12 +303,57 @@ This repo uses pnpm (or run `corepack enable` first).
 
 In `~/.config/opencode/opencode.json`:
 
-```json
+```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-smart-router@/absolute/path/to/opencode-smart-router"]
+  "plugins": [
+    {
+      "package": "/absolute/path/to/opencode-smart-router"
+    }
+  ]
 }
 ```
+
+The V2 package entrypoint is the built `dist/plugin.mjs` bundle. The legacy V1
+implementation is retained in `src/index.ts` for older OpenCode releases, but
+current OpenCode requires the default export to be a definition object with an
+`id` and `setup` function. Restart OpenCode after changing the plugin
+configuration or updating the package cache.
+
+When running OpenCode from this checkout, build first with `pnpm run build`.
+Then `.opencode/plugins/opencode-smart-router.ts` is the local V2 entrypoint
+and is discovered automatically. It re-exports the same built bundle used by
+the published package, so both paths avoid source-only TypeScript module
+resolution.
+
+### OpenCode V2 tier agents
+
+OpenCode V2 requires each router tier agent to be declared in OpenCode config
+before the plugin runs. V1 registered tier agents through its config hook. In
+V2, the plugin's agent transform can update existing agents, but the supported
+`AgentEditor` API has no operation to add agents. The plugin skips tiers that
+are missing, so dispatching to one can fail downstream with
+`Unknown agent: <tier>`.
+
+Declare every active tier ID as a launchable `subagent` in your OpenCode V2
+config (for example, `~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+  "agents": {
+    "fast": { "mode": "subagent" },
+    "light": { "mode": "subagent" },
+    "medium": { "mode": "subagent" },
+    "focused": { "mode": "subagent" },
+    "heavy": { "mode": "subagent" }
+  }
+}
+```
+
+These are the current tier IDs. Keep the declared IDs aligned with the tiers
+used by your selected preset and any configured tiers. The V2 plugin applies
+its tier routing settings to these predeclared agents. This requirement reflects
+the current V2 API; it may change if the API adds agent creation support.
 
 ## Testing
 
